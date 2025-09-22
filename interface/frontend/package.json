@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000",
-    "demo": "vite simple-demo.html --port 3000",
     "build": "vite build",
     "build:check": "tsc && vite build",
     "preview": "vite preview",

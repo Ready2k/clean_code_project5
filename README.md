@@ -2,36 +2,11 @@
 
 A comprehensive web-based interface for managing AI prompts across multiple providers (OpenAI, AWS Bedrock, etc.) with advanced features like AI-powered enhancement, multi-provider rendering, and collaborative workflows.
 
-## 🚀 Quick Start - Demo Mode
-
-To quickly see the UI in action, run the demo version:
-
-### Option 1: Simple Demo Script (Recommended)
-```bash
-cd interface
-./start-demo.sh
-```
-
-### Option 2: Manual Demo
-```bash
-# Navigate to the interface directory
-cd interface
-
-# Install dependencies (one-time setup)
-npm install
-
-# Start the demo UI (frontend only)
-cd frontend
-npm run demo
-```
-
-The demo will be available at: **http://localhost:3000** (or next available port)
-
-✨ **This demo shows the complete UI with mock data - no backend or database required!**
+## 🚀 Quick Start
 
 ### What You'll See
 - **Interactive Dashboard** with system metrics
-- **Prompt Library** with sample prompts you can browse and "edit"
+- **Prompt Library** with sample prompts you can browse and edit
 - **Connection Management** for AI providers
 - **User Settings** and preferences
 - **Fully responsive design** that works on mobile/tablet
@@ -102,35 +77,6 @@ Comprehensive documentation is available in the `/interface/docs` directory:
 - **[API Documentation](interface/docs/api/openapi.yaml)** - REST API specification
 - **[Troubleshooting](interface/docs/troubleshooting/README.md)** - Common issues and solutions
 
-## 🎮 Demo Features
-
-The demo mode includes:
-
-### Dashboard
-- System overview with key metrics
-- Quick access to recent prompts
-- Connection status indicators
-- Activity feed
-
-### Prompt Management
-- Browse and search prompt library
-- Create new prompts with guided wizard
-- Edit existing prompts
-- Tag-based organization
-- Rating and feedback system
-
-### LLM Connections
-- View configured AI provider connections
-- Test connection status
-- Add new connections (UI only in demo)
-- Monitor connection health
-
-### Settings & Profile
-- User preferences and configuration
-- Theme selection (light/dark mode)
-- Notification settings
-- Account management
-
 ## 🏗️ Architecture
 
 ### Frontend Stack
@@ -174,9 +120,6 @@ npm run dev:frontend
 # Backend only
 npm run dev:backend
 
-# Demo mode (frontend only with mocks)
-cd frontend && npm run demo
-
 # Build for production
 npm run build
 
@@ -211,7 +154,7 @@ npm run docker:down
 
 ## 📊 System Requirements
 
-### Minimum (Demo Mode)
+### Minimum Requirements
 - **CPU**: 2 cores, 2.0 GHz
 - **RAM**: 4 GB
 - **Storage**: 1 GB available space
@@ -239,34 +182,21 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ### Quick Troubleshooting
 
-**Frontend Demo Not Working?**
-```bash
-# Try the simple demo (no backend needed)
-cd interface/frontend
-npm install
-npm run demo
-```
-
 **Backend Errors When Running Full Dev?**
 ```bash
 # Install missing dependencies
 cd interface/backend
 npm install prom-client
-
-# Or just run frontend-only demo instead
-cd ../frontend
-npm run demo
 ```
 
 **Still Having Issues?**
 1. **Check Documentation** - Start with the [User Guide](interface/docs/user-guide/README.md)
-2. **Try Demo First** - The frontend demo works independently: `cd interface/frontend && npm run demo`
-3. **Troubleshooting Guide** - See [Troubleshooting Guide](interface/docs/troubleshooting/README.md)
-4. **Report Issues** - Use GitHub issues for bugs and feature requests
+2. **Troubleshooting Guide** - See [Troubleshooting Guide](interface/docs/troubleshooting/README.md)
+3. **Report Issues** - Use GitHub issues for bugs and feature requests
 
 ---
 
-**Ready to get started?** Try the demo: `cd interface/frontend && npm run demo` 🚀
+**Ready to get started?** Follow the setup instructions above! 🚀
 
 ## Usage
 

@@ -1,34 +1,28 @@
 #!/bin/bash
 
-echo "🔄 Prompt Library Interface Mode Switcher"
+echo "🔄 Prompt Library Interface Launcher"
 echo ""
-echo "Choose which version to run:"
+echo "Choose an option:"
 echo ""
-echo "1) Demo Mode (UI only, no backend needed)"
-echo "2) Full Version (complete app with backend & database)"
-echo "3) Status Check (see what's available)"
+echo "1) Full Version (complete app with backend & database)"
+echo "2) Status Check (see what's available)"
 echo ""
-read -p "Enter your choice (1-3): " choice
+read -p "Enter your choice (1-2): " choice
 
 case $choice in
     1)
         echo ""
-        echo "🎮 Starting Demo Mode..."
-        ./start-demo.sh
-        ;;
-    2)
-        echo ""
         echo "🚀 Starting Full Version..."
         ./start-real.sh
         ;;
-    3)
+    2)
         echo ""
         echo "🔍 Checking System Status..."
         ./check-status.sh
         ;;
     *)
         echo ""
-        echo "❌ Invalid choice. Please run the script again and choose 1, 2, or 3."
+        echo "❌ Invalid choice. Please run the script again and choose 1 or 2."
         exit 1
         ;;
 esac

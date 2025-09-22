@@ -67,7 +67,6 @@ else
 fi
 
 echo ""
-echo "🚀 Ready to start! Use one of these commands:"
-echo "   ./start-demo.sh    - Demo mode (no backend needed)"
+echo "🚀 Ready to start! Use this command:"
 echo "   ./start-real.sh    - Full application with backend"
 echo ""

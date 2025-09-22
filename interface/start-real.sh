@@ -17,9 +17,8 @@ if ! command -v docker &> /dev/null; then
     echo "❌ Docker is not installed or not running."
     echo "   The full version requires Docker for database services."
     echo ""
-    echo "💡 Options:"
+    echo "💡 Option:"
     echo "   1. Install Docker: https://docs.docker.com/get-docker/"
-    echo "   2. Use demo mode instead: ./start-demo.sh"
     exit 1
 fi
 
