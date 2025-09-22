@@ -1,0 +1,1325 @@
+openapi: 3.0.3
+info:
+  title: Prompt Library Professional Interface API
+  description: |
+    RESTful API for the Prompt Library Professional Interface, providing comprehensive 
+    management of LLM connections, prompt lifecycle management, and user administration.
+    
+    ## Authentication
+    This API uses JWT Bearer tokens for authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Rate Limiting
+    API requests are limited to 100 requests per 15-minute window per IP address.
+    
+    ## Error Handling
+    All errors follow a consistent format with appropriate HTTP status codes and detailed error messages.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@promptlibrary.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+  - url: https://api.promptlibrary.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with username/email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username or email address
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  description: User password
+                  example: securePassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate current session and JWT token
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh JWT token
+      description: Get a new JWT token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  description: Valid refresh token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user info
+      description: Retrieve information about the currently authenticated user
+      responses:
+        '200':
+          description: User information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Prompt Management Endpoints
+  /prompts:
+    get:
+      tags:
+        - Prompts
+      summary: List prompts
+      description: Retrieve a paginated list of prompts with optional filtering
+      parameters:
+        - name: search
+          in: query
+          description: Search term for prompt title or content
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: Filter by tags (comma-separated)
+          schema:
+            type: string
+        - name: owner
+          in: query
+          description: Filter by owner username
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by prompt status
+          schema:
+            type: string
+            enum: [draft, published, archived]
+        - name: minRating
+          in: query
+          description: Minimum rating filter
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+        - name: maxRating
+          in: query
+          description: Maximum rating filter
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [title, created_at, updated_at, rating]
+            default: updated_at
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Prompts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PromptRecord'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Prompts
+      summary: Create new prompt
+      description: Create a new prompt with metadata and human-readable content
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromptRequest'
+      responses:
+        '201':
+          description: Prompt created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptRecord'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /prompts/{id}:
+    get:
+      tags:
+        - Prompts
+      summary: Get prompt by ID
+      description: Retrieve detailed information about a specific prompt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Prompt retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptRecord'
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Prompts
+      summary: Update prompt
+      description: Update an existing prompt's metadata or content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromptRequest'
+      responses:
+        '200':
+          description: Prompt updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptRecord'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Prompts
+      summary: Delete prompt
+      description: Delete a prompt (archives it, doesn't permanently delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Prompt deleted successfully
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /prompts/{id}/enhance:
+    post:
+      tags:
+        - Prompts
+      summary: Enhance prompt with AI
+      description: Use AI to enhance and improve a prompt's structure and content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  description: LLM provider to use for enhancement
+                  example: openai
+                model:
+                  type: string
+                  description: Specific model to use
+                  example: gpt-4
+                options:
+                  type: object
+                  description: Additional enhancement options
+      responses:
+        '200':
+          description: Enhancement completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancementResult'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Enhancement service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /prompts/{id}/render/{provider}:
+    post:
+      tags:
+        - Prompts
+      summary: Render prompt for provider
+      description: Generate provider-specific formatted output for a prompt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+        - name: provider
+          in: path
+          required: true
+          description: Target provider (openai, bedrock, etc.)
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  description: Target model for rendering
+                  example: gpt-4
+                variables:
+                  type: object
+                  description: Variable values for substitution
+                  additionalProperties:
+                    type: string
+                options:
+                  type: object
+                  description: Rendering options (temperature, etc.)
+      responses:
+        '200':
+          description: Prompt rendered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderPayload'
+        '400':
+          description: Invalid request data or missing variables
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /prompts/{id}/rate:
+    post:
+      tags:
+        - Prompts
+      summary: Rate a prompt
+      description: Submit a rating and optional feedback for a prompt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prompt ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - score
+              properties:
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Rating score (1-5 stars)
+                note:
+                  type: string
+                  description: Optional feedback note
+                  maxLength: 1000
+      responses:
+        '201':
+          description: Rating submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+        '400':
+          description: Invalid rating data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Connection Management Endpoints
+  /connections:
+    get:
+      tags:
+        - Connections
+      summary: List LLM connections
+      description: Retrieve all configured LLM provider connections
+      responses:
+        '200':
+          description: Connections retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LLMConnection'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Connections
+      summary: Create new connection
+      description: Add a new LLM provider connection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectionRequest'
+      responses:
+        '201':
+          description: Connection created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMConnection'
+        '400':
+          description: Invalid connection data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /connections/{id}:
+    get:
+      tags:
+        - Connections
+      summary: Get connection by ID
+      description: Retrieve details of a specific connection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMConnection'
+        '404':
+          description: Connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Connections
+      summary: Update connection
+      description: Update an existing LLM connection configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConnectionRequest'
+      responses:
+        '200':
+          description: Connection updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMConnection'
+        '400':
+          description: Invalid connection data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Connections
+      summary: Delete connection
+      description: Remove an LLM connection configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Connection deleted successfully
+        '404':
+          description: Connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /connections/{id}/test:
+    post:
+      tags:
+        - Connections
+      summary: Test connection
+      description: Test connectivity and validate credentials for an LLM connection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResult'
+        '404':
+          description: Connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # System Endpoints
+  /system/status:
+    get:
+      tags:
+        - System
+      summary: Get system status
+      description: Retrieve overall system health and service status
+      responses:
+        '200':
+          description: System status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /system/stats:
+    get:
+      tags:
+        - System
+      summary: Get system statistics
+      description: Retrieve system usage statistics and metrics
+      responses:
+        '200':
+          description: System statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStats'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /system/health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Simple health check endpoint for monitoring
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Authentication Schemas
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: Refresh token for getting new access tokens
+        user:
+          $ref: '#/components/schemas/User'
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+        username:
+          type: string
+          description: Username
+        email:
+          type: string
+          format: email
+          description: User email address
+        role:
+          type: string
+          enum: [admin, user, viewer]
+          description: User role
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        lastLogin:
+          type: string
+          format: date-time
+          description: Last login timestamp
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+
+    UserPreferences:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+          description: UI theme preference
+        language:
+          type: string
+          description: Language preference
+        defaultProvider:
+          type: string
+          description: Default LLM provider
+        notifications:
+          type: object
+          description: Notification settings
+
+    # Prompt Schemas
+    PromptRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique prompt identifier
+        metadata:
+          $ref: '#/components/schemas/PromptMetadata'
+        humanPrompt:
+          $ref: '#/components/schemas/HumanPrompt'
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variable'
+        ratings:
+          type: object
+          properties:
+            average:
+              type: number
+              minimum: 1
+              maximum: 5
+            count:
+              type: integer
+              minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        owner:
+          type: string
+          description: Username of prompt owner
+
+    PromptMetadata:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Prompt title
+        summary:
+          type: string
+          description: Brief description of the prompt
+        tags:
+          type: array
+          items:
+            type: string
+          description: Categorization tags
+        status:
+          type: string
+          enum: [draft, published, archived]
+          description: Prompt status
+
+    HumanPrompt:
+      type: object
+      properties:
+        goal:
+          type: string
+          description: What the prompt aims to achieve
+        audience:
+          type: string
+          description: Target audience for the prompt
+        steps:
+          type: array
+          items:
+            type: string
+          description: Step-by-step instructions
+        outputExpectations:
+          type: string
+          description: Expected output format and content
+
+    Variable:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Variable name
+        description:
+          type: string
+          description: Variable description
+        type:
+          type: string
+          enum: [string, number, boolean, array]
+          description: Variable data type
+        required:
+          type: boolean
+          description: Whether variable is required
+        defaultValue:
+          description: Default value for the variable
+
+    CreatePromptRequest:
+      type: object
+      required:
+        - metadata
+        - humanPrompt
+      properties:
+        metadata:
+          $ref: '#/components/schemas/PromptMetadata'
+        humanPrompt:
+          $ref: '#/components/schemas/HumanPrompt'
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variable'
+
+    UpdatePromptRequest:
+      type: object
+      properties:
+        metadata:
+          $ref: '#/components/schemas/PromptMetadata'
+        humanPrompt:
+          $ref: '#/components/schemas/HumanPrompt'
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variable'
+
+    # Enhancement Schemas
+    EnhancementResult:
+      type: object
+      properties:
+        enhancedPrompt:
+          $ref: '#/components/schemas/PromptRecord'
+        rationale:
+          type: string
+          description: Explanation of enhancements made
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Confidence score for enhancements
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+              type:
+                type: string
+              required:
+                type: boolean
+
+    # Rendering Schemas
+    ProviderPayload:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Target provider name
+        model:
+          type: string
+          description: Target model name
+        payload:
+          description: Provider-specific formatted prompt
+        metadata:
+          type: object
+          description: Additional rendering metadata
+
+    # Connection Schemas
+    LLMConnection:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique connection identifier
+        name:
+          type: string
+          description: Human-readable connection name
+        provider:
+          type: string
+          enum: [openai, bedrock]
+          description: LLM provider type
+        status:
+          type: string
+          enum: [active, inactive, error]
+          description: Connection status
+        config:
+          description: Provider-specific configuration (sensitive data masked)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastTested:
+          type: string
+          format: date-time
+
+    CreateConnectionRequest:
+      type: object
+      required:
+        - name
+        - provider
+        - config
+      properties:
+        name:
+          type: string
+          description: Human-readable connection name
+        provider:
+          type: string
+          enum: [openai, bedrock]
+          description: LLM provider type
+        config:
+          description: Provider-specific configuration
+
+    UpdateConnectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable connection name
+        config:
+          description: Provider-specific configuration
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the test was successful
+        latency:
+          type: number
+          description: Response latency in milliseconds
+        error:
+          type: string
+          description: Error message if test failed
+        availableModels:
+          type: array
+          items:
+            type: string
+          description: List of available models
+        testedAt:
+          type: string
+          format: date-time
+
+    # Rating Schemas
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique rating identifier
+        promptId:
+          type: string
+          description: ID of rated prompt
+        userId:
+          type: string
+          description: ID of user who submitted rating
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Rating score
+        note:
+          type: string
+          description: Optional feedback note
+        createdAt:
+          type: string
+          format: date-time
+
+    # System Schemas
+    SystemStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, down]
+          description: Overall system status
+        services:
+          type: object
+          properties:
+            api:
+              $ref: '#/components/schemas/ServiceStatus'
+            database:
+              $ref: '#/components/schemas/ServiceStatus'
+            storage:
+              $ref: '#/components/schemas/ServiceStatus'
+            llm:
+              $ref: '#/components/schemas/ServiceStatus'
+        uptime:
+          type: number
+          description: System uptime in seconds
+        version:
+          type: string
+          description: Application version
+
+    ServiceStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [up, down, degraded]
+          description: Service status
+        responseTime:
+          type: number
+          description: Service response time in milliseconds
+        error:
+          type: string
+          description: Error message if service is down
+
+    SystemStats:
+      type: object
+      properties:
+        prompts:
+          type: object
+          properties:
+            total:
+              type: integer
+            published:
+              type: integer
+            drafts:
+              type: integer
+        users:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+        connections:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+        storage:
+          type: object
+          properties:
+            used:
+              type: number
+              description: Used storage in bytes
+            available:
+              type: number
+              description: Available storage in bytes
+
+    # Pagination Schema
+    PaginationInfo:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Items per page
+        total:
+          type: integer
+          description: Total number of items
+        totalPages:
+          type: integer
+          description: Total number of pages
+        hasNext:
+          type: boolean
+          description: Whether there are more pages
+        hasPrev:
+          type: boolean
+          description: Whether there are previous pages
+
+    # Error Schema
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+        requestId:
+          type: string
+          description: Unique request identifier for debugging
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Prompts
+    description: Prompt library management operations
+  - name: Connections
+    description: LLM provider connection management
+  - name: System
+    description: System status and administration

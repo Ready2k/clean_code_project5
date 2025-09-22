@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - prompt-library
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-change-in-production}
+      - JWT_EXPIRES_IN=24h
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/promptlib
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-encryption-key-change-in-production}
+      - STORAGE_DIR=/app/data
+      - LOG_LEVEL=info
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - prompt_data:/app/data
+      - ../src:/app/prompt-library/src:ro
+    networks:
+      - prompt-library
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - prompt-library
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=promptlib
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - prompt-library
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - prompt-library
+
+volumes:
+  prompt_data:
+  redis_data:
+  postgres_data:
+
+networks:
+  prompt-library:
+    driver: bridge

@@ -1,0 +1,33 @@
+{
+  "logging": {
+    "level": "debug",
+    "enableFileLogging": true,
+    "maxLogFiles": 10,
+    "maxLogSize": "10MB"
+  },
+  "performance": {
+    "requestTimeout": 30000,
+    "maxConcurrentRequests": 100,
+    "rateLimitWindow": 900000,
+    "rateLimitMax": 100
+  },
+  "storage": {
+    "dataDirectory": "/Users/jamescregeen/clean_code_project5/interface/backend/data",
+    "backupDirectory": "/Users/jamescregeen/clean_code_project5/interface/backend/backups",
+    "maxBackups": 10,
+    "autoBackupInterval": 86400000
+  },
+  "security": {
+    "jwtExpiresIn": "1h",
+    "refreshTokenExpiresIn": "7d",
+    "passwordMinLength": 8,
+    "maxLoginAttempts": 5,
+    "lockoutDuration": 900000
+  },
+  "features": {
+    "enableEnhancement": true,
+    "enableRating": true,
+    "enableExport": true,
+    "enableMetrics": true
+  }
+}

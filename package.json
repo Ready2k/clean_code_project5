@@ -1,0 +1,42 @@
+{
+  "name": "prompt-library",
+  "version": "1.0.0",
+  "description": "Universal, provider-agnostic prompt management system",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "prompt",
+    "ai",
+    "llm",
+    "openai",
+    "anthropic",
+    "meta",
+    "prompt-engineering"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "chokidar": "^3.5.0",
+    "uuid": "^9.0.1",
+    "yaml": "^2.8.1"
+  }
+}
