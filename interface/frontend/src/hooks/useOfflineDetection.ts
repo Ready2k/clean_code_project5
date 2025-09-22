@@ -15,7 +15,7 @@ interface OfflineDetectionConfig {
 }
 
 const DEFAULT_CONFIG: Required<OfflineDetectionConfig> = {
-  checkInterval: 30000, // 30 seconds
+  checkInterval: 60000, // 1 minute (reduced frequency)
   pingUrl: '/api/health',
   timeout: 5000 // 5 seconds
 };

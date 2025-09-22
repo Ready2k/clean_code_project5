@@ -2,7 +2,8 @@ import { logger } from '../utils/logger.js';
 
 export class MockRedisService {
   private data: Map<string, { value: string; expiry?: number }> = new Map();
-  private isConnected = false;
+  public isConnected = false;
+  public client: any = null; // Mock client property to match RedisService interface
 
   constructor() {
     // Mock constructor
@@ -134,7 +135,7 @@ export class MockRedisService {
     return this.isConnected;
   }
 
-  private ensureConnected(): void {
+  public ensureConnected(): void {
     if (!this.isConnected) {
       throw new Error('Mock Redis service not connected');
     }

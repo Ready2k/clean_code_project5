@@ -49,7 +49,10 @@ describe('Prompt API Integration Tests', () => {
         goal: 'Test the prompt API',
         audience: 'Developers',
         steps: ['Step 1', 'Step 2'],
-        outputExpectations: 'Successful API response',
+        output_expectations: {
+          format: 'Successful API response',
+          fields: [],
+        },
       },
       variables: [],
     };

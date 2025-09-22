@@ -225,18 +225,28 @@ export const AdminPage: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    // Auto-refresh system data every 30 seconds
+    // Auto-refresh system data every 2 minutes (reduced frequency)
     const interval = setInterval(() => {
-      if (activeTab === 0) { // Only refresh if on system status tab
+      if (activeTab === 0 && !isLoadingSystem) { // Only refresh if on system status tab and not already loading
         loadSystemData();
       }
-    }, 30000);
+    }, 120000); // 2 minutes instead of 30 seconds
 
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, [activeTab, isLoadingSystem]);
 
-  // System data loading functions
+  // System data loading functions with debouncing
+  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
+  
   const loadSystemData = async () => {
+    // Debounce: don't allow calls more frequent than every 10 seconds
+    const now = Date.now();
+    if (now - lastLoadTime < 10000) {
+      console.log('Skipping system data load due to debouncing');
+      return;
+    }
+    
+    setLastLoadTime(now);
     setIsLoadingSystem(true);
     setSystemError(null);
     
@@ -256,7 +266,7 @@ export const AdminPage: React.FC = () => {
       setSystemLogs(logs.logs || []);
     } catch (error) {
       setSystemError('Failed to load system data');
-      console.error('Failed to load system data:', error);
+      console.error('Failed to load system data:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoadingSystem(false);
     }
@@ -651,7 +661,7 @@ export const AdminPage: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h6" color="primary">
-                    {users.filter(u => u.role === 'admin').length}
+                    {(users || []).filter(u => u.role === 'admin').length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Administrators
@@ -663,7 +673,7 @@ export const AdminPage: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h6" color="primary">
-                    {users.filter(u => u.role === 'user').length}
+                    {(users || []).filter(u => u.role === 'user').length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Users
@@ -675,7 +685,7 @@ export const AdminPage: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h6" color="primary">
-                    {users.filter(u => u.role === 'viewer').length}
+                    {(users || []).filter(u => u.role === 'viewer').length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Viewers
@@ -687,7 +697,7 @@ export const AdminPage: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h6" color="success.main">
-                    {users.filter(u => (u.status || 'active') === 'active').length}
+                    {(users || []).filter(u => (u.status || 'active') === 'active').length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Active Users
@@ -714,7 +724,7 @@ export const AdminPage: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {users.map((user) => (
+                    {(users || []).map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.email}</TableCell>

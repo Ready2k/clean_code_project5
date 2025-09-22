@@ -114,7 +114,10 @@ const createTestStore = (initialState = {}) => {
               goal: 'Test goal',
               audience: 'Test audience',
               steps: ['Step 1'],
-              outputExpectations: 'Test output',
+              output_expectations: {
+                format: 'Test output',
+                fields: [],
+              },
             },
             variables: [],
             status: 'active' as const,

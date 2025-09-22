@@ -203,8 +203,23 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
       // Get current user
+      .addCase(getCurrentUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
       .addCase(getCurrentUser.fulfilled, (state, action) => {
+        state.isLoading = false;
         state.user = action.payload;
+        state.error = null;
+      })
+      .addCase(getCurrentUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        // Clear invalid token
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        localStorage.removeItem('token');
       })
       // Register
       .addCase(register.pending, (state) => {

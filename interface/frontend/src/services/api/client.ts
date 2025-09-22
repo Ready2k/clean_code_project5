@@ -4,6 +4,7 @@ import { clearCredentials, refreshToken } from '../../store/slices/authSlice';
 import { addNotification } from '../../store/slices/uiSlice';
 import { AppError, ErrorType } from '../../types/errors';
 import { globalRetryMechanism } from '../../utils/retryMechanism';
+import { rateLimitTracker } from '../../utils/rateLimitTracker';
 import { ErrorHandler } from '../../utils/errorHandler';
 
 interface RequestConfig extends AxiosRequestConfig {
@@ -39,6 +40,18 @@ class APIClientClass {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
+        // Check if endpoint is rate limited
+        const endpoint = config.url || '';
+        if (rateLimitTracker.isRateLimited(endpoint)) {
+          const error = new AppError(
+            ErrorType.RATE_LIMIT_ERROR,
+            'Request blocked due to rate limiting',
+            'RATE_LIMITED',
+            { endpoint }
+          );
+          return Promise.reject(error);
+        }
+        
         // Add request ID for tracking
         config.headers['X-Request-ID'] = this.generateRequestId();
         
@@ -75,13 +88,16 @@ class APIClientClass {
         const appError = this.createAppError(error);
         
         // Log error details
-        console.error('API Error:', {
-          url: error.config?.url,
-          method: error.config?.method,
-          status: error.response?.status,
-          message: appError.message,
-          requestId: error.config?.headers?.['X-Request-ID']
-        });
+        if (import.meta.env?.DEV) {
+          console.error('API Error:', {
+            url: error.config?.url,
+            method: error.config?.method,
+            status: error.response?.status,
+            message: appError.message,
+            requestId: error.config?.headers?.['X-Request-ID'],
+            data: error.response?.data
+          });
+        }
 
         // Handle authentication errors with token refresh
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -101,6 +117,12 @@ class APIClientClass {
             await this.handleAuthenticationError();
             return Promise.reject(appError);
           }
+        }
+
+        // Track rate limits
+        if (error.response?.status === 429) {
+          const endpoint = error.config?.url || '';
+          rateLimitTracker.setRateLimited(endpoint, 60000); // Block for 1 minute
         }
 
         // Handle errors with notifications (unless skipped)
@@ -177,11 +199,15 @@ class APIClientClass {
         break;
     }
 
+    // Ensure message is a string
+    const messageStr = typeof message === 'string' ? message : String(message);
+    const actionableStr = typeof actionableMessage === 'string' ? actionableMessage : String(actionableMessage);
+    
     store.dispatch(addNotification({
       id: `api-error-${Date.now()}`,
       type: notificationType,
       title: this.getErrorTitle(error.type),
-      message: `${message} ${actionableMessage}`,
+      message: `${messageStr} ${actionableStr}`.trim(),
       timestamp: new Date().toISOString(),
       autoHide: error.type !== ErrorType.AUTHENTICATION_ERROR,
       duration: 8000,

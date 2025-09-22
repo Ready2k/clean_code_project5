@@ -34,6 +34,9 @@ export class ConnectionStorageService {
       // Load existing connections
       await this.loadConnections();
       
+      // Clean up any connections that cannot be decrypted
+      await this.cleanupCorruptedConnections();
+      
       logger.info('Connection storage service initialized', {
         storageDir: this.storageDir,
         connectionsCount: this.connections.size
@@ -50,6 +53,14 @@ export class ConnectionStorageService {
   private async loadConnections(): Promise<void> {
     try {
       const data = await fs.readFile(this.connectionsFile, 'utf-8');
+      
+      // Handle empty file or whitespace-only content
+      if (!data.trim()) {
+        logger.info('Connections file is empty, starting with empty storage');
+        this.connections.clear();
+        return;
+      }
+      
       const connectionsArray: ConnectionRecord[] = JSON.parse(data);
       
       this.connections.clear();
@@ -70,6 +81,19 @@ export class ConnectionStorageService {
         // File doesn't exist yet, start with empty connections
         logger.info('No existing connections file found, starting with empty storage');
         this.connections.clear();
+      } else if (error instanceof SyntaxError) {
+        // JSON parsing error - file is corrupted
+        logger.warn('Connections file contains invalid JSON, starting with empty storage and backing up corrupted file');
+        this.connections.clear();
+        
+        // Backup the corrupted file
+        try {
+          const backupFile = `${this.connectionsFile}.corrupted.${Date.now()}`;
+          await fs.rename(this.connectionsFile, backupFile);
+          logger.info(`Corrupted connections file backed up to: ${backupFile}`);
+        } catch (backupError) {
+          logger.error('Failed to backup corrupted connections file:', backupError);
+        }
       } else {
         logger.error('Failed to load connections:', error);
         throw error;
@@ -147,13 +171,47 @@ export class ConnectionStorageService {
    */
   public async getConnections(userId: string): Promise<LLMConnection[]> {
     try {
-      const userConnections = Array.from(this.connections.values())
-        .filter(conn => conn.user_id === userId)
-        .map(record => this.recordToConnection(record));
+      const userConnections: LLMConnection[] = [];
+      
+      for (const record of this.connections.values()) {
+        if (record.user_id === userId) {
+          try {
+            const connection = this.recordToConnection(record);
+            userConnections.push(connection);
+          } catch (decryptError) {
+            logger.warn(`Failed to decrypt connection ${record.id} for user ${userId}, skipping:`, decryptError);
+            // Continue processing other connections instead of failing completely
+          }
+        }
+      }
 
       return userConnections;
     } catch (error) {
       logger.error('Failed to get connections:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all connections across all users (for system monitoring)
+   */
+  public async getAllConnections(): Promise<LLMConnection[]> {
+    try {
+      const allConnections: LLMConnection[] = [];
+      
+      for (const record of this.connections.values()) {
+        try {
+          const connection = this.recordToConnection(record);
+          allConnections.push(connection);
+        } catch (decryptError) {
+          logger.warn(`Failed to decrypt connection ${record.id}, skipping:`, decryptError);
+          // Continue processing other connections instead of failing completely
+        }
+      }
+
+      return allConnections;
+    } catch (error) {
+      logger.error('Failed to get all connections:', error);
       throw error;
     }
   }
@@ -376,6 +434,36 @@ export class ConnectionStorageService {
       .filter(conn => conn.status === 'active').length;
 
     return { totalConnections, activeConnections };
+  }
+
+  /**
+   * Clean up connections that cannot be decrypted
+   */
+  public async cleanupCorruptedConnections(): Promise<void> {
+    try {
+      const corruptedIds: string[] = [];
+      
+      for (const [id, record] of this.connections.entries()) {
+        try {
+          // Try to decrypt the connection
+          EncryptionService.decryptConfig(record.encrypted_config);
+        } catch (decryptError) {
+          logger.warn(`Connection ${id} cannot be decrypted, marking for removal:`, decryptError);
+          corruptedIds.push(id);
+        }
+      }
+      
+      if (corruptedIds.length > 0) {
+        for (const id of corruptedIds) {
+          this.connections.delete(id);
+        }
+        
+        await this.saveConnections();
+        logger.info(`Cleaned up ${corruptedIds.length} corrupted connections`);
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup corrupted connections:', error);
+    }
   }
 
   /**

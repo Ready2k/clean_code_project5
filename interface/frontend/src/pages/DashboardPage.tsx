@@ -58,9 +58,9 @@ export const DashboardPage: React.FC = () => {
   }, [dispatch]);
 
   // Calculate statistics
-  const totalPrompts = systemStats?.services?.prompts?.total || pagination.total || 0;
-  const activeConnections = connections.filter(conn => conn.status === 'active').length;
-  const averageRating = prompts.length > 0 
+  const totalPrompts = systemStats?.services?.prompts?.total || pagination?.total || 0;
+  const activeConnections = (connections || []).filter(conn => conn.status === 'active').length;
+  const averageRating = prompts && prompts.length > 0 
     ? prompts.reduce((sum, prompt) => sum + (prompt.averageRating || 0), 0) / prompts.length 
     : 0;
 
@@ -69,9 +69,9 @@ export const DashboardPage: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Box mb={4}>
-        <Typography variant="h4" component="h1" gutterBottom>
+    <Box sx={{ py: 1 }}>
+      <Box mb={2}>
+        <Typography variant="h4" component="h1" sx={{ mb: 0.5 }}>
           Dashboard
         </Typography>
         <Typography variant="body1" color="textSecondary">
@@ -80,7 +80,7 @@ export const DashboardPage: React.FC = () => {
       </Box>
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} mb={4}>
+      <Grid container spacing={2} mb={2}>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Prompts"
@@ -105,7 +105,7 @@ export const DashboardPage: React.FC = () => {
           <StatCard
             title="Active Connections"
             value={activeConnections}
-            subtitle={`${connections.length} total configured`}
+            subtitle={`${(connections || []).length} total configured`}
             icon={<CloudUploadIcon />}
             color="secondary"
             isLoading={connectionsLoading}
@@ -142,13 +142,13 @@ export const DashboardPage: React.FC = () => {
       </Grid>
 
       {/* Additional Stats Row (Desktop) */}
-      {!isMobile && systemStats && (
-        <Grid container spacing={3} mb={4}>
+      {!isMobile && (
+        <Grid container spacing={2} mb={2}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Active Users"
-              value={users.filter(u => (u.status || 'active') === 'active').length}
-              subtitle={`${users.length} total users`}
+              value={(users || []).filter(u => (u.status || 'active') === 'active').length}
+              subtitle={`${(users || []).length} total users`}
               icon={<PeopleIcon />}
               color="info"
             />
@@ -173,7 +173,7 @@ export const DashboardPage: React.FC = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Avg Response Time"
-              value={`${systemStats.performance?.averageResponseTime || 0}ms`}
+              value={`${systemStats?.performance?.averageResponseTime || 0}ms`}
               subtitle="API performance"
               icon={<SpeedIcon />}
               color="primary"
@@ -183,13 +183,13 @@ export const DashboardPage: React.FC = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Error Rate"
-              value={`${systemStats.performance?.errorRate || 0}%`}
+              value={`${systemStats?.performance?.errorRate || 0}%`}
               subtitle="Last 24 hours"
               icon={<SpeedIcon />}
               color={
-                (systemStats.performance?.errorRate || 0) > 5
+                (systemStats?.performance?.errorRate || 0) > 5
                   ? 'error'
-                  : (systemStats.performance?.errorRate || 0) > 2
+                  : (systemStats?.performance?.errorRate || 0) > 2
                   ? 'warning'
                   : 'success'
               }
@@ -199,10 +199,10 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Main Content Grid */}
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {/* Left Column */}
         <Grid item xs={12} lg={8}>
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             {/* Quick Actions */}
             <Grid item xs={12}>
               <QuickActions />
@@ -230,6 +230,6 @@ export const DashboardPage: React.FC = () => {
           <RealTimeActivityFeed />
         </Grid>
       </Grid>
-    </Container>
+    </Box>
   );
 };

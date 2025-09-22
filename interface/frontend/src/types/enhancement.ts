@@ -23,7 +23,10 @@ export interface EnhancementResult {
       goal: string;
       audience: string;
       steps: string[];
-      outputExpectations: string;
+      output_expectations: {
+        format: string;
+        fields: string[];
+      };
       examples?: string[];
     };
     structuredPrompt?: {

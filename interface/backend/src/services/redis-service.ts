@@ -3,8 +3,8 @@ import { logger } from '../utils/logger.js';
 import { ServiceUnavailableError } from '../types/errors.js';
 
 export class RedisService {
-  private client: RedisClientType;
-  private isConnected = false;
+  public client: RedisClientType;
+  public isConnected = false;
 
   constructor() {
     const redisUrl = process.env['REDIS_URL'] || 'redis://localhost:6379';
@@ -120,7 +120,7 @@ export class RedisService {
     this.ensureConnected();
     try {
       const result = await this.client.expire(key, seconds);
-      return result === 1;
+      return Boolean(result);
     } catch (error) {
       logger.error('Redis EXPIRE error:', { key, seconds, error });
       throw new ServiceUnavailableError('Redis operation failed');
@@ -172,7 +172,7 @@ export class RedisService {
     return this.isConnected;
   }
 
-  private ensureConnected(): void {
+  public ensureConnected(): void {
     if (!this.isConnected) {
       throw new ServiceUnavailableError('Redis service not connected');
     }

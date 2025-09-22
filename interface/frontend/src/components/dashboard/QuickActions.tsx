@@ -92,8 +92,8 @@ export const QuickActions: React.FC = () => {
 
   return (
     <Card>
-      <CardHeader title="Quick Actions" />
-      <CardContent>
+      <CardHeader title="Quick Actions" sx={{ pb: 0.5 }} />
+      <CardContent sx={{ pt: 1 }}>
         <Grid container spacing={2}>
           {actions.map((action) => (
             <Grid item xs={12} sm={6} md={4} key={action.id}>
@@ -104,30 +104,36 @@ export const QuickActions: React.FC = () => {
                 disabled={action.disabled}
                 onClick={() => handleActionClick(action)}
                 sx={{
-                  height: 80,
+                  height: 100,
                   flexDirection: 'column',
                   gap: 1,
                   textTransform: 'none',
+                  p: 2,
                   '&:hover': {
                     backgroundColor: action.disabled ? 'transparent' : `${action.color}.light`,
                     opacity: action.disabled ? 0.6 : 1,
                   },
                 }}
               >
-                <Box color={action.disabled ? 'text.disabled' : `${action.color}.main`}>
+                <Box 
+                  color={action.disabled ? 'text.disabled' : `${action.color}.main`}
+                  sx={{ mb: 1 }}
+                >
                   {action.icon}
                 </Box>
-                <Box textAlign="center">
+                <Box textAlign="center" sx={{ width: '100%' }}>
                   <Typography
                     variant="body2"
                     fontWeight="medium"
                     color={action.disabled ? 'text.disabled' : 'text.primary'}
+                    sx={{ mb: 0.5, lineHeight: 1.2 }}
                   >
                     {action.title}
                   </Typography>
                   <Typography
                     variant="caption"
                     color={action.disabled ? 'text.disabled' : 'text.secondary'}
+                    sx={{ lineHeight: 1.2, display: 'block' }}
                   >
                     {action.description}
                   </Typography>

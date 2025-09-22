@@ -4,7 +4,7 @@ import { RefreshOutlined } from '@mui/icons-material';
 import { APIError, AppError, ErrorType } from '../types/errors';
 import { ErrorHandler } from '../utils/errorHandler';
 import { OfflineIndicator } from '../components/common/OfflineIndicator';
-import { useOfflineDetection } from '../hooks/useOfflineDetection';
+import { useOfflineContext } from '../contexts/OfflineContext';
 
 interface ErrorContextType {
   showError: (error: AppError | Error) => void;
@@ -22,7 +22,7 @@ interface ErrorProviderProps {
 export function ErrorProvider({ children }: ErrorProviderProps) {
   const [currentError, setCurrentError] = useState<APIError | null>(null);
   const [errorQueue, setErrorQueue] = useState<APIError[]>([]);
-  const { isOffline } = useOfflineDetection();
+  const { isOffline } = useOfflineContext();
 
   const showError = useCallback((error: AppError | Error) => {
     const apiError = ErrorHandler.handle(error);

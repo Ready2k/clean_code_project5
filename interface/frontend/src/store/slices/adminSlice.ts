@@ -121,6 +121,7 @@ const adminSlice = createSlice({
       })
       .addCase(createUser.fulfilled, (state, action) => {
         state.isLoading = false;
+        if (!state.users) state.users = [];
         state.users.push(action.payload);
         state.error = null;
       })
@@ -135,6 +136,7 @@ const adminSlice = createSlice({
       })
       .addCase(updateUser.fulfilled, (state, action) => {
         state.isLoading = false;
+        if (!state.users) state.users = [];
         const index = state.users.findIndex(user => user.id === action.payload.id);
         if (index !== -1) {
           state.users[index] = action.payload;
@@ -152,6 +154,7 @@ const adminSlice = createSlice({
       })
       .addCase(deleteUser.fulfilled, (state, action) => {
         state.isLoading = false;
+        if (!state.users) state.users = [];
         state.users = state.users.filter(user => user.id !== action.payload);
         state.error = null;
       })
@@ -166,6 +169,7 @@ const adminSlice = createSlice({
       })
       .addCase(toggleUserStatus.fulfilled, (state, action) => {
         state.isLoading = false;
+        if (!state.users) state.users = [];
         const index = state.users.findIndex(user => user.id === action.payload.id);
         if (index !== -1) {
           state.users[index] = action.payload;

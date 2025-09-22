@@ -84,12 +84,12 @@ export interface SystemMetrics {
 export const systemAPI = {
   async getSystemStatus(): Promise<SystemStatus> {
     const response = await apiClient.get('/system/status');
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async getSystemStats(): Promise<SystemStats> {
     const response = await apiClient.get('/system/stats');
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async getSystemHealth(): Promise<any> {
@@ -112,7 +112,7 @@ export const systemAPI = {
     limit?: number;
     offset?: number;
   }): Promise<{ logs: SystemLog[]; total: number }> {
-    const response = await apiClient.get('/system/logs', { params });
+    const response = await apiClient.get('/system/maintenance/logs', { params });
     return response.data;
   },
 

@@ -125,7 +125,7 @@ export const ConnectionsPage: React.FC = () => {
   const handleTestAllConnections = async () => {
     try {
       // Test all connections in parallel
-      const testPromises = connections.map(connection => 
+      const testPromises = (connections || []).map(connection => 
         dispatch(testConnection(connection.id))
       );
       
@@ -212,7 +212,7 @@ export const ConnectionsPage: React.FC = () => {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          {connections.length > 0 && (
+          {(connections || []).length > 0 && (
             <Button
               variant="outlined"
               startIcon={<TestIcon />}
@@ -234,11 +234,11 @@ export const ConnectionsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {isLoading && connections.length === 0 ? (
+      {isLoading && (connections || []).length === 0 ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : connections.length === 0 ? (
+      ) : (connections || []).length === 0 ? (
         <Card sx={{ textAlign: 'center', py: 4 }}>
           <CardContent>
             <Typography variant="h6" color="textSecondary" gutterBottom>
@@ -258,7 +258,7 @@ export const ConnectionsPage: React.FC = () => {
         </Card>
       ) : (
         <Grid container spacing={3}>
-          {connections.map((connection) => (
+          {(connections || []).map((connection) => (
             <Grid item xs={12} md={6} lg={4} key={connection.id}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1 }}>

@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     // In production, send to error tracking service
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       // Example: Sentry.captureException(error, { contexts: { react: errorInfo } });
     }
   }
@@ -85,7 +85,7 @@ export class ErrorBoundary extends Component<Props, State> {
               An unexpected error occurred. This has been logged and our team has been notified.
             </Typography>
             
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" component="div" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                   <strong>Error:</strong> {this.state.error.message}

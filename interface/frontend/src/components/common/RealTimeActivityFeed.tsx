@@ -50,7 +50,7 @@ export const RealTimeActivityFeed: React.FC = () => {
     // Listen for various real-time events and convert them to activity items
     const unsubscribeUserActivity = addEventListener('user:activity', (activity) => {
       const newActivity: ActivityItem = {
-        id: `${activity.userId}-${activity.timestamp}`,
+        id: `${activity.userId}-${activity.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         userId: activity.userId,
         username: activity.username,
         action: activity.action,
@@ -64,7 +64,7 @@ export const RealTimeActivityFeed: React.FC = () => {
 
     const unsubscribePromptUpdated = addEventListener('prompt:updated', (data) => {
       const newActivity: ActivityItem = {
-        id: `prompt-update-${data.promptId}-${data.timestamp}`,
+        id: `prompt-update-${data.promptId}-${data.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         userId: data.userId,
         username: data.username,
         action: 'updated prompt',
@@ -92,7 +92,7 @@ export const RealTimeActivityFeed: React.FC = () => {
 
     const unsubscribeExportCompleted = addEventListener('export:completed', (data) => {
       const newActivity: ActivityItem = {
-        id: `export-${data.exportId}-${data.timestamp}`,
+        id: `export-${data.exportId}-${data.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         userId: 'system',
         username: 'Export Service',
         action: 'completed export',
@@ -106,7 +106,7 @@ export const RealTimeActivityFeed: React.FC = () => {
 
     const unsubscribeRatingUpdated = addEventListener('rating:updated', (data) => {
       const newActivity: ActivityItem = {
-        id: `rating-${data.promptId}-${data.timestamp}`,
+        id: `rating-${data.promptId}-${data.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         userId: data.userId,
         username: 'User', // Username not provided in rating events
         action: 'rated prompt',

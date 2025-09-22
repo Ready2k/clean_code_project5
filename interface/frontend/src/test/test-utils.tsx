@@ -123,7 +123,10 @@ export const mockPrompt = {
     goal: 'Test goal',
     audience: 'Test audience',
     steps: ['Step 1', 'Step 2'],
-    outputExpectations: 'Test output',
+    output_expectations: {
+      format: 'Test output',
+      fields: [],
+    },
   },
   variables: [],
   ratings: {

@@ -16,6 +16,7 @@ import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { login } from '../../store/slices/authSlice';
 import { LoginCredentials } from '../../types/auth';
+import { QuickLogin } from '../../components/auth/QuickLogin';
 
 export const LoginPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -88,14 +89,19 @@ export const LoginPage: React.FC = () => {
               margin="normal"
               required
               fullWidth
-              id="username"
-              label="Username"
-              autoComplete="username"
+              id="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
               autoFocus
-              error={!!errors.username}
-              helperText={errors.username?.message}
-              {...register('username', {
-                required: 'Username is required',
+              error={!!errors.email}
+              helperText={errors.email?.message}
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: 'Invalid email address',
+                },
               })}
             />
             
@@ -136,6 +142,9 @@ export const LoginPage: React.FC = () => {
                 </Link>
               </Grid>
             </Grid>
+            
+            {/* Development quick login */}
+            {import.meta.env.DEV && <QuickLogin />}
           </Box>
         </Paper>
       </Box>

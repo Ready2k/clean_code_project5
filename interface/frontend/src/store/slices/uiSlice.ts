@@ -79,7 +79,26 @@ const uiSlice = createSlice({
       state.loading.global = action.payload;
     },
     addNotification: (state, action: PayloadAction<Notification>) => {
-      state.notifications.push(action.payload);
+      // Prevent duplicate notifications with the same message and type
+      const existingNotification = state.notifications.find(
+        n => n.message === action.payload.message && n.type === action.payload.type
+      );
+      
+      // Special handling for rate limit notifications - prevent multiple within 5 seconds
+      if (action.payload.title === 'Rate Limited') {
+        const recentRateLimit = state.notifications.find(
+          n => n.title === 'Rate Limited' && 
+               Date.now() - new Date(n.timestamp).getTime() < 5000
+        );
+        
+        if (recentRateLimit) {
+          return; // Don't add duplicate rate limit notification
+        }
+      }
+      
+      if (!existingNotification) {
+        state.notifications.push(action.payload);
+      }
     },
     removeNotification: (state, action: PayloadAction<string>) => {
       state.notifications = state.notifications.filter(
@@ -88,6 +107,11 @@ const uiSlice = createSlice({
     },
     clearNotifications: (state) => {
       state.notifications = [];
+    },
+    clearRateLimitNotifications: (state) => {
+      state.notifications = state.notifications.filter(
+        n => !n.message.includes('Rate Limited') && !n.message.includes('Too many requests')
+      );
     },
     setModal: (state, action: PayloadAction<{ key: string; open: boolean }>) => {
       state.modals[action.payload.key] = action.payload.open;
@@ -112,6 +136,7 @@ export const {
   addNotification,
   removeNotification,
   clearNotifications,
+  clearRateLimitNotifications,
   setModal,
   closeAllModals,
 } = uiSlice.actions;

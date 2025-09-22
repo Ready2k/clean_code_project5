@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import Joi from 'joi';
 import { getUserService } from '../services/user-service.js';
-import { LoginCredentials, RegisterData, RefreshTokenRequest, UserPreferences } from '../types/auth.js';
+import { LoginCredentials, RegisterData, RefreshTokenRequest } from '../types/auth.js';
 import { ValidationError } from '../types/errors.js';
 import { logger } from '../utils/logger.js';
 
@@ -45,9 +45,20 @@ const changePasswordSchema = Joi.object({
 });
 
 export const login = async (req: Request, res: Response): Promise<void> => {
+  // Debug logging
+  logger.info('Login attempt', { 
+    body: req.body,
+    headers: req.headers['content-type']
+  });
+
   const { error, value } = loginSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    logger.error('Login validation error', { 
+      error: error.details[0]?.message || 'Validation error',
+      field: error.details[0]?.path?.[0] || 'unknown',
+      body: req.body
+    });
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const credentials: LoginCredentials = value;
@@ -71,7 +82,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 export const register = async (req: Request, res: Response): Promise<void> => {
   const { error, value } = registerSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const registerData: RegisterData = value;
@@ -95,7 +106,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
   const { error, value } = refreshTokenSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const { refreshToken }: RefreshTokenRequest = value;
@@ -162,7 +173,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
 
   const { error, value } = updateProfileSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const userService = getUserService();
@@ -191,7 +202,7 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 
   const { error, value } = changePasswordSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const { currentPassword, newPassword } = value;

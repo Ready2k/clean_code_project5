@@ -37,7 +37,7 @@ export class RetryMechanism {
         }
 
         // Calculate delay for next attempt
-        const delay = this.calculateDelay(attempt);
+        const delay = this.calculateDelay(attempt, lastError);
         
         console.warn(`Operation failed, retrying in ${delay}ms (attempt ${attempt + 1}/${this.config.maxRetries})`, {
           context,
@@ -62,8 +62,15 @@ export class RetryMechanism {
     return error.name === 'TypeError' || error.message.includes('fetch');
   }
 
-  private calculateDelay(attempt: number): number {
-    const exponentialDelay = this.config.baseDelay * Math.pow(this.config.backoffFactor, attempt);
+  private calculateDelay(attempt: number, error?: AppError | Error): number {
+    let baseDelay = this.config.baseDelay;
+    
+    // Use longer delays for rate limit errors
+    if (error instanceof AppError && error.type === ErrorType.RATE_LIMIT_ERROR) {
+      baseDelay = Math.max(baseDelay, 5000); // Minimum 5 seconds for rate limits
+    }
+    
+    const exponentialDelay = baseDelay * Math.pow(this.config.backoffFactor, attempt);
     const jitteredDelay = exponentialDelay * (0.5 + Math.random() * 0.5); // Add jitter
     return Math.min(jitteredDelay, this.config.maxDelay);
   }

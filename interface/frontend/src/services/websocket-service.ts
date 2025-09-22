@@ -134,13 +134,22 @@ class WebSocketService {
       return;
     }
 
-    const serverUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    // Clean up existing connection first
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket.removeAllListeners();
+    }
+
+    const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     
     this.socket = io(serverUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true
+      forceNew: false, // Don't force new connection
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000
     });
 
     this.setupEventListeners(userId);
@@ -158,16 +167,18 @@ class WebSocketService {
       // Join user-specific room
       this.socket?.emit('join', userId);
       
-      // Dispatch connection success notification
-      store.dispatch(addNotification({
-        id: `ws-connected-${Date.now()}`,
-        type: 'success',
-        title: 'Connected',
-        message: 'Real-time updates enabled',
-        timestamp: new Date().toISOString(),
-        autoHide: true,
-        duration: 3000
-      }));
+      // Only show notification on reconnect, not initial connect
+      if (this.reconnectAttempts > 0) {
+        store.dispatch(addNotification({
+          id: `ws-reconnected-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'success',
+          title: 'Reconnected',
+          message: 'Real-time updates restored',
+          timestamp: new Date().toISOString(),
+          autoHide: true,
+          duration: 3000
+        }));
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -286,7 +297,7 @@ class WebSocketService {
 
     this.socket.on('system:alert', ({ level, message, timestamp }) => {
       store.dispatch(addNotification({
-        id: `system-alert-${timestamp}`,
+        id: `system-alert-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         type: level === 'info' ? 'info' : level === 'warning' ? 'warning' : 'error',
         title: 'System Alert',
         message,
@@ -298,7 +309,7 @@ class WebSocketService {
 
     this.socket.on('system:maintenance', ({ status, message, timestamp }) => {
       store.dispatch(addNotification({
-        id: `maintenance-${timestamp}`,
+        id: `maintenance-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         type: status === 'started' ? 'warning' : 'info',
         title: 'System Maintenance',
         message,
@@ -336,7 +347,7 @@ class WebSocketService {
         this.emitToListeners('prompt:updated', { promptId, userId: updaterUserId, username, changes, timestamp });
         
         store.dispatch(addNotification({
-          id: `prompt-updated-${promptId}-${timestamp}`,
+          id: `prompt-updated-${promptId}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'info',
           title: 'Prompt Updated',
           message: `${username} updated this prompt`,
@@ -419,7 +430,7 @@ class WebSocketService {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
       store.dispatch(addNotification({
-        id: `ws-reconnect-failed-${Date.now()}`,
+        id: `ws-reconnect-failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type: 'error',
         title: 'Connection Lost',
         message: 'Unable to reconnect to real-time updates',

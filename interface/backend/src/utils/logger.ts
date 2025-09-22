@@ -19,8 +19,8 @@ const structuredFormat = winston.format.combine(
       requestId,
       userId,
       environment: nodeEnv,
-      version: process.env.APP_VERSION || '1.0.0',
-      hostname: process.env.HOSTNAME || 'unknown',
+      version: process.env['APP_VERSION'] || '1.0.0',
+      hostname: process.env['HOSTNAME'] || 'unknown',
       ...meta
     });
   })
@@ -43,7 +43,7 @@ export const logger = winston.createLogger({
   defaultMeta: {
     service: 'prompt-library-backend',
     environment: nodeEnv,
-    hostname: process.env.HOSTNAME || 'unknown'
+    hostname: process.env['HOSTNAME'] || 'unknown'
   },
   transports: [
     // Console transport
@@ -85,8 +85,8 @@ if (nodeEnv === 'production') {
     format: winston.format.combine(
       winston.format.timestamp(),
       winston.format.json(),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
-        if (meta.audit) {
+      winston.format.printf(({ timestamp, level, message, ...meta }: any) => {
+        if (meta['audit']) {
           return JSON.stringify({
             '@timestamp': timestamp,
             level,
@@ -95,9 +95,9 @@ if (nodeEnv === 'production') {
             ...meta
           });
         }
-        return null;
+        return '';
       }),
-      winston.format.filter(info => info !== null)
+      winston.format((info: any) => info !== null ? info : false)()
     )
   }));
 }

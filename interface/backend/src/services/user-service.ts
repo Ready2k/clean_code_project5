@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { User, RegisterData, LoginCredentials, AuthResponse, UserPreferences, JWTPayload } from '../types/auth.js';
+import { User, RegisterData, LoginCredentials, AuthResponse, JWTPayload } from '../types/auth.js';
 import { ValidationError, AuthenticationError, ConflictError, NotFoundError, ErrorCode } from '../types/errors.js';
 import { logger } from '../utils/logger.js';
 import { RedisService } from './redis-service.js';
@@ -34,10 +34,12 @@ export class UserService {
     try {
       // Check if any users exist
       if (this.users.size === 0) {
+        logger.info('No users found, creating default admin user');
+        
         const defaultAdmin: RegisterData = {
           username: 'admin',
-          email: 'admin@promptlibrary.local',
-          password: 'admin123',
+          email: 'admin@example.com',
+          password: 'admin123456',
           role: 'user' // Will be set to admin below
         };
 
@@ -45,9 +47,16 @@ export class UserService {
         adminUser.role = 'admin'; // Set as admin after creation
         this.users.set(adminUser.id, adminUser);
         
-        logger.info('Default admin user created', { 
+        logger.info('Default admin user created successfully', { 
+          id: adminUser.id,
           username: adminUser.username, 
-          email: adminUser.email 
+          email: adminUser.email,
+          role: adminUser.role,
+          totalUsers: this.users.size
+        });
+      } else {
+        logger.info('Users already exist, skipping default user creation', {
+          totalUsers: this.users.size
         });
       }
     } catch (error) {
@@ -78,22 +87,35 @@ export class UserService {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const { email, password } = credentials;
 
+    logger.info('Login attempt', { 
+      email, 
+      passwordLength: password?.length,
+      totalUsers: this.users.size,
+      emailsInIndex: Array.from(this.usersByEmail.keys())
+    });
+
     if (!email || !password) {
       throw new ValidationError('Email and password are required');
     }
 
     const userId = this.usersByEmail.get(email.toLowerCase());
     if (!userId) {
+      logger.warn('User not found by email', { 
+        email: email.toLowerCase(),
+        availableEmails: Array.from(this.usersByEmail.keys())
+      });
       throw new AuthenticationError('Invalid credentials', ErrorCode.INVALID_CREDENTIALS);
     }
 
     const user = this.users.get(userId);
     if (!user) {
+      logger.warn('User not found by ID', { userId });
       throw new AuthenticationError('Invalid credentials', ErrorCode.INVALID_CREDENTIALS);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      logger.warn('Invalid password', { userId: user.id, email: user.email });
       throw new AuthenticationError('Invalid credentials', ErrorCode.INVALID_CREDENTIALS);
     }
 
@@ -369,7 +391,7 @@ export class UserService {
 
     const accessToken = jwt.sign(basePayload, this.jwtSecret, { 
       expiresIn: this.jwtExpiresIn 
-    });
+    } as jwt.SignOptions);
 
     // Add different jti (JWT ID) to ensure tokens are unique
     const refreshPayload = {
@@ -379,7 +401,7 @@ export class UserService {
 
     const refreshToken = jwt.sign(refreshPayload, this.jwtSecret, { 
       expiresIn: this.refreshTokenExpiresIn 
-    });
+    } as jwt.SignOptions);
 
     return { accessToken, refreshToken };
   }
@@ -399,7 +421,7 @@ export class UserService {
     const match = expiresIn.match(/^(\d+)([smhd])$/);
     if (!match) return 900; // Default 15 minutes
 
-    const value = parseInt(match[1]);
+    const value = parseInt(match[1] || '0');
     const unit = match[2];
 
     switch (unit) {

@@ -91,7 +91,10 @@ beforeEach(() => {
             goal: 'Test the application',
             audience: 'QA Engineers',
             steps: ['Step 1', 'Step 2'],
-            outputExpectations: 'Successful test',
+            output_expectations: {
+              format: 'Successful test',
+              fields: [],
+            },
           },
           variables: [],
           ratings: { average: 4.5, count: 10 },

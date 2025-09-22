@@ -11,14 +11,20 @@ export const getSystemStatus = async (_req: Request, res: Response): Promise<voi
     const monitoringService = getSystemMonitoringService();
     const status = await monitoringService.getSystemStatus();
     
-    res.json(status);
+    res.json({
+      success: true,
+      data: status,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     logger.error('Failed to get system status:', error);
     res.status(500).json({
+      success: false,
       error: {
         code: 'SYSTEM_STATUS_ERROR',
         message: 'Failed to retrieve system status'
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -73,14 +79,20 @@ export const getSystemStats = async (_req: Request, res: Response): Promise<void
     const monitoringService = getSystemMonitoringService();
     const stats = await monitoringService.getSystemStats();
     
-    res.json(stats);
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     logger.error('Failed to get system stats:', error);
     res.status(500).json({
+      success: false,
       error: {
         code: 'SYSTEM_STATS_ERROR',
         message: 'Failed to retrieve system statistics'
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   }
 };

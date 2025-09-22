@@ -4,7 +4,7 @@ import { User, LoginCredentials, AuthResponse } from '../../types/auth';
 export const authAPI = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await apiClient.post('/auth/login', credentials);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async logout(): Promise<void> {
@@ -18,7 +18,7 @@ export const authAPI = {
 
   async getCurrentUser(): Promise<User> {
     const response = await apiClient.get('/auth/me');
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async register(userData: {
@@ -28,7 +28,7 @@ export const authAPI = {
     role: 'user' | 'viewer';
   }): Promise<AuthResponse> {
     const response = await apiClient.post('/auth/register', userData);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async updateProfile(profileData: {

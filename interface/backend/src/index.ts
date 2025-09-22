@@ -64,10 +64,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - more generous for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env['NODE_ENV'] === 'production' ? 100 : 500, // Higher limit for development
   message: {
     error: {
       code: 'RATE_LIMIT_EXCEEDED',
@@ -76,6 +76,13 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks in development
+    if (process.env['NODE_ENV'] !== 'production' && req.path === '/api/health') {
+      return true;
+    }
+    return false;
+  }
 });
 
 app.use('/api', limiter);

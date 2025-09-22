@@ -47,8 +47,8 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <Card sx={{ height: '100%', ...sx }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
           <Typography color="textSecondary" variant="body2">
             {title}
           </Typography>
@@ -65,18 +65,18 @@ export const StatCard: React.FC<StatCardProps> = ({
           </Box>
         ) : (
           <>
-            <Typography variant="h4" component="div" color={`${color}.main`} gutterBottom>
+            <Typography variant="h4" component="div" color={`${color}.main`} sx={{ mb: 0.5 }}>
               {value}
             </Typography>
             
             {subtitle && (
-              <Typography variant="body2" color="textSecondary">
+              <Typography variant="body2" color="textSecondary" sx={{ mb: trend ? 0.5 : 0 }}>
                 {subtitle}
               </Typography>
             )}
             
             {trend && (
-              <Box mt={1}>
+              <Box mt={0.5}>
                 <Chip
                   label={`${trend.direction === 'up' ? '+' : trend.direction === 'down' ? '-' : ''}${trend.value}% ${trend.label}`}
                   size="small"

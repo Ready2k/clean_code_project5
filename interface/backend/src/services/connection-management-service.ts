@@ -106,6 +106,26 @@ export class ConnectionManagementService extends EventEmitter {
   }
 
   /**
+   * Get all connections across all users (for system monitoring)
+   */
+  public async getAllConnections(): Promise<LLMConnection[]> {
+    this.ensureInitialized();
+    
+    try {
+      const connections = await this.storageService.getAllConnections();
+      
+      logger.debug('Retrieved all connections', {
+        count: connections.length
+      });
+      
+      return connections;
+    } catch (error) {
+      logger.error('Failed to get all connections:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get a specific connection by ID
    */
   public async getConnection(userId: string, connectionId: string): Promise<LLMConnection> {

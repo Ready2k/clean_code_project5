@@ -88,7 +88,7 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
       {/* Skip Navigation Links */}
       <SkipNavigation />
 
@@ -97,14 +97,12 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
         position="fixed"
         sx={{
           zIndex: theme.zIndex.drawer + 1,
-          ...(sidebar && !isMobile && sidebarOpen && {
-            width: `calc(100% - ${DRAWER_WIDTH}px)`,
-            ml: `${DRAWER_WIDTH}px`,
-          }),
+          width: '100%',
+          left: 0,
         }}
       >
-        <Toolbar>
-          {sidebar && (
+        <Toolbar sx={{ minHeight: '64px !important' }}>
+          {sidebar && (isMobile || !sidebarOpen) && (
             <IconButton
               color="inherit"
               aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
@@ -129,41 +127,28 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
 
       {/* Sidebar Navigation */}
       {sidebar && (
-        <>
-          {/* Mobile Drawer */}
-          <Drawer
-            variant="temporary"
-            open={sidebarOpen}
-            onClose={handleDrawerToggle}
-            ModalProps={{
-              keepMounted: true, // Better open performance on mobile
-            }}
-            sx={{
-              display: { xs: 'block', md: 'none' },
-              '& .MuiDrawer-paper': {
-                boxSizing: 'border-box',
-                width: MOBILE_DRAWER_WIDTH,
-              },
-            }}
-          >
-            {drawerContent}
-          </Drawer>
-
-          {/* Desktop Drawer */}
-          <Drawer
-            variant="persistent"
-            open={sidebarOpen}
-            sx={{
-              display: { xs: 'none', md: 'block' },
-              '& .MuiDrawer-paper': {
-                boxSizing: 'border-box',
-                width: DRAWER_WIDTH,
-              },
-            }}
-          >
-            {drawerContent}
-          </Drawer>
-        </>
+        <Drawer
+          variant={isMobile ? 'temporary' : 'persistent'}
+          open={sidebarOpen}
+          onClose={isMobile ? handleDrawerToggle : undefined}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile
+          }}
+          sx={{
+            width: DRAWER_WIDTH,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: DRAWER_WIDTH,
+              boxSizing: 'border-box',
+              position: 'fixed',
+              top: '64px',
+              height: 'calc(100vh - 64px)',
+              zIndex: theme.zIndex.drawer,
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
       )}
 
       {/* Main Content */}
@@ -173,33 +158,23 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
         tabIndex={-1}
         sx={{
           flexGrow: 1,
-          width: '100%',
           minHeight: '100vh',
-          ...(sidebar && !isMobile && sidebarOpen && {
-            width: `calc(100% - ${DRAWER_WIDTH}px)`,
-          }),
+          bgcolor: 'background.default',
         }}
       >
         {/* Toolbar spacer */}
         <Toolbar />
 
         {/* Content Container */}
-        <Container
-          maxWidth={false}
+        <Box
           sx={{
-            py: { xs: 2, sm: 3 },
-            px: { xs: 1, sm: 2, md: 3 },
-            maxWidth: {
-              xs: '100%',
-              sm: '100%',
-              md: isTablet ? '100%' : '1200px',
-              lg: '1400px',
-              xl: '1600px',
-            },
+            py: { xs: 1, sm: 1 },
+            px: { xs: 2, sm: 2, md: 2 },
+            maxWidth: '100%',
           }}
         >
           {children}
-        </Container>
+        </Box>
 
         {/* Scroll to Top Button */}
         <Zoom in={showScrollTop}>

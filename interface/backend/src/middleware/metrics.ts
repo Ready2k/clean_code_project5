@@ -9,14 +9,14 @@ const register = new promClient.Registry();
 // Add a default label which is added to all metrics
 register.setDefaultLabels({
   app: 'prompt-library-backend',
-  version: process.env.APP_VERSION || '1.0.0',
-  environment: process.env.NODE_ENV || 'development'
+  version: process.env['APP_VERSION'] || '1.0.0',
+  environment: process.env['NODE_ENV'] || 'development'
 });
 
 // Enable the collection of default metrics
 promClient.collectDefaultMetrics({ 
   register,
-  timeout: 10000,
+  // timeout: 10000, // Removed as it's not a valid option
   gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
 });
 
@@ -72,7 +72,7 @@ const errorRate = new promClient.Counter({
 });
 
 // Endpoint to expose metrics
-export const metricsEndpoint = async (req: Request, res: Response) => {
+export const metricsEndpoint = async (_req: Request, res: Response) => {
   try {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
@@ -191,7 +191,7 @@ export function recordMetrics(req: Request, res: Response, next: NextFunction): 
     activeConnections.dec();
     
     // Call the original end method
-    originalEnd.call(this, chunk, encoding);
+    return originalEnd.call(this, chunk, encoding);
   };
   
   next();
@@ -200,7 +200,7 @@ export function recordMetrics(req: Request, res: Response, next: NextFunction): 
 /**
  * Middleware to track API usage and generate events for monitoring
  */
-export function trackAPIUsage(req: Request, res: Response, next: NextFunction): void {
+export function trackAPIUsage(req: Request, _res: Response, next: NextFunction): void {
   try {
     const systemMonitoringService = getSystemMonitoringService();
     

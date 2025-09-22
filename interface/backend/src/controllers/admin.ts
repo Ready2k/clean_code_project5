@@ -64,7 +64,7 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 export const createUser = async (req: Request, res: Response): Promise<void> => {
   const { error, value } = createUserSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const userData: RegisterData = value;
@@ -127,7 +127,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 
   const { error, value } = updateUserSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const userService = getUserService();
@@ -187,7 +187,7 @@ export const updateUserRole = async (req: Request, res: Response): Promise<void>
 
   const { error, value } = updateRoleSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   // Prevent admin from changing their own role
@@ -246,7 +246,7 @@ export const resetUserPassword = async (req: Request, res: Response): Promise<vo
 
   const { error, value } = resetPasswordSchema.validate(req.body);
   if (error) {
-    throw new ValidationError(error.details[0].message, error.details[0].path[0] as string);
+    throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
   const userService = getUserService();

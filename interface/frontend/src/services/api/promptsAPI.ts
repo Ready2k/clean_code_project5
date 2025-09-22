@@ -10,22 +10,22 @@ import {
 export const promptsAPI = {
   async getPrompts(filters?: PromptFilters): Promise<PromptsResponse> {
     const response = await apiClient.get('/prompts', { params: filters });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async getPrompt(id: string): Promise<PromptRecord> {
     const response = await apiClient.get(`/prompts/${id}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async createPrompt(data: CreatePromptRequest): Promise<PromptRecord> {
     const response = await apiClient.post('/prompts', data);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async updatePrompt(id: string, data: UpdatePromptRequest): Promise<PromptRecord> {
     const response = await apiClient.put(`/prompts/${id}`, data);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   async deletePrompt(id: string): Promise<void> {

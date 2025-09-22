@@ -4,7 +4,7 @@ import { styled } from '@mui/material/styles';
 
 const SkipLink = styled(Button)(({ theme }) => ({
   position: 'absolute',
-  top: -40,
+  top: -100,
   left: 6,
   zIndex: 9999,
   backgroundColor: theme.palette.primary.main,
@@ -15,8 +15,13 @@ const SkipLink = styled(Button)(({ theme }) => ({
   fontSize: '0.875rem',
   fontWeight: 500,
   border: `2px solid ${theme.palette.primary.main}`,
+  opacity: 0,
+  transform: 'translateY(-10px)',
+  transition: 'all 0.2s ease-in-out',
   '&:focus': {
     top: 6,
+    opacity: 1,
+    transform: 'translateY(0)',
     outline: `2px solid ${theme.palette.background.paper}`,
     outlineOffset: '2px',
   },
@@ -35,7 +40,6 @@ interface SkipNavigationProps {
 const defaultLinks = [
   { href: '#main-content', label: 'Skip to main content' },
   { href: '#navigation', label: 'Skip to navigation' },
-  { href: '#search', label: 'Skip to search' },
 ];
 
 export const SkipNavigation: React.FC<SkipNavigationProps> = ({ 
@@ -53,7 +57,15 @@ export const SkipNavigation: React.FC<SkipNavigationProps> = ({
     <Box
       component="nav"
       aria-label="Skip navigation links"
-      sx={{ position: 'relative' }}
+      sx={{ 
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: 0,
+        overflow: 'hidden',
+        zIndex: 9999
+      }}
     >
       {links.map((link) => (
         <SkipLink

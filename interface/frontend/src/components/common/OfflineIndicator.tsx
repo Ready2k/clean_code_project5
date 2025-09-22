@@ -1,4 +1,4 @@
-import React from 'react';
+
 import {
   Alert,
   Box,
@@ -12,7 +12,7 @@ import {
   RefreshOutlined,
   SignalWifiOffOutlined
 } from '@mui/icons-material';
-import { useOfflineDetection } from '../../hooks/useOfflineDetection';
+import { useOfflineContext } from '../../contexts/OfflineContext';
 
 interface OfflineIndicatorProps {
   variant?: 'banner' | 'snackbar' | 'inline';
@@ -25,7 +25,7 @@ export function OfflineIndicator({
   showRetry = true,
   onRetry 
 }: OfflineIndicatorProps) {
-  const { isOffline, lastOnlineAt, checkConnectivity } = useOfflineDetection();
+  const { isOffline, lastOnlineAt, checkConnectivity } = useOfflineContext();
 
   const handleRetry = async () => {
     const isOnline = await checkConnectivity();
@@ -129,7 +129,7 @@ interface OfflineStatusProps {
 }
 
 export function OfflineStatus({ compact = false }: OfflineStatusProps) {
-  const { isOffline, isOnline } = useOfflineDetection();
+  const { isOffline } = useOfflineContext();
 
   if (compact) {
     return (

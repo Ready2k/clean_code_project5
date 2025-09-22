@@ -4,7 +4,7 @@ import { User } from '../../types/auth';
 export const adminAPI = {
   async getUsers(): Promise<User[]> {
     const response = await apiClient.get('/admin/users');
-    return response.data;
+    return (response.data as any).data || response.data;
   },
 
   async createUser(userData: {
@@ -15,7 +15,7 @@ export const adminAPI = {
     status: 'active' | 'inactive';
   }): Promise<User> {
     const response = await apiClient.post('/admin/users', userData);
-    return response.data;
+    return (response.data as any).data || response.data;
   },
 
   async updateUser(id: string, data: {
@@ -26,7 +26,7 @@ export const adminAPI = {
     status?: 'active' | 'inactive';
   }): Promise<User> {
     const response = await apiClient.put(`/admin/users/${id}`, data);
-    return response.data;
+    return (response.data as any).data || response.data;
   },
 
   async deleteUser(id: string): Promise<void> {
@@ -35,6 +35,6 @@ export const adminAPI = {
 
   async toggleUserStatus(id: string): Promise<User> {
     const response = await apiClient.patch(`/admin/users/${id}/toggle-status`);
-    return response.data;
+    return (response.data as any).data || response.data;
   },
 };

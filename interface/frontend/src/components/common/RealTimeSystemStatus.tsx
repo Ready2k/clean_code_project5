@@ -201,9 +201,10 @@ export const RealTimeSystemStatus: React.FC = () => {
                     border: 1,
                     borderColor: 'divider',
                     borderRadius: 1,
-                    backgroundColor: service.status === 'up' ? 'success.light' : 
-                                   service.status === 'degraded' ? 'warning.light' : 'error.light',
-                    opacity: 0.1
+                    backgroundColor: 'background.paper',
+                    borderLeftWidth: 4,
+                    borderLeftColor: service.status === 'up' ? 'success.main' : 
+                                   service.status === 'degraded' ? 'warning.main' : 'error.main'
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>

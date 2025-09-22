@@ -237,9 +237,9 @@ export class SystemMonitoringService extends EventEmitter {
       };
 
       const responseTime = Date.now() - startTime;
-      logger.debug('System status check completed', { 
-        status: overallStatus, 
-        responseTime 
+      logger.debug('System status check completed', {
+        status: overallStatus,
+        responseTime
       });
 
       return status;
@@ -336,7 +336,7 @@ export class SystemMonitoringService extends EventEmitter {
    */
   recordRequest(responseTime: number, success: boolean): void {
     const now = Date.now();
-    
+
     this.performanceCounters.requests++;
     this.performanceCounters.totalResponseTime += responseTime;
     this.performanceCounters.requestTimestamps.push(now);
@@ -351,7 +351,7 @@ export class SystemMonitoringService extends EventEmitter {
     const oneMinuteAgo = now - 60000;
     this.performanceCounters.requestTimestamps = this.performanceCounters.requestTimestamps
       .filter(timestamp => timestamp > oneMinuteAgo);
-    
+
     this.performanceCounters.lastMinuteRequests = this.performanceCounters.requestTimestamps.length;
   }
 
@@ -399,7 +399,7 @@ export class SystemMonitoringService extends EventEmitter {
     try {
       const backupId = `backup-${Date.now()}`;
       const backupDir = path.join(this.config.storage.backupDirectory, backupId);
-      
+
       await fs.mkdir(backupDir, { recursive: true });
 
       // Backup configuration
@@ -540,11 +540,11 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async checkAPIService(): Promise<ServiceStatus> {
     const startTime = Date.now();
-    
+
     try {
       // Simple health check - if we can execute this, API is up
       const responseTime = Date.now() - startTime;
-      
+
       return {
         status: 'up',
         responseTime,
@@ -568,12 +568,12 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async checkDatabaseService(): Promise<ServiceStatus> {
     const startTime = Date.now();
-    
+
     try {
       // For now, we don't have a traditional database
       // This would check PostgreSQL or similar if implemented
       const responseTime = Date.now() - startTime;
-      
+
       return {
         status: 'up',
         responseTime,
@@ -597,12 +597,12 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async checkStorageService(): Promise<ServiceStatus> {
     const startTime = Date.now();
-    
+
     try {
       const promptLibraryService = getPromptLibraryService();
       const status = await promptLibraryService.getStatus();
       const responseTime = Date.now() - startTime;
-      
+
       return {
         status: status.healthy ? 'up' : 'down',
         responseTime,
@@ -623,15 +623,27 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async checkLLMService(): Promise<ServiceStatus> {
     const startTime = Date.now();
-    
+
     try {
       const connectionService = getConnectionManagementService();
-      const stats = await connectionService.getConnectionStats();
+      // Get all connections for system monitoring (not user-specific)
+      const allConnections = await connectionService.getAllConnections();
       const responseTime = Date.now() - startTime;
-      
+
+      const stats = {
+        total: allConnections.length,
+        active: allConnections.filter(c => c.status === 'active').length,
+        inactive: allConnections.filter(c => c.status === 'inactive').length,
+        error: allConnections.filter(c => c.status === 'error').length,
+        byProvider: allConnections.reduce((acc, conn) => {
+          acc[conn.provider] = (acc[conn.provider] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      };
+
       const hasActiveConnections = stats.active > 0;
       const status = hasActiveConnections ? 'up' : (stats.total > 0 ? 'degraded' : 'down');
-      
+
       return {
         status,
         responseTime,
@@ -652,12 +664,12 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async checkRedisService(): Promise<ServiceStatus> {
     const startTime = Date.now();
-    
+
     try {
       const redisService = getRedisService();
       await redisService.ping();
       const responseTime = Date.now() - startTime;
-      
+
       return {
         status: redisService.isHealthy() ? 'up' : 'down',
         responseTime,
@@ -679,11 +691,26 @@ export class SystemMonitoringService extends EventEmitter {
    * Determine overall system status
    */
   private determineOverallStatus(services: SystemStatus['services']): SystemStatus['status'] {
-    const serviceStatuses = Object.values(services).map(s => s.status);
-    
-    if (serviceStatuses.every(s => s === 'up')) {
-      return 'healthy';
-    } else if (serviceStatuses.some(s => s === 'down')) {
+    // Core services that must be up for system to be healthy
+    const coreServices = ['api', 'database', 'storage', 'redis'];
+    const coreStatuses = coreServices.map(name => services[name as keyof typeof services]?.status);
+
+    // LLM service is optional - system can be healthy without LLM connections
+    const llmStatus = services.llm.status;
+
+    // Check core services
+    if (coreStatuses.every(s => s === 'up')) {
+      // If core services are up, system is at least degraded
+      if (llmStatus === 'up') {
+        return 'healthy';
+      } else if (llmStatus === 'down') {
+        // LLM down but core services up = degraded (not down)
+        return 'degraded';
+      } else {
+        return 'degraded';
+      }
+    } else if (coreStatuses.some(s => s === 'down')) {
+      // If any core service is down, system is down
       return 'down';
     } else {
       return 'degraded';
@@ -694,7 +721,37 @@ export class SystemMonitoringService extends EventEmitter {
    * Get system information
    */
   private async getSystemInfo(): Promise<SystemStats['system']> {
-    const memInfo = process.memoryUsage();
+    // Use mock data in demo mode for more reasonable values
+    const isDemoMode = process.env['DEMO_MODE'] === 'true' || process.env['ENABLE_MOCK_DATA'] === 'true';
+
+    if (isDemoMode) {
+      // Mock data for demo - more reasonable values
+      const mockTotalMem = 8 * 1024 * 1024 * 1024; // 8GB
+      const mockUsedMem = 3.2 * 1024 * 1024 * 1024; // 3.2GB (40% usage)
+      const mockFreeMem = mockTotalMem - mockUsedMem;
+
+      return {
+        uptime: Math.floor(Math.random() * 86400) + 3600, // 1-24 hours
+        memory: {
+          total: mockTotalMem,
+          used: mockUsedMem,
+          free: mockFreeMem,
+          usage: (mockUsedMem / mockTotalMem) * 100
+        },
+        cpu: {
+          usage: Math.random() * 30 + 10, // 10-40% CPU usage
+          loadAverage: [0.5, 0.7, 0.9]
+        },
+        disk: {
+          total: 100 * 1024 * 1024 * 1024, // 100GB
+          used: 45 * 1024 * 1024 * 1024,   // 45GB (45% usage)
+          free: 55 * 1024 * 1024 * 1024,   // 55GB
+          usage: 45
+        }
+      };
+    }
+
+    // Real system data for production
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
@@ -749,9 +806,8 @@ export class SystemMonitoringService extends EventEmitter {
         },
         connections: connectionStats,
         redis: {
-          connected: redisService.isHealthy(),
-          memoryUsage: undefined, // Would need Redis INFO command
-          keyCount: undefined // Would need Redis DBSIZE command
+          connected: redisService.isHealthy()
+          // memoryUsage and keyCount would need Redis INFO/DBSIZE commands
         }
       };
     } catch (error) {
@@ -769,11 +825,11 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private getPerformanceStats(): SystemStats['performance'] {
     const totalRequests = this.performanceCounters.requests;
-    const averageResponseTime = totalRequests > 0 
-      ? this.performanceCounters.totalResponseTime / totalRequests 
+    const averageResponseTime = totalRequests > 0
+      ? this.performanceCounters.totalResponseTime / totalRequests
       : 0;
-    const errorRate = totalRequests > 0 
-      ? (this.performanceCounters.failedRequests / totalRequests) * 100 
+    const errorRate = totalRequests > 0
+      ? (this.performanceCounters.failedRequests / totalRequests) * 100
       : 0;
 
     return {
@@ -789,24 +845,53 @@ export class SystemMonitoringService extends EventEmitter {
   private startMetricsCollection(): void {
     this.metricsInterval = setInterval(async () => {
       try {
-        const metrics: SystemMetrics = {
-          timestamp: new Date().toISOString(),
-          cpu: {
-            usage: await this.getCPUUsage(),
-            loadAverage: os.loadavg()
-          },
-          memory: {
+        const isDemoMode = process.env['DEMO_MODE'] === 'true' || process.env['ENABLE_MOCK_DATA'] === 'true';
+
+        let memoryData;
+        let cpuData;
+
+        if (isDemoMode) {
+          // Mock data for demo
+          const mockTotalMem = 8 * 1024 * 1024 * 1024; // 8GB
+          const mockUsedMem = (3 + Math.random() * 1.5) * 1024 * 1024 * 1024; // 3-4.5GB varying
+          const mockFreeMem = mockTotalMem - mockUsedMem;
+
+          memoryData = {
+            total: mockTotalMem,
+            used: mockUsedMem,
+            free: mockFreeMem,
+            usage: (mockUsedMem / mockTotalMem) * 100
+          };
+
+          cpuData = {
+            usage: Math.random() * 30 + 10, // 10-40% varying
+            loadAverage: [0.5 + Math.random() * 0.5, 0.7 + Math.random() * 0.3, 0.9 + Math.random() * 0.2]
+          };
+        } else {
+          // Real system data
+          memoryData = {
             total: os.totalmem(),
             used: os.totalmem() - os.freemem(),
             free: os.freemem(),
             usage: ((os.totalmem() - os.freemem()) / os.totalmem()) * 100
-          },
+          };
+
+          cpuData = {
+            usage: await this.getCPUUsage(),
+            loadAverage: os.loadavg()
+          };
+        }
+
+        const metrics: SystemMetrics = {
+          timestamp: new Date().toISOString(),
+          cpu: cpuData,
+          memory: memoryData,
           requests: {
             total: this.performanceCounters.requests,
             successful: this.performanceCounters.successfulRequests,
             failed: this.performanceCounters.failedRequests,
-            averageResponseTime: this.performanceCounters.requests > 0 
-              ? this.performanceCounters.totalResponseTime / this.performanceCounters.requests 
+            averageResponseTime: this.performanceCounters.requests > 0
+              ? this.performanceCounters.totalResponseTime / this.performanceCounters.requests
               : 0
           },
           services: {} // Would be populated with service-specific metrics
@@ -831,13 +916,13 @@ export class SystemMonitoringService extends EventEmitter {
     this.healthCheckInterval = setInterval(async () => {
       try {
         const status = await this.getSystemStatus();
-        
+
         // Check if status has changed and broadcast via WebSocket
         if (this.webSocketService && this.hasStatusChanged(status)) {
           this.webSocketService.broadcastSystemStatus(status.status, status.services);
           this.lastSystemStatus = status;
         }
-        
+
         if (status.status === 'down') {
           this.addSystemEvent('critical', 'system', 'System is down', status);
           if (this.webSocketService) {
@@ -864,10 +949,10 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private hasStatusChanged(newStatus: SystemStatus): boolean {
     if (!this.lastSystemStatus) return true;
-    
+
     // Check if overall status changed
     if (this.lastSystemStatus.status !== newStatus.status) return true;
-    
+
     // Check if any service status changed
     for (const [serviceName, serviceStatus] of Object.entries(newStatus.services)) {
       const lastServiceStatus = this.lastSystemStatus.services[serviceName as keyof SystemStatus['services']];
@@ -875,7 +960,7 @@ export class SystemMonitoringService extends EventEmitter {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -924,7 +1009,7 @@ export class SystemMonitoringService extends EventEmitter {
   private async loadConfiguration(): Promise<void> {
     try {
       const configPath = path.join(process.cwd(), 'config', 'system.json');
-      
+
       if (await this.pathExists(configPath)) {
         const configData = await fs.readFile(configPath, 'utf-8');
         const loadedConfig = JSON.parse(configData);
@@ -945,10 +1030,10 @@ export class SystemMonitoringService extends EventEmitter {
     try {
       const configDir = path.join(process.cwd(), 'config');
       const configPath = path.join(configDir, 'system.json');
-      
+
       await fs.mkdir(configDir, { recursive: true });
       await fs.writeFile(configPath, JSON.stringify(this.config, null, 2));
-      
+
       logger.info('System configuration saved to file');
     } catch (error) {
       logger.error('Failed to save configuration file:', error);
@@ -970,15 +1055,15 @@ export class SystemMonitoringService extends EventEmitter {
     return new Promise((resolve) => {
       const startUsage = process.cpuUsage();
       const startTime = process.hrtime();
-      
+
       setTimeout(() => {
         const currentUsage = process.cpuUsage(startUsage);
         const currentTime = process.hrtime(startTime);
-        
+
         const totalTime = currentTime[0] * 1000000 + currentTime[1] / 1000;
         const totalUsage = currentUsage.user + currentUsage.system;
         const cpuPercent = (totalUsage / totalTime) * 100;
-        
+
         resolve(Math.min(100, Math.max(0, cpuPercent)));
       }, 100);
     });
@@ -987,14 +1072,14 @@ export class SystemMonitoringService extends EventEmitter {
   /**
    * Get disk usage for a directory
    */
-  private async getDiskUsage(dirPath: string): Promise<{
+  private async getDiskUsage(_dirPath: string): Promise<{
     total: number;
     used: number;
     free: number;
     usage: number;
   }> {
     try {
-      const stats = await fs.stat(dirPath);
+      // const _stats = await fs.stat(dirPath);
       // This is a simplified implementation
       // In a real system, you'd use a library like 'statvfs' or platform-specific commands
       return {
@@ -1031,11 +1116,11 @@ export class SystemMonitoringService extends EventEmitter {
   private async copyDirectory(src: string, dest: string): Promise<void> {
     await fs.mkdir(dest, { recursive: true });
     const entries = await fs.readdir(src, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const srcPath = path.join(src, entry.name);
       const destPath = path.join(dest, entry.name);
-      
+
       if (entry.isDirectory()) {
         await this.copyDirectory(srcPath, destPath);
       } else {
@@ -1049,13 +1134,13 @@ export class SystemMonitoringService extends EventEmitter {
    */
   private async getDirectorySize(dirPath: string): Promise<number> {
     let size = 0;
-    
+
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
-        
+
         if (entry.isDirectory()) {
           size += await this.getDirectorySize(fullPath);
         } else {
@@ -1066,7 +1151,7 @@ export class SystemMonitoringService extends EventEmitter {
     } catch (error) {
       logger.error('Failed to get directory size:', error);
     }
-    
+
     return size;
   }
 
@@ -1076,11 +1161,11 @@ export class SystemMonitoringService extends EventEmitter {
   private async cleanupOldBackups(): Promise<void> {
     try {
       const backupDir = this.config.storage.backupDirectory;
-      
+
       if (!(await this.pathExists(backupDir))) {
         return;
       }
-      
+
       const entries = await fs.readdir(backupDir, { withFileTypes: true });
       const backups = entries
         .filter(entry => entry.isDirectory() && entry.name.startsWith('backup-'))
@@ -1090,10 +1175,10 @@ export class SystemMonitoringService extends EventEmitter {
           timestamp: parseInt(entry.name.replace('backup-', ''))
         }))
         .sort((a, b) => b.timestamp - a.timestamp);
-      
+
       // Keep only the configured number of backups
       const backupsToDelete = backups.slice(this.config.storage.maxBackups);
-      
+
       for (const backup of backupsToDelete) {
         await fs.rm(backup.path, { recursive: true, force: true });
         logger.info('Deleted old backup', { backupId: backup.name });
@@ -1111,13 +1196,13 @@ export class SystemMonitoringService extends EventEmitter {
       if (this.metricsInterval) {
         clearInterval(this.metricsInterval);
       }
-      
+
       if (this.healthCheckInterval) {
         clearInterval(this.healthCheckInterval);
       }
-      
+
       this.addSystemEvent('info', 'system', 'System monitoring service shutting down');
-      
+
       this.initialized = false;
       logger.info('System Monitoring Service shut down successfully');
       this.emit('shutdown');
@@ -1139,7 +1224,7 @@ export async function initializeSystemMonitoringService(): Promise<void> {
     logger.warn('System monitoring service already initialized');
     return;
   }
-  
+
   systemMonitoringService = new SystemMonitoringService();
   await systemMonitoringService.initialize();
 }
@@ -1151,6 +1236,6 @@ export function getSystemMonitoringService(): SystemMonitoringService {
   if (!systemMonitoringService) {
     throw new Error('System monitoring service not initialized');
   }
-  
+
   return systemMonitoringService;
 }

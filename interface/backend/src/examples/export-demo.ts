@@ -73,7 +73,8 @@ const mockPrompt: PromptRecord = {
 };
 
 // Mock the prompt library service
-const mockPromptLibraryService = {
+/*
+const _mockPromptLibraryService = {
   getPrompt: async (id: string) => {
     if (id === mockPrompt.id) {
       return mockPrompt;
@@ -98,7 +99,7 @@ const mockPromptLibraryService = {
       timestamp: new Date('2024-01-03T00:00:00Z')
     }
   ],
-  renderPrompt: async (id: string, provider: string) => {
+  renderPrompt: async (_id: string, provider: string) => {
     const baseMessages = [
       {
         role: 'system',
@@ -140,11 +141,12 @@ const mockPromptLibraryService = {
     }
   }
 };
+*/
 
 // Mock the service
-jest.mock('../services/prompt-library-service.js', () => ({
-  getPromptLibraryService: () => mockPromptLibraryService
-}));
+// jest.mock('../services/prompt-library-service.js', () => ({
+//   getPromptLibraryService: () => _mockPromptLibraryService
+// }));
 
 async function demonstrateExportFunctionality() {
   console.log('🚀 Export and Integration Endpoints Demonstration\n');
@@ -262,7 +264,8 @@ async function demonstrateExportFunctionality() {
 
     // 7. Demonstrate variable substitution
     console.log('🔄 Variable Substitution Example:');
-    const substitutedExport = await exportService.exportPrompt(mockPrompt.id, {
+    /*
+    const _substitutedExport = await exportService.exportPrompt(mockPrompt.id, {
       format: 'json',
       substituteVariables: true,
       variableValues: {
@@ -271,8 +274,9 @@ async function demonstrateExportFunctionality() {
         context: 'Modern ES6 arrow function example'
       }
     });
+    */
     
-    const substitutedData = JSON.parse(substitutedExport.content);
+    // const _substitutedData = JSON.parse(substitutedExport.content);
     console.log('  Original goal:', mockPrompt.humanPrompt.goal);
     console.log('  Substituted content available in renderedContent field');
     console.log();
