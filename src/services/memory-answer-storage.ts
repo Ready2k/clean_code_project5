@@ -22,7 +22,7 @@ export class MemoryAnswerStorage implements AnswerStorage {
     return results;
   }
 
-  async getAnswersByUser(userId: string, _promptId: string): Promise<Answer[]> {
+  async getAnswersByUser(userId: string): Promise<Answer[]> {
     const results: Answer[] = [];
     
     for (const answer of this.answers.values()) {

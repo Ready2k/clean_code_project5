@@ -3,7 +3,7 @@
 import { FileRatingSystem } from '../services/file-rating-system';
 import { PromptRecordClass } from '../models/prompt';
 
-async function demonstrateRatingSystem() {
+async function demonstrateRatingSystem(): Promise<void> {
   // Initialize the rating system
   const ratingSystem = new FileRatingSystem('./example-data');
   await ratingSystem.initialize();

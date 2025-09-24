@@ -129,7 +129,7 @@ export class PromptHistoryService implements HistoryService {
         message: version.message,
         author: version.author,
         created_at: version.created_at,
-        ratings: includeRatings ? this.getVersionRatings(prompt, version.number) : []
+        ratings: includeRatings ? this.getVersionRatings(prompt) : []
       };
 
       // Add changes if requested and we have a previous version to compare
@@ -177,7 +177,7 @@ export class PromptHistoryService implements HistoryService {
   /**
    * Get ratings for a specific version
    */
-  getVersionRatings(prompt: PromptRecord, _version: number): Array<{
+  getVersionRatings(prompt: PromptRecord): Array<{
     user: string;
     score: number;
     note: string;

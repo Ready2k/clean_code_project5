@@ -5,6 +5,7 @@ import { ProviderPayload } from '../types/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import * as YAML from 'yaml';
 
 export interface PromptStorage {
   /**
@@ -411,7 +412,6 @@ export class FileSystemPromptStorage implements PromptStorage {
    * Convert structured prompt to YAML
    */
   private structuredPromptToYAML(structured: any): string {
-    const YAML = require('yaml');
     return YAML.stringify(structured, {
       indent: 2,
       lineWidth: 0,
@@ -423,7 +423,6 @@ export class FileSystemPromptStorage implements PromptStorage {
    * Parse structured prompt from YAML
    */
   private parseStructuredPromptYAML(yamlContent: string): any {
-    const YAML = require('yaml');
     return YAML.parse(yamlContent);
   }
 }

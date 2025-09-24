@@ -53,7 +53,7 @@ export interface EnhancementResult {
 export interface EnhancementQuestion {
   id: string;
   question: string;
-  type: 'text' | 'select' | 'multiselect' | 'number' | 'boolean';
+  type: 'text' | 'string' | 'select' | 'multiselect' | 'number' | 'boolean';
   required: boolean;
   options?: string[];
   placeholder?: string;

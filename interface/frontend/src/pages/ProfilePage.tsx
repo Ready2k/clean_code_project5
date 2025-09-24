@@ -128,12 +128,12 @@ export const ProfilePage: React.FC = () => {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <Avatar sx={{ width: 64, height: 64, mr: 2 }}>
-              {user.username.charAt(0).toUpperCase()}
+              {user.username?.charAt(0).toUpperCase() || '?'}
             </Avatar>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="h6">{user.username}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {user.role.charAt(0).toUpperCase() + user.role.slice(1)} • Member since {new Date(user.createdAt).toLocaleDateString()}
+                {user.role?.charAt(0).toUpperCase() + user.role?.slice(1) || 'User'} • Member since {new Date(user.createdAt).toLocaleDateString()}
               </Typography>
             </Box>
             <IconButton

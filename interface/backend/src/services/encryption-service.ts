@@ -16,10 +16,16 @@ export class EncryptionService {
   public static initialize(masterKey?: string): void {
     try {
       if (masterKey) {
-        // Use provided master key - pad or truncate to correct length
-        const keyBuffer = Buffer.from(masterKey, 'utf8');
-        this.encryptionKey = Buffer.alloc(this.KEY_LENGTH);
-        keyBuffer.copy(this.encryptionKey, 0, 0, Math.min(keyBuffer.length, this.KEY_LENGTH));
+        // Check if the key is a hex string (64 characters for 32 bytes)
+        if (masterKey.length === 64 && /^[0-9a-fA-F]+$/.test(masterKey)) {
+          // Use hex key directly
+          this.encryptionKey = Buffer.from(masterKey, 'hex');
+        } else {
+          // Use provided master key - pad or truncate to correct length
+          const keyBuffer = Buffer.from(masterKey, 'utf8');
+          this.encryptionKey = Buffer.alloc(this.KEY_LENGTH);
+          keyBuffer.copy(this.encryptionKey, 0, 0, Math.min(keyBuffer.length, this.KEY_LENGTH));
+        }
       } else {
         // Generate a random key (for development/testing)
         this.encryptionKey = crypto.randomBytes(this.KEY_LENGTH);
@@ -155,11 +161,4 @@ export class EncryptionService {
   }
 }
 
-// Initialize the encryption service on module load
-const masterKey = process.env['ENCRYPTION_KEY'];
-if (masterKey) {
-  EncryptionService.initialize(masterKey);
-} else {
-  logger.warn('No ENCRYPTION_KEY environment variable found. Using random key for development.');
-  EncryptionService.initialize();
-}
+// Note: Encryption service initialization is now handled in index.ts after environment variables are loaded

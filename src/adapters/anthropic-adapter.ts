@@ -210,7 +210,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
       models: this.supportedModels.map(modelId => ({
         id: modelId,
         name: this.getModelDisplayName(modelId),
-        contextLength: this.getModelContextLength(modelId),
+        contextLength: this.getModelContextLength(),
         deprecated: this.isModelDeprecated(modelId),
         capabilities: this.capabilities
       })),
@@ -235,7 +235,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
 
     return {
       maxTokens: this.getModelMaxTokens(model),
-      contextLength: this.getModelContextLength(model),
+      contextLength: this.getModelContextLength(),
       supportsSystemMessages: true
     };
   }
@@ -306,7 +306,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
   /**
    * Get context length for model
    */
-  private getModelContextLength(_modelId: string): number {
+  private getModelContextLength(): number {
     // All Claude 3 models have 200k context length
     return 200000;
   }

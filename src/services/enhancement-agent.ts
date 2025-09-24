@@ -2,9 +2,10 @@
 
 import { HumanPrompt, StructuredPrompt, Variable, HumanPromptClass, StructuredPromptClass } from '../models/prompt';
 import { EnhancementResult } from '../models/enhancement';
-import { Question, QuestionClass } from '../models/variable';
+import { Question } from '../models/variable';
 import { ValidationResult } from '../types/validation';
 import { EnhancementContext, VariableType } from '../types/common';
+import { IntelligentQuestionGenerator, IntelligentQuestionGeneratorImpl } from './intelligent-question-generator';
 
 export interface EnhancementAgent {
   /**
@@ -60,9 +61,11 @@ export interface LLMService {
 
 export class EnhancementAgentImpl implements EnhancementAgent {
   private llmService: LLMService;
+  private questionGenerator: IntelligentQuestionGenerator;
 
   constructor(llmService: LLMService) {
     this.llmService = llmService;
+    this.questionGenerator = new IntelligentQuestionGeneratorImpl();
   }
 
   async enhance(humanPrompt: HumanPrompt, context?: EnhancementContext): Promise<EnhancementResult> {
@@ -96,9 +99,13 @@ export class EnhancementAgentImpl implements EnhancementAgent {
         throw new Error(`Generated structured prompt is invalid: ${structuredValidation.errors.join(', ')}`);
       }
 
-      // Extract variables and generate questions
-      const variables = this.extractVariables(structuredPrompt.user_template);
-      const questions = await this.generateQuestions(variables);
+      // Generate intelligent, context-aware questions
+      const questions = await this.questionGenerator.generateQuestions({
+        humanPrompt,
+        structuredPrompt,
+        enhancementContext: context,
+        taskType: this.questionGenerator.detectTaskType(humanPrompt)
+      });
 
       // Calculate confidence score
       const confidence = this.calculateConfidence(humanPrompt, structuredPrompt, parsedResult.warnings || []);
@@ -121,16 +128,9 @@ export class EnhancementAgentImpl implements EnhancementAgent {
   }
 
   async generateQuestions(variables: Variable[]): Promise<Question[]> {
-    const questions: Question[] = [];
-    
-    for (const variable of variables) {
-      // Generate a temporary prompt ID for question creation
-      const tempPromptId = 'temp-prompt-id';
-      const question = QuestionClass.fromVariable(variable, tempPromptId);
-      questions.push(question);
-    }
-
-    return questions;
+    // Use the intelligent question generator for variable-based questions
+    const tempPromptId = 'temp-prompt-id';
+    return this.questionGenerator.generateVariableQuestions(variables, tempPromptId);
   }
 
   validateStructuredPrompt(structured: StructuredPrompt): ValidationResult {

@@ -60,8 +60,9 @@ export const DashboardPage: React.FC = () => {
   // Calculate statistics
   const totalPrompts = systemStats?.services?.prompts?.total || pagination?.total || 0;
   const activeConnections = (connections || []).filter(conn => conn.status === 'active').length;
-  const averageRating = prompts && prompts.length > 0 
-    ? prompts.reduce((sum, prompt) => sum + (prompt.averageRating || 0), 0) / prompts.length 
+  const totalRatings = systemStats?.services?.prompts?.totalRatings || 0;
+  const averageRating = totalRatings > 0 && totalPrompts > 0 
+    ? totalRatings / totalPrompts 
     : 0;
 
   const handleTestConnection = (connectionId: string) => {

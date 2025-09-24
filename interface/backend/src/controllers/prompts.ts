@@ -68,7 +68,12 @@ const enhancePromptSchema = Joi.object({
 const renderPromptSchema = Joi.object({
   model: Joi.string(),
   temperature: Joi.number().min(0).max(2),
-  variables: Joi.object().pattern(Joi.string(), Joi.any()).default({})
+  variables: Joi.object().pattern(Joi.string(), Joi.any()).default({}),
+  connectionId: Joi.string().optional(),
+  maxTokens: Joi.number().optional(),
+  topP: Joi.number().optional(),
+  frequencyPenalty: Joi.number().optional(),
+  presencePenalty: Joi.number().optional()
 });
 
 // Rating schema moved to rating controller
@@ -118,11 +123,16 @@ export const getPrompts = async (req: Request, res: Response): Promise<void> => 
     const promptLibraryService = getPromptLibraryService();
     const prompts = await promptLibraryService.listPrompts(filters);
 
+    const totalPages = filters.limit ? Math.ceil(prompts.length / filters.limit) : 1;
+    
     res.json({
-      prompts,
-      total: prompts.length,
-      page: filters.page || 1,
-      limit: filters.limit || prompts.length
+      items: prompts,
+      pagination: {
+        page: filters.page || 1,
+        limit: filters.limit || prompts.length,
+        total: prompts.length,
+        totalPages
+      }
     });
   } catch (error) {
     logger.error('Failed to get prompts:', error);
@@ -519,12 +529,17 @@ export const searchPrompts = async (req: Request, res: Response): Promise<void> 
     const promptLibraryService = getPromptLibraryService();
     const prompts = await promptLibraryService.listPrompts(filters);
 
+    const totalPages = filters.limit ? Math.ceil(prompts.length / filters.limit) : 1;
+    
     res.json({
       query,
-      prompts,
-      total: prompts.length,
-      page: filters.page,
-      limit: filters.limit
+      items: prompts,
+      pagination: {
+        page: filters.page || 1,
+        limit: filters.limit || prompts.length,
+        total: prompts.length,
+        totalPages
+      }
     });
   } catch (error) {
     logger.error('Failed to search prompts:', error);

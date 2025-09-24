@@ -58,7 +58,7 @@ export interface ValidationRule {
 export interface Rating {
   id: string;
   userId: string;
-  username: string;
+  username?: string;
   score: number; // 1-5
   note?: string;
   createdAt: string;
@@ -130,7 +130,16 @@ export interface RenderResult {
   connectionId: string;
   provider: string;
   model: string;
-  payload: string;
+  payload: string | {
+    provider: string;
+    model?: string;
+    messages: Array<{
+      role: string;
+      content: string;
+    }>;
+    parameters?: Record<string, any>;
+    formatted_prompt: string;
+  };
   variables: Record<string, any>;
   createdAt: string;
   success: boolean;

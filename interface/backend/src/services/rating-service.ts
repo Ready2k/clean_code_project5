@@ -47,7 +47,7 @@ export interface RatingAnalytics {
     averageScore: number;
     count: number;
   }>;
-  recentRatings: Rating[];
+  recentRatings: any[];
   topRatedVersions: Array<{
     version: number;
     averageScore: number;
@@ -69,6 +69,7 @@ export interface SystemRatingStats {
     promptId: string;
     title: string;
     userId: string;
+    username?: string | undefined;
     score: number;
     timestamp: string;
   }>;
@@ -334,6 +335,59 @@ export class RatingService {
   }
 
   /**
+   * Map backend rating fields to frontend format
+   */
+  private mapRatingToFrontend(rating: Rating & { username?: string | undefined }): any {
+    return {
+      id: rating.id,
+      userId: rating.user_id,
+      username: rating.username,
+      score: rating.score,
+      note: rating.note,
+      createdAt: rating.created_at,
+      promptVersion: rating.prompt_version
+    };
+  }
+
+  /**
+   * Enrich ratings with username information
+   */
+  private async enrichRatingsWithUsernames(ratings: Rating[]): Promise<Array<Rating & { username?: string | undefined }>> {
+    try {
+      // Import getUserService dynamically to avoid circular dependencies
+      const { getUserService } = await import('./user-service.js');
+      const userService = getUserService();
+
+      const enrichedRatings = await Promise.all(
+        ratings.map(async (rating) => {
+          try {
+            const user = await userService.getUserById(rating.user_id);
+            return {
+              ...rating,
+              username: user?.username
+            } as Rating & { username?: string | undefined };
+          } catch (error) {
+            logger.warn('Failed to get username for rating', { 
+              ratingId: rating.id, 
+              userId: rating.user_id, 
+              error 
+            });
+            return {
+              ...rating,
+              username: undefined
+            } as Rating & { username?: string | undefined };
+          }
+        })
+      );
+
+      return enrichedRatings;
+    } catch (error) {
+      logger.warn('Failed to enrich ratings with usernames, returning original ratings', { error });
+      return ratings.map(rating => ({ ...rating, username: undefined } as Rating & { username?: string | undefined }));
+    }
+  }
+
+  /**
    * Submit a rating for a prompt
    */
   async ratePrompt(promptId: string, userId: string, ratingData: {
@@ -382,7 +436,7 @@ export class RatingService {
    * Get ratings for a prompt with filtering
    */
   async getPromptRatings(promptId: string, filters?: RatingFilters): Promise<{
-    ratings: Rating[];
+    ratings: any[];
     total: number;
     aggregation: RatingAggregation;
   }> {
@@ -450,10 +504,16 @@ export class RatingService {
         }
       }
 
+      // Enrich ratings with username information
+      const enrichedRatings = await this.enrichRatingsWithUsernames(ratings);
+
+      // Map to frontend format
+      const mappedRatings = enrichedRatings.map(rating => this.mapRatingToFrontend(rating));
+
       const aggregation = await this.fileRatingSystem.getRatingAggregation(promptId);
 
       return {
-        ratings,
+        ratings: mappedRatings,
         total,
         aggregation
       };
@@ -498,8 +558,10 @@ export class RatingService {
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      // Get recent ratings (last 10)
-      const recentRatings = ratings.slice(0, 10);
+      // Get recent ratings (last 10) and enrich with usernames
+      const recentRatingsRaw = ratings.slice(0, 10);
+      const enrichedRecentRatings = await this.enrichRatingsWithUsernames(recentRatingsRaw);
+      const recentRatings = enrichedRecentRatings.map(rating => this.mapRatingToFrontend(rating));
 
       // Get top rated versions
       const versionMap = new Map<number, { scores: number[]; count: number }>();
@@ -593,11 +655,14 @@ export class RatingService {
               totalRatings: aggregation.total_ratings
             });
 
-            // Collect recent ratings
-            const recentRatings = ratings.slice(0, 5).map(rating => ({
+            // Collect recent ratings with usernames
+            const recentRatingsRaw = ratings.slice(0, 5);
+            const enrichedRecentRatings = await this.enrichRatingsWithUsernames(recentRatingsRaw);
+            const recentRatings = enrichedRecentRatings.map(rating => ({
               promptId: prompt.id,
               title: prompt.metadata.title,
               userId: rating.user_id,
+              username: rating.username,
               score: rating.score,
               timestamp: rating.created_at
             }));

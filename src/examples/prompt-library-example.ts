@@ -6,7 +6,7 @@ import { HumanPrompt } from '../models/prompt';
 /**
  * Example demonstrating how to use the PromptLibrary
  */
-export async function promptLibraryExample() {
+export async function promptLibraryExample(): Promise<void> {
   // Configure the library
   const config: PromptLibraryConfig = {
     storageDir: './example-data',
@@ -42,7 +42,7 @@ export async function promptLibraryExample() {
       initialized: status.initialized,
       providers: status.providers.map(p => p.id),
       services: Object.entries(status.services)
-        .filter(([_, service]) => service.initialized)
+        .filter(([, service]) => service.initialized)
         .map(([name]) => name)
     });
 

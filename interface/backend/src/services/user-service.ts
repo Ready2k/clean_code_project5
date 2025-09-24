@@ -5,6 +5,9 @@ import { User, RegisterData, LoginCredentials, AuthResponse, JWTPayload } from '
 import { ValidationError, AuthenticationError, ConflictError, NotFoundError, ErrorCode } from '../types/errors.js';
 import { logger } from '../utils/logger.js';
 import { RedisService } from './redis-service.js';
+import fs from 'fs/promises';
+import path from 'path';
+import * as YAML from 'yaml';
 
 export class UserService {
   private users: Map<string, User> = new Map();
@@ -15,26 +18,138 @@ export class UserService {
   private readonly jwtSecret: string;
   private readonly jwtExpiresIn: string;
   private readonly refreshTokenExpiresIn: string;
+  private readonly storageDir: string;
 
-  constructor(redisService: RedisService) {
+  constructor(redisService: RedisService, storageDir?: string) {
     this.redisService = redisService;
     this.jwtSecret = process.env['JWT_SECRET'] || 'your-secret-key';
     this.jwtExpiresIn = process.env['JWT_EXPIRES_IN'] || '15m';
     this.refreshTokenExpiresIn = process.env['REFRESH_TOKEN_EXPIRES_IN'] || '7d';
+    this.storageDir = storageDir || path.resolve(process.cwd(), 'data/users');
     
     if (!process.env['JWT_SECRET']) {
       logger.warn('JWT_SECRET not set in environment variables, using default (not secure for production)');
     }
 
-    // Initialize with default admin user if no users exist
-    this.initializeDefaultUser();
+    // Initialize storage and load users
+    this.initializeStorage();
+  }
+
+  /**
+   * Initialize storage and load users from files
+   */
+  private async initializeStorage(): Promise<void> {
+    try {
+      // Create storage directory if it doesn't exist
+      await fs.mkdir(this.storageDir, { recursive: true });
+      
+      // Load existing users from files
+      await this.loadUsersFromFiles();
+      
+      // Initialize with default admin user if no users exist
+      await this.initializeDefaultUser();
+    } catch (error) {
+      logger.error('Failed to initialize user storage:', error);
+    }
+  }
+
+  /**
+   * Save a user to file
+   */
+  private async saveUserToFile(user: User): Promise<void> {
+    try {
+      const filePath = path.join(this.storageDir, `${user.id}.yaml`);
+      const yamlContent = YAML.stringify(user);
+      await fs.writeFile(filePath, yamlContent, 'utf-8');
+      logger.debug('User saved to file', { userId: user.id, filePath });
+    } catch (error) {
+      logger.error('Failed to save user to file', { userId: user.id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Load users from files
+   */
+  private async loadUsersFromFiles(): Promise<void> {
+    try {
+      const files = await fs.readdir(this.storageDir);
+      const yamlFiles = files.filter(file => file.endsWith('.yaml'));
+      
+      logger.info('Loading users from files', { fileCount: yamlFiles.length });
+      
+      for (const file of yamlFiles) {
+        try {
+          const filePath = path.join(this.storageDir, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const user = YAML.parse(content) as User;
+          
+          // Validate that the user has required fields
+          if (user.id && user.username && user.email && user.passwordHash) {
+            // Convert date strings back to Date objects
+            user.createdAt = new Date(user.createdAt);
+            user.updatedAt = new Date(user.updatedAt);
+            if (user.lastLogin) {
+              user.lastLogin = new Date(user.lastLogin);
+            }
+            
+            this.users.set(user.id, user);
+            this.usersByEmail.set(user.email.toLowerCase(), user.id);
+            this.usersByUsername.set(user.username.toLowerCase(), user.id);
+            
+            logger.debug('Loaded user from file', { userId: user.id, username: user.username });
+          } else {
+            logger.warn('Invalid user structure in file', { 
+              file, 
+              hasId: !!user.id, 
+              hasUsername: !!user.username, 
+              hasEmail: !!user.email,
+              hasPasswordHash: !!user.passwordHash
+            });
+          }
+        } catch (error) {
+          logger.error('Failed to load user from file', { file, error });
+        }
+      }
+      
+      logger.info('Finished loading users from files', { 
+        totalLoaded: this.users.size 
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.info('No existing users directory found, starting with empty collection');
+      } else {
+        logger.error('Failed to load users from files', { error });
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Delete user file
+   */
+  private async deleteUserFile(userId: string): Promise<void> {
+    try {
+      const filePath = path.join(this.storageDir, `${userId}.yaml`);
+      await fs.unlink(filePath);
+      logger.debug('User file deleted', { userId, filePath });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.debug('User file not found, nothing to delete', { userId });
+      } else {
+        logger.error('Failed to delete user file', { userId, error });
+        throw error;
+      }
+    }
   }
 
   private async initializeDefaultUser(): Promise<void> {
     try {
-      // Check if any users exist
-      if (this.users.size === 0) {
-        logger.info('No users found, creating default admin user');
+      // Check if admin user exists
+      const existingAdmin = await this.getUserByUsername('admin');
+      
+      if (!existingAdmin) {
+        logger.info('No admin user found, creating default admin user');
         
         const defaultAdmin: RegisterData = {
           username: 'admin',
@@ -47,6 +162,9 @@ export class UserService {
         adminUser.role = 'admin'; // Set as admin after creation
         this.users.set(adminUser.id, adminUser);
         
+        // Save the updated admin user with admin role
+        await this.saveUserToFile(adminUser);
+        
         logger.info('Default admin user created successfully', { 
           id: adminUser.id,
           username: adminUser.username, 
@@ -55,7 +173,18 @@ export class UserService {
           totalUsers: this.users.size
         });
       } else {
-        logger.info('Users already exist, skipping default user creation', {
+        // Ensure existing admin user has admin role
+        if (existingAdmin.role !== 'admin') {
+          logger.info('Upgrading existing admin user to admin role');
+          existingAdmin.role = 'admin';
+          existingAdmin.updatedAt = new Date();
+          this.users.set(existingAdmin.id, existingAdmin);
+          await this.saveUserToFile(existingAdmin);
+        }
+        
+        logger.info('Admin user already exists', {
+          adminId: existingAdmin.id,
+          role: existingAdmin.role,
           totalUsers: this.users.size
         });
       }
@@ -122,6 +251,13 @@ export class UserService {
     // Update last login
     user.lastLogin = new Date();
     user.updatedAt = new Date();
+
+    // Save updated user to file
+    try {
+      await this.saveUserToFile(user);
+    } catch (error) {
+      logger.warn('Failed to save user login update to file', { userId: user.id, error });
+    }
 
     const tokens = await this.generateTokens(user);
 
@@ -263,6 +399,9 @@ export class UserService {
 
     this.users.set(id, updatedUser);
 
+    // Save updated user to file
+    await this.saveUserToFile(updatedUser);
+
     logger.info('User updated successfully', { 
       userId: id, 
       updatedFields: Object.keys(updates) 
@@ -291,6 +430,9 @@ export class UserService {
 
     this.users.set(id, updatedUser);
 
+    // Save updated user to file
+    await this.saveUserToFile(updatedUser);
+
     logger.info('User password updated successfully', { userId: id });
   }
 
@@ -306,6 +448,9 @@ export class UserService {
     
     // Remove user
     this.users.delete(id);
+
+    // Delete user file
+    await this.deleteUserFile(id);
 
     logger.info('User deleted successfully', { 
       userId: id, 
@@ -347,6 +492,9 @@ export class UserService {
     this.usersByEmail.set(user.email, user.id);
     this.usersByUsername.set(user.username.toLowerCase(), user.id);
 
+    // Save user to file
+    await this.saveUserToFile(user);
+
     return user;
   }
 
@@ -378,12 +526,51 @@ export class UserService {
     }
   }
 
+  /**
+   * Get permissions for a user role
+   */
+  private getPermissionsForRole(role: string): string[] {
+    switch (role) {
+      case 'admin':
+        return [
+          'read:prompts',
+          'write:prompts',
+          'delete:prompts',
+          'enhance:prompts',
+          'rate:prompts',
+          'export:prompts',
+          'admin:users',
+          'system:config',
+          'view:system'
+        ];
+      case 'user':
+        return [
+          'read:prompts',
+          'write:prompts',
+          'delete:prompts',
+          'enhance:prompts',
+          'rate:prompts',
+          'export:prompts'
+        ];
+      case 'viewer':
+        return [
+          'read:prompts',
+          'rate:prompts'
+        ];
+      default:
+        return ['read:prompts'];
+    }
+  }
+
   private async generateTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
-    const basePayload: Omit<JWTPayload, 'iat' | 'exp' | 'permissions'> = {
+    const permissions = this.getPermissionsForRole(user.role);
+    
+    const basePayload: Omit<JWTPayload, 'iat' | 'exp'> = {
       userId: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      permissions
     };
 
     // Add a small delay to ensure different timestamps
@@ -437,9 +624,9 @@ export class UserService {
 // Singleton instance
 let userServiceInstance: UserService | null = null;
 
-export async function initializeUserService(redisService: RedisService): Promise<UserService> {
+export async function initializeUserService(redisService: RedisService, storageDir?: string): Promise<UserService> {
   if (!userServiceInstance) {
-    userServiceInstance = new UserService(redisService);
+    userServiceInstance = new UserService(redisService, storageDir);
     logger.info('User service initialized');
   }
   return userServiceInstance;

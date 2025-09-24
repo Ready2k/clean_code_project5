@@ -19,8 +19,7 @@ export const enhancementAPI = {
   },
 
   async submitQuestionnaireResponse(promptId: string, jobId: string, answers: Record<string, any>): Promise<void> {
-    const response: QuestionnaireResponse = { jobId, answers };
-    await apiClient.post(`/prompts/${promptId}/enhance/questionnaire?jobId=${jobId}`, response);
+    await apiClient.post(`/prompts/${promptId}/enhance/questionnaire?jobId=${jobId}`, { answers });
   },
 
   async cancelEnhancement(promptId: string, jobId: string): Promise<void> {

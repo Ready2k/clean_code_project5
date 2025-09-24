@@ -14,6 +14,7 @@ import { systemRoutes } from './routes/system.js';
 import { adminRoutes } from './routes/admin.js';
 import { ratingRoutes } from './routes/ratings.js';
 import { exportRoutes } from './routes/export.js';
+import { importRoutes } from './routes/import.js';
 import { authenticateToken } from './middleware/auth.js';
 import { recordMetrics, trackAPIUsage, trackSecurityEvents } from './middleware/metrics.js';
 import { initializePromptLibraryService, getPromptLibraryService } from './services/prompt-library-service.js';
@@ -27,8 +28,18 @@ import { initializeAPIDocumentationService, getAPIDocumentationService } from '.
 import { initializeSystemMonitoringService, getSystemMonitoringService } from './services/system-monitoring-service.js';
 import { webSocketService } from './services/websocket-service.js';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from parent directory
+dotenv.config({ path: '../.env' });
+
+// Initialize encryption service after environment variables are loaded
+import { EncryptionService } from './services/encryption-service.js';
+const masterKey = process.env['ENCRYPTION_KEY'];
+if (masterKey) {
+  EncryptionService.initialize(masterKey);
+} else {
+  logger.warn('No ENCRYPTION_KEY environment variable found. Using random key for development.');
+  EncryptionService.initialize();
+}
 
 const app = express();
 const server = createServer(app);
@@ -124,6 +135,7 @@ app.use('/api/system', authenticateToken, systemRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/ratings', authenticateToken, ratingRoutes);
 app.use('/api/export', authenticateToken, exportRoutes);
+app.use('/api/import', authenticateToken, importRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -143,44 +155,54 @@ app.use(errorHandler);
 async function initializeServices() {
   try {
     logger.info('Initializing services...');
-    
+
     // Initialize Redis service first (required by user service)
     await initializeRedisService();
-    
+
     // Initialize user service
     const redisService = getRedisService();
     await initializeUserService(redisService);
-    
+
     // Initialize prompt library service
     await initializePromptLibraryService({
       storageDir: process.env['PROMPT_STORAGE_DIR'] || './data/prompts'
     });
-    
+
     // Initialize connection management service
     await initializeConnectionManagementService({
       storageDir: process.env['CONNECTION_STORAGE_DIR'] || './data/connections'
     });
-    
+
     // Initialize rating service
     await initializeRatingService({
       storageDir: process.env['RATING_STORAGE_DIR'] || './data'
     });
-    
+
     // Initialize export service
     await initializeExportService({
       tempDir: process.env['EXPORT_TEMP_DIR'] || './temp/exports'
     });
-    
+
+    // Sync ratings from rating service to prompt library service
+    // This must happen after both services are initialized
+    try {
+      const promptLibraryService = getPromptLibraryService();
+      await promptLibraryService.syncRatingsFromRatingService();
+      logger.info('Successfully synced ratings from rating service to prompt library');
+    } catch (error) {
+      logger.warn('Failed to sync ratings during startup', { error });
+    }
+
     // Initialize API documentation service
     await initializeAPIDocumentationService();
-    
+
     // Initialize system monitoring service
     await initializeSystemMonitoringService();
-    
+
     // Connect WebSocket service to system monitoring
     const systemMonitoringService = getSystemMonitoringService();
     systemMonitoringService.setWebSocketService(webSocketService);
-    
+
     logger.info('Services initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize services:', error);
@@ -204,33 +226,33 @@ app.set('webSocketService', webSocketService);
 // Graceful shutdown
 async function gracefulShutdown() {
   logger.info('Starting graceful shutdown...');
-  
+
   try {
     // Close server
     server.close();
-    
+
     // Shutdown services
     const promptLibraryService = getPromptLibraryService();
     await promptLibraryService.shutdown();
-    
+
     const connectionService = getConnectionManagementService();
     await connectionService.shutdown();
-    
+
     const redisService = getRedisService();
     await redisService.disconnect();
-    
+
     const ratingService = getRatingService();
     await ratingService.shutdown();
-    
+
     const exportService = getExportService();
     await exportService.shutdown();
-    
+
     const apiDocService = getAPIDocumentationService();
     await apiDocService.shutdown();
-    
+
     const systemMonitoringService = getSystemMonitoringService();
     await systemMonitoringService.shutdown();
-    
+
     logger.info('Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
@@ -246,7 +268,7 @@ process.on('SIGINT', gracefulShutdown);
 async function startServer() {
   try {
     await initializeServices();
-    
+
     server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`, {
         environment: process.env['NODE_ENV'] || 'development',

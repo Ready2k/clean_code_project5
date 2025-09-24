@@ -71,6 +71,15 @@ export const ratePrompt = async (req: ExtendedAuthenticatedRequest, res: Respons
     const ratingService = getRatingService();
     await ratingService.ratePrompt(promptId, req.user!.userId, value);
 
+    // Sync the specific prompt's ratings in the prompt library service cache
+    try {
+      const { getPromptLibraryService } = await import('../services/prompt-library-service.js');
+      const promptLibraryService = getPromptLibraryService();
+      await promptLibraryService.syncPromptRatings(promptId);
+    } catch (error) {
+      logger.warn('Failed to sync prompt ratings in prompt library service', { error });
+    }
+
     // Emit WebSocket events for rating update and user activity
     const webSocketService = req.app.get('webSocketService');
     if (webSocketService) {

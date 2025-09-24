@@ -268,7 +268,7 @@ export const RealTimeActivityFeed: React.FC = () => {
                         {activity.type === 'system' ? (
                           getActivityIcon(activity.type, activity.action)
                         ) : (
-                          activity.username.charAt(0).toUpperCase()
+                          activity.username?.charAt(0).toUpperCase() || '?'
                         )}
                       </Avatar>
                     </ListItemAvatar>
@@ -277,7 +277,7 @@ export const RealTimeActivityFeed: React.FC = () => {
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="body2" component="span">
-                            <strong>{activity.username}</strong> {activity.action}
+                            <strong>{activity.username || 'Anonymous User'}</strong> {activity.action}
                           </Typography>
                           {getActivityIcon(activity.type, activity.action)}
                         </Box>

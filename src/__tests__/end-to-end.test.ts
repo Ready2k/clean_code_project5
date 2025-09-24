@@ -3,7 +3,7 @@
 // Tests multi-provider rendering consistency
 // Tests import/export round-trip scenarios
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PromptLibrary, PromptLibraryConfig } from '../prompt-library';
 import { PromptRecord, HumanPrompt } from '../models/prompt';
 import { RenderOptions } from '../types/common';
@@ -274,7 +274,7 @@ describe('End-to-End Workflows', () => {
       });
 
       // Enhance to generate variables
-      const enhancementResult = await promptManager.enhancePrompt(createdPrompt.id);
+      await promptManager.enhancePrompt(createdPrompt.id);
       const enhancedPrompt = await promptManager.getPrompt(createdPrompt.id);
 
       expect(enhancedPrompt.variables.length).toBeGreaterThanOrEqual(3);

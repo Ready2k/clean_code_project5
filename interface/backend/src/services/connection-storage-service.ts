@@ -34,6 +34,11 @@ export class ConnectionStorageService {
       // Load existing connections
       await this.loadConnections();
       
+      // If no connections exist, load sample data for development
+      if (this.connections.size === 0 && (process.env['NODE_ENV'] === 'development' || process.env['DEMO_MODE'] === 'true')) {
+        await this.loadSampleConnections();
+      }
+      
       // Clean up any connections that cannot be decrypted
       await this.cleanupCorruptedConnections();
       
@@ -100,6 +105,110 @@ export class ConnectionStorageService {
       }
     }
   }
+
+  /**
+   * Load sample connections for development/demo
+   */
+  private async loadSampleConnections(): Promise<void> {
+    try {
+      const sampleConnectionConfigs = [
+        {
+          name: 'OpenAI GPT-4',
+          provider: 'openai' as const,
+          config: {
+            apiKey: 'demo-key-openai-gpt4',
+            models: ['gpt-4', 'gpt-4-turbo'],
+            defaultModel: 'gpt-4'
+          } as OpenAIConfig,
+          status: 'active' as const,
+          user_id: 'system',
+          last_tested: new Date(Date.now() - 3600000) // 1 hour ago
+        },
+        {
+          name: 'OpenAI GPT-3.5 Turbo',
+          provider: 'openai' as const,
+          config: {
+            apiKey: 'demo-key-openai-gpt35',
+            models: ['gpt-3.5-turbo', 'gpt-3.5-turbo-16k'],
+            defaultModel: 'gpt-3.5-turbo'
+          } as OpenAIConfig,
+          status: 'active' as const,
+          user_id: 'system',
+          last_tested: new Date(Date.now() - 7200000) // 2 hours ago
+        },
+        {
+          name: 'AWS Bedrock Claude',
+          provider: 'bedrock' as const,
+          config: {
+            region: 'us-east-1',
+            accessKeyId: 'demo-access-key',
+            secretAccessKey: 'demo-secret-key',
+            models: ['anthropic.claude-v2', 'anthropic.claude-instant-v1'],
+            defaultModel: 'anthropic.claude-v2'
+          } as BedrockConfig,
+          status: 'inactive' as const,
+          user_id: 'system',
+          last_tested: new Date(Date.now() - 86400000) // 1 day ago
+        }
+      ];
+
+      for (const connectionData of sampleConnectionConfigs) {
+        // Encrypt the config before creating the connection record
+        const encryptedConfig = EncryptionService.encryptConfig(connectionData.config);
+        
+        const connection: ConnectionRecord = {
+          id: uuidv4(),
+          name: connectionData.name,
+          provider: connectionData.provider,
+          encrypted_config: encryptedConfig,
+          status: connectionData.status,
+          user_id: connectionData.user_id,
+          last_tested: connectionData.last_tested,
+          created_at: new Date(Date.now() - Math.random() * 86400000 * 7), // Within last week
+          updated_at: new Date(Date.now() - Math.random() * 86400000 * 2)  // Within last 2 days
+        };
+
+        this.connections.set(connection.id, connection);
+      }
+
+      // Save the sample connections
+      await this.saveConnections();
+      
+      logger.info(`Loaded ${sampleConnectionConfigs.length} sample connections for development`);
+    } catch (error) {
+      logger.error('Failed to load sample connections:', error);
+      // Don't throw - this is just for demo purposes
+    }
+  }
+
+  /**
+   * Migrate connections from old user ID to new user ID
+   * This is useful when user IDs change due to service restarts before persistence was implemented
+   */
+  public async migrateUserConnections(oldUserId: string, newUserId: string): Promise<number> {
+    let migratedCount = 0;
+    
+    for (const connection of this.connections.values()) {
+      if (connection.user_id === oldUserId) {
+        connection.user_id = newUserId;
+        connection.updated_at = new Date();
+        migratedCount++;
+      }
+    }
+    
+    if (migratedCount > 0) {
+      await this.saveConnections();
+      logger.info('Migrated connections to new user ID', { 
+        oldUserId, 
+        newUserId, 
+        migratedCount 
+      });
+    }
+    
+    return migratedCount;
+  }
+
+
 
   /**
    * Save connections to storage

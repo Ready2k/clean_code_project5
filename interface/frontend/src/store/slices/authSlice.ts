@@ -25,6 +25,9 @@ export const login = createAsyncThunk(
     try {
       const response = await authAPI.login(credentials);
       localStorage.setItem('token', response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
+      }
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Login failed');
@@ -38,9 +41,11 @@ export const logout = createAsyncThunk(
     try {
       await authAPI.logout();
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
     } catch (error: any) {
       // Even if logout fails on server, clear local storage
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       return rejectWithValue(error.response?.data?.message || 'Logout failed');
     }
   }
@@ -52,9 +57,13 @@ export const refreshToken = createAsyncThunk(
     try {
       const response = await authAPI.refreshToken();
       localStorage.setItem('token', response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
+      }
       return response;
     } catch (error: any) {
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       return rejectWithValue(error.response?.data?.message || 'Token refresh failed');
     }
   }
@@ -151,6 +160,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
     },
   },
   extraReducers: (builder) => {

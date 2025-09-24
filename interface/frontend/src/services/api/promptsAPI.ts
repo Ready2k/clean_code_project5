@@ -44,7 +44,7 @@ export const promptsAPI = {
   },
 
   async submitQuestionnaireResponse(id: string, jobId: string, answers: Record<string, any>): Promise<void> {
-    await apiClient.post(`/prompts/${id}/enhance/questionnaire?jobId=${jobId}`, { jobId, answers });
+    await apiClient.post(`/prompts/${id}/enhance/questionnaire?jobId=${jobId}`, { answers });
   },
 
   async renderPrompt(id: string, provider: string, options: any): Promise<any> {
@@ -104,6 +104,52 @@ export const promptsAPI = {
 
   async filterPromptsByRating(filters: any): Promise<any> {
     const response = await apiClient.get('/ratings/prompts/filter', { params: filters });
+    return response.data;
+  },
+
+  // Import functionality
+  async getSupportedImportFormats(): Promise<any> {
+    const response = await apiClient.get('/import/formats');
+    return response.data;
+  },
+
+  async validateImportContent(data: { content: string; sourceProvider?: string }): Promise<any> {
+    const response = await apiClient.post('/import/validate', data);
+    return response.data;
+  },
+
+  async importFromContent(data: {
+    content: string;
+    sourceProvider?: string;
+    conflictResolution?: string;
+    defaultTags?: string[];
+    autoEnhance?: boolean;
+    slugPrefix?: string;
+    validateBeforeImport?: boolean;
+  }): Promise<any> {
+    const response = await apiClient.post('/import/content', data);
+    return response.data;
+  },
+
+  async importFromUrl(data: {
+    url: string;
+    sourceProvider?: string;
+    conflictResolution?: string;
+    defaultTags?: string[];
+    autoEnhance?: boolean;
+    slugPrefix?: string;
+    validateBeforeImport?: boolean;
+  }): Promise<any> {
+    const response = await apiClient.post('/import/url', data);
+    return response.data;
+  },
+
+  async importFromFile(formData: FormData): Promise<any> {
+    const response = await apiClient.post('/import/file', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };

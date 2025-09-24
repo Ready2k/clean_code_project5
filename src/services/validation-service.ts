@@ -288,12 +288,13 @@ export class ValidationService {
         }
         break;
 
-      case 'number':
+      case 'number': {
         const numValue = Number(value);
         if (!Number.isFinite(numValue)) {
           errors.push(`Variable '${variable.key}' must be a valid number, got '${value}'`);
         }
         break;
+      }
 
       case 'boolean':
         if (typeof value !== 'boolean' && value !== 'true' && value !== 'false' && value !== true && value !== false) {

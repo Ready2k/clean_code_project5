@@ -11,11 +11,7 @@ export class MockLLMService implements LLMService {
     this.setupDefaultResponses();
   }
 
-  async complete(prompt: string, _options?: {
-    temperature?: number;
-    maxTokens?: number;
-    systemPrompt?: string;
-  }): Promise<string> {
+  async complete(prompt: string): Promise<string> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100));
 

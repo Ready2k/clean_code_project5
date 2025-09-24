@@ -194,7 +194,7 @@ export const CollaborativeEditingIndicator: React.FC<CollaborativeEditingIndicat
                           fontSize: '0.75rem'
                         }}
                       >
-                        {editor.username.charAt(0).toUpperCase()}
+                        {editor.username?.charAt(0).toUpperCase() || '?'}
                       </Avatar>
                     }
                     label={editor.username}

@@ -4,7 +4,6 @@ import { HumanPrompt, StructuredPrompt } from '../models/prompt';
 import { EnhancementResult, EnhancementRequest } from '../models/enhancement';
 import { Question, Answer } from '../models/variable';
 import { EnhancementAgent } from './enhancement-agent';
-import { VariableManager } from './variable-manager';
 import { ValidationResult } from '../types/validation';
 import { EnhancementContext } from '../types/common';
 
@@ -81,8 +80,7 @@ export interface QualityMetrics {
 export class EnhancementWorkflowImpl implements EnhancementWorkflow {
   private enhancementAgent: EnhancementAgent;
   constructor(
-    enhancementAgent: EnhancementAgent,
-    _variableManager: VariableManager
+    enhancementAgent: EnhancementAgent
   ) {
     this.enhancementAgent = enhancementAgent;
   }

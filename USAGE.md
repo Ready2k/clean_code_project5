@@ -256,15 +256,24 @@ Ensure the storage directory is writable:
 chmod 755 ./my-prompts
 ```
 
-### 3. API Key Issues
-For real AI providers, make sure to set your API keys:
+### 3. API Key Configuration
+For real AI providers, set your API keys in environment variables:
+```bash
+export OPENAI_API_KEY="your-key-here"
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+### 4. Provider Not Found Errors
+Make sure the provider is enabled in your configuration:
 ```typescript
-llmService: {
-  provider: 'openai',
-  apiKey: process.env.OPENAI_API_KEY,
-  model: 'gpt-4'
+providers: {
+  enabled: ['openai', 'anthropic', 'meta'],
+  disabled: []
 }
 ```
+
+### 5. Enhancement Questions Not Appearing
+The intelligent question generator only asks questions when they add value. If your prompt is already complete and specific, no questions will be generated - this is the intended behavior.
 
 ## 🎉 Next Steps
 

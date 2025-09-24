@@ -12,7 +12,11 @@ export const authAPI = {
   },
 
   async refreshToken(): Promise<AuthResponse> {
-    const response = await apiClient.post('/auth/refresh');
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+    const response = await apiClient.post('/auth/refresh', { refreshToken });
     return response.data;
   },
 

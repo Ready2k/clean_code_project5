@@ -99,7 +99,7 @@ export class FileRatingSystem implements RatingSystem {
   /**
    * Get top-rated prompts (requires integration with prompt storage)
    */
-  async getTopRatedPrompts(_limit: number): Promise<PromptRecord[]> {
+  async getTopRatedPrompts(): Promise<PromptRecord[]> {
     // This would need integration with the prompt storage system
     // For now, return empty array as this requires cross-service coordination
     return [];
