@@ -26,8 +26,13 @@ inclusion: always
   - `src/services/` - Business logic services
   - `src/adapters/` - Provider-specific implementations
   - `src/models/` - Data models and interfaces
-  - `interface/` - Web interface application
+  - `interface/` - Full-stack web application
+    - `interface/frontend/` - React TypeScript application
+    - `interface/backend/` - Node.js Express API server
+    - `interface/shared/` - Shared types and utilities
+    - `interface/docs/` - Comprehensive documentation
 - Use consistent naming conventions (kebab-case for files, PascalCase for classes)
+- Maintain workspace structure with proper package.json workspaces
 
 ## Development Workflow
 
@@ -62,3 +67,29 @@ inclusion: always
 - Use environment variables for configuration
 - Validate all user inputs
 - Implement proper error handling without exposing internals
+- Use JWT tokens for authentication with proper expiration
+- Implement role-based access control (RBAC)
+- Encrypt sensitive data at rest using AES-256-GCM
+- Use TLS 1.3 for all network communications
+
+## Web Interface Standards
+
+### Frontend Development
+- Use React 18 with TypeScript for type safety
+- Material-UI (MUI) for consistent component design
+- Redux Toolkit for state management
+- React Router for client-side routing
+- Vite for fast development and optimized builds
+
+### Backend Development
+- Express.js with TypeScript for API services
+- PostgreSQL for persistent data storage
+- Redis for caching and session management
+- Socket.io for real-time features
+- OpenAPI/Swagger for API documentation
+
+### Development Workflow
+- Use Docker Compose for local development environment
+- Implement comprehensive logging with structured formats
+- Use Prometheus metrics for monitoring
+- Maintain separate development and production configurations

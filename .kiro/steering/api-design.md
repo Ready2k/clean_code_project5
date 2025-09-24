@@ -34,10 +34,12 @@ fileMatchPattern: "**/*.ts"
 - `Rating`: User evaluation with score and notes
 
 ### API Responses
-- Use consistent response shapes
-- Include metadata (timestamps, versions, etc.)
-- Support pagination for list endpoints
-- Provide clear error response format
+- Use consistent response shapes with standard HTTP status codes
+- Include metadata (timestamps, versions, pagination info)
+- Support pagination for list endpoints with cursor-based pagination
+- Provide clear error response format with error codes and messages
+- Include request correlation IDs for debugging
+- Use OpenAPI 3.0 specification for comprehensive API documentation
 
 ## Provider Integration
 
@@ -51,3 +53,27 @@ fileMatchPattern: "**/*.ts"
 - New providers should be addable without core changes
 - Support custom model configurations
 - Allow provider-specific options in render calls
+- Use plugin architecture for extending functionality
+- Support middleware for request/response processing
+
+## REST API Standards
+
+### Endpoint Design
+- Use RESTful resource-based URLs: `/api/v1/prompts/{id}`
+- Support standard HTTP methods (GET, POST, PUT, DELETE, PATCH)
+- Use query parameters for filtering, sorting, and pagination
+- Include API versioning in URL path
+- Implement proper CORS policies for web interface
+
+### Authentication & Authorization
+- Use JWT tokens for stateless authentication
+- Implement refresh token rotation for security
+- Support role-based access control (RBAC)
+- Include proper rate limiting per user/IP
+- Log all authentication attempts for security monitoring
+
+### Real-time Features
+- Use WebSocket connections for collaborative editing
+- Implement proper connection management and reconnection logic
+- Support room-based collaboration with proper access control
+- Handle connection state synchronization gracefully
