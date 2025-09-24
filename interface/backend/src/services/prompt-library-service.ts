@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger.js';
 import { ServiceUnavailableError, NotFoundError, ValidationError } from '../types/errors.js';
+import { LLMExecutionService } from './llm-execution-service.js';
 import path from 'path';
 import fs from 'fs/promises';
 import * as YAML from 'yaml';
@@ -44,6 +45,9 @@ export interface PromptRecord {
     owner: string;
     created_at: string;
     updated_at: string;
+    preferred_model?: string;
+    tuned_for_provider?: string;
+    source_url?: string;
   };
   humanPrompt: HumanPrompt;
   prompt_structured?: StructuredPrompt;
@@ -54,6 +58,8 @@ export interface PromptRecord {
     author: string;
     timestamp: string;
     changes: any;
+    enhancement_model?: string;
+    enhancement_provider?: string;
   }>;
   ratings?: Rating[];
   averageRating?: number;
@@ -71,6 +77,8 @@ export interface EnhancementResult {
   confidence: number;
   changes_made: string[];
   warnings?: string[];
+  enhancement_model?: string;
+  enhancement_provider?: string;
 }
 
 export interface Question {
@@ -107,6 +115,8 @@ export interface RenderOptions {
   model?: string;
   temperature?: number;
   variables?: Record<string, any>;
+  version?: 'original' | 'enhanced' | 'original-no-adapt';
+  connectionId?: string;
 }
 
 export interface ProviderPayload {
@@ -118,6 +128,12 @@ export interface ProviderPayload {
   }>;
   parameters?: Record<string, any>;
   formatted_prompt: string;
+  response?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface CreatePromptRequest {
@@ -125,6 +141,9 @@ export interface CreatePromptRequest {
     title: string;
     summary: string;
     tags: string[];
+    preferred_model?: string;
+    tuned_for_provider?: string;
+    source_url?: string;
   };
   humanPrompt: HumanPrompt;
   owner: string;
@@ -143,6 +162,7 @@ export interface UpdatePromptRequest {
 export interface EnhancementOptions {
   preserve_style?: boolean;
   target_provider?: string;
+  target_model?: string;
 }
 
 export interface RatingData {
@@ -671,7 +691,10 @@ export class PromptLibraryService {
           tags: request.metadata.tags,
           owner: request.owner,
           created_at: now,
-          updated_at: now
+          updated_at: now,
+          ...(request.metadata.preferred_model && { preferred_model: request.metadata.preferred_model }),
+          ...(request.metadata.tuned_for_provider && { tuned_for_provider: request.metadata.tuned_for_provider }),
+          ...(request.metadata.source_url && { source_url: request.metadata.source_url })
         },
         humanPrompt: request.humanPrompt,
         variables: [],
@@ -723,14 +746,27 @@ export class PromptLibraryService {
         variables: updates.variables || existingPrompt.variables
       };
 
+      // Determine if this is an enhancement update
+      const isEnhancement = updates.humanPrompt && 
+        (updates.humanPrompt.goal?.includes('Enhanced context:') || 
+         updates.humanPrompt.steps?.some(step => step.includes('Enhanced:')));
+
       // Add to history
-      updatedPrompt.history.push({
+      const historyEntry: any = {
         version: existingPrompt.version,
-        message: 'Prompt updated via API',
+        message: isEnhancement ? 'Prompt enhanced via AI' : 'Prompt updated via API',
         author: existingPrompt.metadata.owner,
         timestamp: new Date().toISOString(),
         changes: updates
-      });
+      };
+
+      // Add enhancement model info if this is an enhancement
+      if (isEnhancement) {
+        historyEntry.enhancement_model = 'claude-3-sonnet'; // Default for now
+        historyEntry.enhancement_provider = 'anthropic';
+      }
+
+      updatedPrompt.history.push(historyEntry);
 
       this.prompts.set(id, updatedPrompt);
 
@@ -987,7 +1023,9 @@ export class PromptLibraryService {
           'Extracted variables for input data and context',
           'Added rules for accuracy and completeness'
         ],
-        warnings: []
+        warnings: [],
+        enhancement_model: options?.target_model || 'claude-3-sonnet',
+        enhancement_provider: options?.target_provider || 'anthropic'
       };
 
       logger.info('Prompt enhanced successfully', { id, confidence: result.confidence });
@@ -1004,7 +1042,7 @@ export class PromptLibraryService {
   /**
    * Render a prompt for a specific provider
    */
-  async renderPrompt(id: string, provider: string, options: RenderOptions): Promise<ProviderPayload> {
+  async renderPrompt(id: string, provider: string, options: RenderOptions, userId?: string): Promise<ProviderPayload> {
     this.ensureInitialized();
 
     try {
@@ -1019,41 +1057,218 @@ export class PromptLibraryService {
         throw new ValidationError(`Invalid provider: ${provider}. Valid providers are: ${validProviders.join(', ')}`);
       }
 
-      // Mock rendering based on provider
+      // Determine which version to use
+      const useEnhanced = options.version === 'enhanced' && prompt.prompt_structured;
+      const noAdaptation = options.version === 'original-no-adapt';
+      
+      // Mock rendering based on provider and version
       let messages: Array<{ role: string; content: string }>;
       let formattedPrompt: string;
 
-      if (provider === 'openai') {
-        messages = [
-          {
-            role: 'system',
-            content: `You are a helpful assistant. ${prompt.humanPrompt.goal}`
-          },
-          {
-            role: 'user',
-            content: `Please help me with the following:\n\nGoal: ${prompt.humanPrompt.goal}\nAudience: ${prompt.humanPrompt.audience}\n\nSteps:\n${prompt.humanPrompt.steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nExpected output format: ${prompt.humanPrompt.output_expectations.format}`
-          }
-        ];
-        formattedPrompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
-      } else if (provider === 'anthropic') {
-        messages = [
-          {
-            role: 'user',
-            content: `Human: ${prompt.humanPrompt.goal}\n\nPlease follow these steps:\n${prompt.humanPrompt.steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nTarget audience: ${prompt.humanPrompt.audience}\nExpected format: ${prompt.humanPrompt.output_expectations.format}\n\nAssistant: I'll help you with that. Let me work through this step by step.`
-          }
-        ];
-        formattedPrompt = messages[0]?.content || '';
+      if (useEnhanced && prompt.prompt_structured) {
+        // Use enhanced structured prompt
+        const structured = prompt.prompt_structured;
+        
+        if (provider === 'openai') {
+          messages = [
+            {
+              role: 'system',
+              content: (structured.system || []).join('\n')
+            },
+            {
+              role: 'user',
+              content: this.substituteVariables(structured.user_template || '', options.variables || {})
+            }
+          ];
+          formattedPrompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+        } else if (provider === 'anthropic') {
+          const systemInstructions = (structured.system || []).join('\n');
+          const userContent = this.substituteVariables(structured.user_template || '', options.variables || {});
+          messages = [
+            {
+              role: 'user',
+              content: `Human: ${systemInstructions}\n\n${userContent}\n\nAssistant: I'll help you with that following the provided instructions.`
+            }
+          ];
+          formattedPrompt = messages[0]?.content || '';
+        } else {
+          // Meta/Llama format
+          const systemInstructions = (structured.system || []).join('\n');
+          const userContent = this.substituteVariables(structured.user_template || '', options.variables || {});
+          messages = [
+            {
+              role: 'user',
+              content: `[INST] ${systemInstructions}\n\n${userContent} [/INST]`
+            }
+          ];
+          formattedPrompt = messages[0]?.content || '';
+        }
+      } else if (noAdaptation) {
+        // Use original prompt without any adaptation
+        const originalPromptText = this.buildCompleteOriginalPrompt(prompt.humanPrompt);
+        
+        if (provider === 'openai') {
+          messages = [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant. Please respond to the following prompt exactly as written.'
+            },
+            {
+              role: 'user',
+              content: originalPromptText
+            }
+          ];
+          formattedPrompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+        } else if (provider === 'anthropic') {
+          messages = [
+            {
+              role: 'user',
+              content: `Human: ${originalPromptText}\n\nAssistant: I'll respond to this prompt:`
+            }
+          ];
+          formattedPrompt = messages[0]?.content || '';
+        } else {
+          // Meta/Llama format
+          messages = [
+            {
+              role: 'user',
+              content: `[INST] ${originalPromptText} [/INST]`
+            }
+          ];
+          formattedPrompt = messages[0]?.content || '';
+        }
       } else {
-        // Meta/Llama format
-        messages = [
-          {
-            role: 'user',
-            content: `[INST] ${prompt.humanPrompt.goal}\n\nSteps to follow:\n${prompt.humanPrompt.steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nAudience: ${prompt.humanPrompt.audience}\nFormat: ${prompt.humanPrompt.output_expectations.format} [/INST]`
+        // Use original human prompt with adaptive rendering
+        const isAgentPrompt = this.isAgentPrompt(prompt.humanPrompt, prompt.metadata);
+        
+        if (isAgentPrompt) {
+          // Agent prompt - send complete original prompt for adaptation
+          const originalPromptText = this.buildCompleteOriginalPrompt(prompt.humanPrompt);
+          const formatInstructions = this.buildFormatAdaptationInstructions(prompt, provider);
+          const fullAgentPrompt = `${formatInstructions}\n\n## Original Prompt to Adapt:\n\n${originalPromptText}`;
+          
+          if (provider === 'openai') {
+            messages = [
+              {
+                role: 'system',
+                content: fullAgentPrompt
+              },
+              {
+                role: 'user',
+                content: 'Become this expert agent with all specified capabilities.'
+              }
+            ];
+          } else if (provider === 'anthropic') {
+            messages = [
+              {
+                role: 'user',
+                content: `Human: ${fullAgentPrompt}\n\nBecome this expert agent with all specified capabilities.\n\nAssistant: I am this expert agent:`
+              }
+            ];
+          } else {
+            // Meta/Llama format
+            messages = [
+              {
+                role: 'user',
+                content: `[INST] ${fullAgentPrompt}\n\nBecome this expert agent with all specified capabilities. [/INST]`
+              }
+            ];
           }
-        ];
-        formattedPrompt = messages[0]?.content || '';
+        } else {
+          // Task prompt - complete the specific task with format adaptation
+          const taskDefinition = this.buildTaskDefinition(prompt.humanPrompt);
+          const formatInstructions = this.buildTaskFormatInstructions(prompt, provider);
+          const fullTaskPrompt = `${formatInstructions}\n\n${taskDefinition}`;
+          
+          if (provider === 'openai') {
+            messages = [
+              {
+                role: 'system',
+                content: fullTaskPrompt
+              },
+              {
+                role: 'user',
+                content: 'Please complete this task now.'
+              }
+            ];
+          } else if (provider === 'anthropic') {
+            messages = [
+              {
+                role: 'user',
+                content: `Human: ${fullTaskPrompt}\n\nPlease complete this task now.\n\nAssistant: I'll complete this task for you:`
+              }
+            ];
+          } else {
+            // Meta/Llama format
+            messages = [
+              {
+                role: 'user',
+                content: `[INST] ${fullTaskPrompt}\n\nPlease complete this task now. [/INST]`
+              }
+            ];
+          }
+        }
+        
+        formattedPrompt = provider === 'openai' 
+          ? messages.map(m => `${m.role}: ${m.content}`).join('\n\n')
+          : messages[0]?.content || '';
       }
 
+      // If connectionId is provided and userId is available, use real LLM execution
+      logger.info('Checking LLM execution conditions', { 
+        hasConnectionId: !!options.connectionId, 
+        connectionId: options.connectionId,
+        hasUserId: !!userId,
+        userId: userId 
+      });
+      
+      if (options.connectionId && userId) {
+        try {
+          logger.info('Using real LLM execution', { connectionId: options.connectionId, provider });
+          
+          const executionResult = await LLMExecutionService.executePrompt({
+            connectionId: options.connectionId,
+            userId,
+            messages,
+            options: {
+              temperature: options.temperature || 0.7,
+              maxTokens: 2000,
+              ...(options.model && { model: options.model })
+            }
+          });
+
+          const payload: ProviderPayload = {
+            provider: executionResult.provider,
+            model: executionResult.model,
+            messages,
+            parameters: {
+              temperature: options.temperature || 0.7,
+              max_tokens: 2000
+            },
+            formatted_prompt: formattedPrompt,
+            response: executionResult.response,
+            ...(executionResult.usage && { usage: executionResult.usage })
+          };
+
+          logger.info('Real LLM execution completed', { 
+            id, 
+            provider, 
+            model: executionResult.model,
+            responseLength: executionResult.response.length,
+            responsePreview: executionResult.response.substring(0, 100) + '...'
+          });
+          return payload;
+        } catch (error) {
+          logger.error('Real LLM execution failed, falling back to mock', { error: (error as Error).message });
+          // Fall through to mock response
+        }
+      }
+
+      // Mock response (fallback or when no connectionId provided)
+      logger.info('Using mock response', { 
+        reason: !options.connectionId ? 'no connectionId' : !userId ? 'no userId' : 'LLM execution failed'
+      });
+      
       const payload: ProviderPayload = {
         provider,
         model: options.model || 'default',
@@ -1062,10 +1277,16 @@ export class PromptLibraryService {
           temperature: options.temperature || 0.7,
           max_tokens: 2000
         },
-        formatted_prompt: formattedPrompt
+        formatted_prompt: formattedPrompt,
+        response: `[MOCK RESPONSE] This would be the actual response from ${provider} ${options.model || 'default'}. The prompt has been formatted correctly and would be sent to the real API.`,
+        usage: {
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150
+        }
       };
 
-      logger.info('Prompt rendered successfully', { id, provider });
+      logger.info('Mock prompt rendered successfully', { id, provider });
       return payload;
     } catch (error) {
       logger.error('Failed to render prompt:', error);
@@ -1280,6 +1501,198 @@ export class PromptLibraryService {
       this.isInitialized = false;
       logger.info('Prompt Library Service shut down successfully');
     }
+  }
+
+  /**
+   * Substitute variables in a template string
+   */
+  private substituteVariables(template: string, variables: Record<string, any>): string {
+    let result = template;
+    
+    // Replace variables in the format {{variable_name}}
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      result = result.replace(regex, String(value || ''));
+    });
+    
+    return result;
+  }
+
+  /**
+   * Detect if this is an agent prompt (vs a task prompt) using hybrid approach
+   */
+  private isAgentPrompt(humanPrompt: HumanPrompt, metadata?: any): boolean {
+    // 1. Check explicit metadata tag first (manual override)
+    if (metadata?.tags) {
+      if (metadata.tags.includes('prompt-type:agent')) return true;
+      if (metadata.tags.includes('prompt-type:task')) return false;
+    }
+    
+    // 2. Auto-detect based on language patterns
+    const goalLower = humanPrompt.goal.toLowerCase();
+    const stepsText = humanPrompt.steps.join(' ').toLowerCase();
+    
+    // Agent-defining keywords (identity/capability focused)
+    const agentKeywords = [
+      'expert', 'specialist', 'engineer', 'architect', 'masters', 'specializing',
+      'capabilities', 'behavioral traits', 'knowledge base', 'response approach',
+      'example interactions', 'purpose', '## capabilities', '## behavioral',
+      'you are', 'i am', 'my expertise', 'my specialization'
+    ];
+    
+    // Task-defining keywords (action/deliverable focused)
+    const taskKeywords = [
+      'create', 'build', 'generate', 'analyze', 'write', 'develop', 'design',
+      'implement', 'test', 'review', 'document', 'plan', 'organize', 'identify'
+    ];
+    
+    const hasAgentKeywords = agentKeywords.some(keyword => 
+      goalLower.includes(keyword) || stepsText.includes(keyword)
+    );
+    
+    const hasTaskKeywords = taskKeywords.some(keyword => 
+      goalLower.includes(keyword)
+    );
+    
+    // If both present, prioritize agent keywords
+    // If only task keywords, it's likely a task
+    return hasAgentKeywords || (!hasTaskKeywords && hasAgentKeywords);
+  }
+
+  /**
+   * Build the complete original prompt text exactly as it was structured
+   */
+  private buildCompleteOriginalPrompt(humanPrompt: HumanPrompt): string {
+    const sections = [];
+    
+    // Goal section
+    sections.push(`**Goal:** ${humanPrompt.goal}`);
+    
+    // Audience section
+    if (humanPrompt.audience) {
+      sections.push(`\n**Audience:** ${humanPrompt.audience}`);
+    }
+    
+    // Steps section (contains all the detailed capabilities, traits, etc.)
+    if (humanPrompt.steps && humanPrompt.steps.length > 0) {
+      sections.push('\n**Capabilities and Knowledge:**');
+      humanPrompt.steps.forEach(step => {
+        // Preserve exact original formatting and content
+        sections.push(`\n${step}`);
+      });
+    }
+    
+    // Output expectations
+    if (humanPrompt.output_expectations?.format) {
+      sections.push(`\n**Output Expectations:** ${humanPrompt.output_expectations.format}`);
+    }
+    
+    return sections.join('\n');
+  }
+
+  /**
+   * Build task definition for completion - preserving original structure
+   */
+  private buildTaskDefinition(humanPrompt: HumanPrompt): string {
+    const sections = [];
+    
+    // Preserve original structure
+    sections.push(`**Goal:** ${humanPrompt.goal}`);
+    
+    if (humanPrompt.audience && humanPrompt.audience !== 'General') {
+      sections.push(`**Audience:** ${humanPrompt.audience}`);
+    }
+    
+    if (humanPrompt.steps && humanPrompt.steps.length > 0) {
+      sections.push('\n**Steps:**');
+      humanPrompt.steps.forEach((step, i) => {
+        sections.push(`${i + 1}. ${step}`);
+      });
+    }
+    
+    if (humanPrompt.output_expectations?.format) {
+      sections.push(`\n**Expected Output:** ${humanPrompt.output_expectations.format}`);
+    }
+    
+    // Add completion instructions
+    sections.push('\n---');
+    sections.push('\n**TASK COMPLETION:**');
+    sections.push('Please complete the above task by following each step systematically and delivering the expected output. Start your response by acknowledging the goal and audience, then work through each step to produce the final deliverable.');
+    
+    return sections.join('\n');
+  }
+
+  /**
+   * Build format instructions for task completion
+   */
+  private buildTaskFormatInstructions(_prompt: PromptRecord, targetProvider: string): string {
+    const providerFormats = {
+      openai: {
+        name: 'OpenAI GPT',
+        style: 'structured, clear, and actionable deliverables with numbered lists, code blocks, and practical examples',
+      },
+      anthropic: {
+        name: 'Anthropic Claude',
+        style: 'detailed, thorough deliverables with comprehensive explanations and step-by-step reasoning',
+      },
+      meta: {
+        name: 'Meta Llama',
+        style: 'concise, direct deliverables with practical examples and straightforward presentation',
+      }
+    };
+
+    const outputFormat = providerFormats[targetProvider as keyof typeof providerFormats] || {
+      name: 'Unknown',
+      style: 'standard format',
+    };
+
+    return `## Task Completion Instructions:
+
+**Format**: Deliver the task output using ${outputFormat.style}.
+
+**Structure**: Start your response by restating the Goal, Audience, and Steps from the task definition below, then provide the complete deliverable.
+
+**Objective**: Complete the task and provide the actual deliverable, not instructions on how to do it. Follow the defined steps systematically to produce the expected output.`;
+  }
+
+  /**
+   * Build format adaptation instructions for cross-provider compatibility
+   */
+  private buildFormatAdaptationInstructions(prompt: PromptRecord, targetProvider: string): string {
+    const originalProvider = (prompt.metadata as any)?.tuned_for_provider || 'generic';
+    
+    const providerFormats = {
+      openai: {
+        name: 'OpenAI GPT',
+        style: 'structured, clear, and actionable responses with numbered lists, code blocks, and practical examples',
+      },
+      anthropic: {
+        name: 'Anthropic Claude',
+        style: 'conversational, detailed explanations with step-by-step reasoning and thoughtful analysis',
+      },
+      meta: {
+        name: 'Meta Llama',
+        style: 'concise, direct responses with practical examples and straightforward explanations',
+      }
+    };
+
+    const outputFormat = providerFormats[targetProvider as keyof typeof providerFormats] || {
+      name: 'Unknown',
+      style: 'standard format',
+    };
+
+    if (originalProvider === targetProvider) {
+      // Same provider - minimal adaptation needed
+      return `## Format Instructions:
+This prompt is optimized for ${outputFormat.name}. Respond using ${outputFormat.style}.`;
+    }
+
+    // Cross-provider adaptation
+    return `## Transform to ${outputFormat.name} Format:
+
+**Task**: Become this agent using ${outputFormat.style}. Preserve ALL content - every capability, trait, tool, example, and methodology exactly as specified below.
+
+**Critical**: This is format adaptation, not summarization. Include everything.`;
   }
 }
 

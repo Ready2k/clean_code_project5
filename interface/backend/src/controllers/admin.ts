@@ -10,7 +10,8 @@ const createUserSchema = Joi.object({
   username: Joi.string().min(3).max(50).required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  role: Joi.string().valid('admin', 'user', 'viewer').required()
+  role: Joi.string().valid('admin', 'user', 'viewer').required(),
+  status: Joi.string().valid('active', 'inactive').optional().default('active')
 });
 
 const updateUserSchema = Joi.object({
@@ -67,7 +68,13 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
 
-  const userData: RegisterData = value;
+  const userData: RegisterData = {
+    username: value.username,
+    email: value.email,
+    password: value.password,
+    role: value.role,
+    status: value.status
+  };
   const userService = getUserService();
   
   // Create user without generating tokens (admin creation)

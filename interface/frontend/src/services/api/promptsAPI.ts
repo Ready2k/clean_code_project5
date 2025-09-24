@@ -52,6 +52,16 @@ export const promptsAPI = {
     return response.data;
   },
 
+  async saveVariant(promptId: string, variantData: {
+    provider: string;
+    model: string;
+    adaptedContent: string;
+    renderResult?: any;
+  }): Promise<any> {
+    const response = await apiClient.post(`/prompts/${promptId}/variants`, variantData);
+    return response.data;
+  },
+
   async ratePrompt(promptId: string, rating: { score: number; note?: string }): Promise<void> {
     await apiClient.post(`/ratings/prompts/${promptId}/rate`, rating);
   },

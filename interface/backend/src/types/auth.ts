@@ -3,6 +3,7 @@ export interface User {
   username: string;
   email: string;
   role: 'admin' | 'user' | 'viewer';
+  status: 'active' | 'inactive';
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
@@ -44,6 +45,7 @@ export interface RegisterData {
   email: string;
   password: string;
   role?: 'user' | 'viewer';
+  status?: 'active' | 'inactive';
 }
 
 export interface AuthResponse {

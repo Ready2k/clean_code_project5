@@ -30,6 +30,7 @@ export interface RenderRequest {
   provider: string;
   options: RenderOptions;
   userId: string;
+  connectionId?: string;
 }
 
 export interface RenderResult {
@@ -165,11 +166,20 @@ export class ProviderRegistryService {
       }
 
       // Use the prompt library service to render
+      logger.info('Calling prompt library service', { 
+        promptId: request.promptId,
+        provider: request.provider,
+        userId: request.userId,
+        connectionId: request.connectionId,
+        optionsConnectionId: request.options.connectionId
+      });
+      
       const promptLibraryService = getPromptLibraryService();
       const payload = await promptLibraryService.renderPrompt(
         request.promptId,
         request.provider,
-        request.options
+        request.options,
+        request.userId
       );
 
       const renderTime = Date.now() - startTime;

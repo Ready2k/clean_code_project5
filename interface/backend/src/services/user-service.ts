@@ -93,6 +93,11 @@ export class UserService {
               user.lastLogin = new Date(user.lastLogin);
             }
             
+            // Set default status for existing users without status field
+            if (!user.status) {
+              user.status = 'active';
+            }
+            
             this.users.set(user.id, user);
             this.usersByEmail.set(user.email.toLowerCase(), user.id);
             this.usersByUsername.set(user.username.toLowerCase(), user.id);
@@ -155,7 +160,8 @@ export class UserService {
           username: 'admin',
           email: 'admin@example.com',
           password: 'admin123456',
-          role: 'user' // Will be set to admin below
+          role: 'user', // Will be set to admin below
+          status: 'active'
         };
 
         const adminUser = await this.createUser(defaultAdmin, true);
@@ -472,6 +478,7 @@ export class UserService {
       username: data.username,
       email: data.email.toLowerCase(),
       role: data.role || 'user',
+      status: data.status || 'active',
       passwordHash,
       createdAt: now,
       updatedAt: now,

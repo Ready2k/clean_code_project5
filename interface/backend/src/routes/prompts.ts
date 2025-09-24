@@ -31,6 +31,9 @@ router.post('/:id/enhance/questionnaire', requirePermission(Permission.ENHANCE_P
 router.post('/:id/render/:provider', requirePermission(Permission.READ_PROMPTS), asyncHandler(promptController.renderPrompt));
 router.post('/:id/compare', requirePermission(Permission.READ_PROMPTS), asyncHandler(promptController.compareProviders));
 
+// Prompt variants
+router.post('/:id/variants', requirePermission(Permission.WRITE_PROMPTS), asyncHandler(promptController.saveVariant));
+
 // Prompt versioning
 router.get('/:id/history', requirePermission(Permission.READ_PROMPTS), asyncHandler(promptController.getPromptHistory));
 router.get('/:id/versions/:version', requirePermission(Permission.READ_PROMPTS), asyncHandler(promptController.getPromptVersion));

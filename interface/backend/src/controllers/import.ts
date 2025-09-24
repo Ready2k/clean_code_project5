@@ -139,7 +139,8 @@ export const importFromUrl = async (req: ImportRequest, res: Response): Promise<
       defaultTags: value.defaultTags || ['imported-from-url'],
       autoEnhance: value.autoEnhance,
       slugPrefix: value.slugPrefix,
-      validateBeforeImport: value.validateBeforeImport
+      validateBeforeImport: value.validateBeforeImport,
+      sourceUrl: value.url
     };
 
     const importedPrompt = await importService.importFromContent(content, options);

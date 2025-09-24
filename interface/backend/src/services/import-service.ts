@@ -8,6 +8,7 @@ export interface ImportOptions {
   autoEnhance?: boolean;
   slugPrefix?: string;
   validateBeforeImport?: boolean;
+  sourceUrl?: string;
 }
 
 export interface ImportValidationResult {
@@ -357,6 +358,7 @@ export class ImportService {
     let currentSection = '';
     let format = 'Text';
     let mainContent = content;
+    let modelInfo = '';
     
     // Parse YAML frontmatter if present
     if (content.startsWith('---')) {
@@ -373,6 +375,8 @@ export class ImportService {
             title = trimmedLine.substring(5).trim();
           } else if (trimmedLine.startsWith('description:')) {
             description = trimmedLine.substring(12).trim();
+          } else if (trimmedLine.startsWith('model:')) {
+            modelInfo = trimmedLine.substring(6).trim();
           }
         }
       }
@@ -466,6 +470,36 @@ export class ImportService {
     // Use description as summary if available, otherwise generate one
     const summary = description || `Imported from markdown: ${title}`;
     
+    // Determine provider from model info
+    let tunedForProvider = '';
+    let preferredModel = modelInfo;
+    
+    if (modelInfo) {
+      const lowerModel = modelInfo.toLowerCase();
+      if (lowerModel.includes('sonnet') || lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
+        tunedForProvider = 'anthropic';
+      } else if (lowerModel.includes('gpt') || lowerModel.includes('openai')) {
+        tunedForProvider = 'openai';
+      } else if (lowerModel.includes('llama') || lowerModel.includes('meta')) {
+        tunedForProvider = 'meta';
+      }
+    }
+    
+    // Build tags including provider-model tag
+    const baseTags = options.defaultTags || ['imported', 'markdown'];
+    const providerModelTag = tunedForProvider && preferredModel 
+      ? `${tunedForProvider}-${preferredModel}` 
+      : null;
+    
+    // Auto-detect prompt type and add tag
+    const promptType = ImportService.detectPromptType({ goal, audience, steps, output_expectations: { format, fields: [] } });
+    const promptTypeTag = `prompt-type:${promptType}`;
+    
+    let allTags = [...baseTags, promptTypeTag];
+    if (providerModelTag) {
+      allTags.push(providerModelTag);
+    }
+    
     return {
       humanPrompt: {
         goal,
@@ -479,10 +513,40 @@ export class ImportService {
       metadata: {
         title,
         summary,
-        tags: [...(options.defaultTags || ['imported', 'markdown'])]
+        tags: allTags,
+        ...(preferredModel && { preferred_model: preferredModel }),
+        ...(tunedForProvider && { tuned_for_provider: tunedForProvider }),
+        ...(options.sourceUrl && { source_url: options.sourceUrl })
       },
       owner: options.defaultOwner || 'unknown'
     };
+  }
+
+  /**
+   * Detect prompt type based on content
+   */
+  private static detectPromptType(humanPrompt: any): 'task' | 'agent' {
+    const goalLower = humanPrompt.goal.toLowerCase();
+    const stepsText = humanPrompt.steps.join(' ').toLowerCase();
+    
+    // Agent-defining keywords (identity/capability focused)
+    const agentKeywords = [
+      'expert', 'specialist', 'engineer', 'architect', 'masters', 'specializing',
+      'capabilities', 'behavioral traits', 'knowledge base', 'response approach',
+      'example interactions', 'purpose', '## capabilities', '## behavioral',
+      'you are', 'i am', 'my expertise', 'my specialization'
+    ];
+    
+    // Task-defining keywords (action/deliverable focused) - for future use
+    // const taskKeywords = ['create', 'build', 'generate', 'analyze', 'write', 'develop', 'design'];
+    
+    const hasAgentKeywords = agentKeywords.some(keyword => 
+      goalLower.includes(keyword) || stepsText.includes(keyword)
+    );
+    
+    // If agent keywords present, it's an agent
+    // Otherwise, it's a task
+    return hasAgentKeywords ? 'agent' : 'task';
   }
 
   /**

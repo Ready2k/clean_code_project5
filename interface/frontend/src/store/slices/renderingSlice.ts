@@ -38,7 +38,9 @@ export const renderPrompt = createAsyncThunk(
         promptId,
         connectionId,
         provider,
-        ...result,
+        model: result.metadata?.model || options.model,
+        payload: result.payload,
+        variables: options.variables || {},
         createdAt: new Date().toISOString(),
         success: true,
       } as RenderResult;
@@ -110,6 +112,11 @@ const renderingSlice = createSlice({
     clearRenderSelection: (state) => {
       state.selectedRenders = [];
     },
+    addPreviewRender: (state, action: PayloadAction<RenderResult>) => {
+      const render = action.payload;
+      state.renders[render.id] = render;
+      state.activeRenders.push(render.id);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -145,6 +152,7 @@ export const {
   toggleCompareMode,
   toggleRenderSelection,
   clearRenderSelection,
+  addPreviewRender,
 } = renderingSlice.actions;
 
 export default renderingSlice.reducer;

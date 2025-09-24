@@ -38,7 +38,8 @@ const updatePromptSchema = Joi.object({
   metadata: Joi.object({
     title: Joi.string().min(1).max(200),
     summary: Joi.string().min(1).max(500),
-    tags: Joi.array().items(Joi.string().min(1).max(50))
+    tags: Joi.array().items(Joi.string().min(1).max(50)),
+    owner: Joi.string().strip() // Allow but strip out owner field - it shouldn't be modifiable
   }),
   humanPrompt: Joi.object({
     goal: Joi.string().min(10),
@@ -73,7 +74,8 @@ const renderPromptSchema = Joi.object({
   maxTokens: Joi.number().optional(),
   topP: Joi.number().optional(),
   frequencyPenalty: Joi.number().optional(),
-  presencePenalty: Joi.number().optional()
+  presencePenalty: Joi.number().optional(),
+  version: Joi.string().valid('original', 'enhanced').default('original')
 });
 
 // Rating schema moved to rating controller
@@ -377,9 +379,12 @@ export const renderPrompt = async (req: ExtendedAuthenticatedRequest, res: Respo
       options: {
         model: value.model,
         temperature: value.temperature,
-        variables: value.variables
+        variables: value.variables,
+        version: value.version,
+        connectionId: value.connectionId
       },
-      userId: req.user!.userId
+      userId: req.user!.userId,
+      connectionId: value.connectionId
     };
 
     const providerService = getProviderRegistryService();
@@ -630,6 +635,63 @@ export const compareProviders = async (req: ExtendedAuthenticatedRequest, res: R
     });
   } catch (error) {
     logger.error('Failed to compare providers:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save a rendered prompt as a variant
+ */
+export const saveVariant = async (req: ExtendedAuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { provider, model, adaptedContent } = req.body;
+
+    if (!provider || !model || !adaptedContent) {
+      throw new ValidationError('provider, model, and adaptedContent are required');
+    }
+
+    const promptLibraryService = getPromptLibraryService();
+    
+    // Get the original prompt
+    const originalPrompt = await promptLibraryService.getPrompt(id);
+    
+    // Create variant with provider-model tag
+    const variantTag = `${provider}-${model}`;
+    const variantTags = [...(originalPrompt.metadata.tags || []), variantTag];
+    
+    // Create new prompt as variant
+    const variantPrompt = {
+      humanPrompt: {
+        goal: originalPrompt.humanPrompt.goal,
+        audience: originalPrompt.humanPrompt.audience,
+        steps: originalPrompt.humanPrompt.steps,
+        output_expectations: originalPrompt.humanPrompt.output_expectations
+      },
+      metadata: {
+        title: `${originalPrompt.metadata.title} (${provider}-${model})`,
+        summary: `${originalPrompt.metadata.summary} - Optimized for ${provider} ${model}`,
+        tags: variantTags,
+        owner: req.user!.userId,
+        variant_of: id,
+        tuned_for_provider: provider,
+        preferred_model: model
+      },
+      owner: req.user!.userId
+    };
+
+    const savedVariant = await promptLibraryService.createPrompt(variantPrompt);
+
+    logger.info('Variant saved successfully', { 
+      originalId: id, 
+      variantId: savedVariant.id, 
+      provider, 
+      model 
+    });
+
+    res.status(201).json(savedVariant);
+  } catch (error) {
+    logger.error('Failed to save variant:', error);
     throw error;
   }
 };
