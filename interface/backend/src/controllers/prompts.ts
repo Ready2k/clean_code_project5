@@ -68,6 +68,7 @@ const enhancePromptSchema = Joi.object({
 
 const renderPromptSchema = Joi.object({
   model: Joi.string(),
+  targetModel: Joi.string().optional(), // Target model for adaptation
   temperature: Joi.number().min(0).max(2),
   variables: Joi.object().pattern(Joi.string(), Joi.any()).default({}),
   connectionId: Joi.string().optional(),
@@ -378,6 +379,7 @@ export const renderPrompt = async (req: ExtendedAuthenticatedRequest, res: Respo
       provider,
       options: {
         model: value.model,
+        targetModel: value.targetModel, // Pass target model for adaptation
         temperature: value.temperature,
         variables: value.variables,
         version: value.version,

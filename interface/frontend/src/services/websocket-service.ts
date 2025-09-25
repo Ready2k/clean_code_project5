@@ -105,6 +105,41 @@ export interface WebSocketEvents {
     userId: string;
     timestamp: string;
   };
+
+  // Render events
+  'render:started': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    timestamp: string;
+  };
+  'render:progress': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    status: 'preparing' | 'executing' | 'processing' | 'completing';
+    message: string;
+    timestamp: string;
+  };
+  'render:completed': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    result: any;
+    renderTime: number;
+    timestamp: string;
+  };
+  'render:failed': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    error: string;
+    timestamp: string;
+  };
 }
 
 export interface NotificationData {
@@ -422,6 +457,73 @@ class WebSocketService {
     this.socket.on('user:activity', (activity) => {
       if (activity.userId !== userId) { // Don't notify self
         this.emitToListeners('user:activity', activity);
+      }
+    });
+
+    // Render events
+    this.socket.on('render:started', ({ promptId, provider, userId: renderUserId, connectionId, timestamp }) => {
+      console.log('WebSocket: render:started received', { promptId, provider, renderUserId, connectionId });
+      if (renderUserId === userId) {
+        this.emitToListeners('render:started', { promptId, provider, userId: renderUserId, connectionId, timestamp });
+        
+        store.dispatch(addNotification({
+          id: `render-started-${promptId}-${connectionId}`,
+          type: 'info',
+          title: 'Rendering Started',
+          message: `Starting to render prompt with ${provider}...`,
+          timestamp,
+          autoHide: true,
+          duration: 3000
+        }));
+      }
+    });
+
+    this.socket.on('render:progress', ({ promptId, provider, userId: renderUserId, connectionId, status, message, timestamp }) => {
+      console.log('WebSocket: render:progress received', { promptId, provider, renderUserId, connectionId, status, message });
+      if (renderUserId === userId) {
+        this.emitToListeners('render:progress', { promptId, provider, userId: renderUserId, connectionId, status, message, timestamp });
+        
+        // Update existing notification or create new one
+        store.dispatch(addNotification({
+          id: `render-progress-${promptId}-${connectionId}`,
+          type: 'info',
+          title: 'Rendering Progress',
+          message: message,
+          timestamp,
+          autoHide: false // Keep showing until completed
+        }));
+      }
+    });
+
+    this.socket.on('render:completed', ({ promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp }) => {
+      console.log('WebSocket: render:completed received', { promptId, provider, renderUserId, connectionId, renderTime });
+      if (renderUserId === userId) {
+        this.emitToListeners('render:completed', { promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp });
+        
+        store.dispatch(addNotification({
+          id: `render-completed-${promptId}-${connectionId}`,
+          type: 'success',
+          title: 'Rendering Complete',
+          message: `Prompt rendered successfully with ${provider} in ${(renderTime / 1000).toFixed(1)}s`,
+          timestamp,
+          autoHide: true,
+          duration: 5000
+        }));
+      }
+    });
+
+    this.socket.on('render:failed', ({ promptId, provider, userId: renderUserId, connectionId, error, timestamp }) => {
+      if (renderUserId === userId) {
+        this.emitToListeners('render:failed', { promptId, provider, userId: renderUserId, connectionId, error, timestamp });
+        
+        store.dispatch(addNotification({
+          id: `render-failed-${promptId}-${connectionId}`,
+          type: 'error',
+          title: 'Rendering Failed',
+          message: `Failed to render prompt with ${provider}: ${error}`,
+          timestamp,
+          autoHide: false
+        }));
       }
     });
   }

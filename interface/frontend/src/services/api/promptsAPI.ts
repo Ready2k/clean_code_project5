@@ -32,6 +32,11 @@ export const promptsAPI = {
     await apiClient.delete(`/prompts/${id}`);
   },
 
+  async getPromptHistory(id: string): Promise<any[]> {
+    const response = await apiClient.get(`/prompts/${id}/history`);
+    return response.data.history || response.data;
+  },
+
   async enhancePrompt(id: string, options?: any): Promise<any> {
     const response = await apiClient.post(`/prompts/${id}/enhance`, options);
     return response.data;

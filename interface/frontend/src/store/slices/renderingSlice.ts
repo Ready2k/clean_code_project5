@@ -39,6 +39,7 @@ export const renderPrompt = createAsyncThunk(
         connectionId,
         provider,
         model: result.metadata?.model || options.model,
+        targetModel: result.metadata?.targetModel || options.targetModel,
         payload: result.payload,
         variables: options.variables || {},
         createdAt: new Date().toISOString(),

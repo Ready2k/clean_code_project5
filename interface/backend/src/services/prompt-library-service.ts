@@ -113,6 +113,7 @@ export interface PromptFilters {
 
 export interface RenderOptions {
   model?: string;
+  targetModel?: string; // Target model for adaptation
   temperature?: number;
   variables?: Record<string, any>;
   version?: 'original' | 'enhanced' | 'original-no-adapt';
@@ -122,6 +123,7 @@ export interface RenderOptions {
 export interface ProviderPayload {
   provider: string;
   model?: string;
+  targetModel?: string | undefined; // Target model for adaptation/variant tagging
   messages: Array<{
     role: string;
     content: string;
@@ -200,7 +202,7 @@ export class PromptLibraryService {
 
       // Load existing prompts from files
       await this.loadPromptsFromFiles();
-      
+
       // If no prompts were loaded, create some sample data
       if (this.prompts.size === 0) {
         logger.info('No existing prompts found, creating sample data');
@@ -237,15 +239,15 @@ export class PromptLibraryService {
     try {
       const files = await fs.readdir(this.storageDir);
       const yamlFiles = files.filter(file => file.endsWith('.yaml'));
-      
+
       logger.info('Loading prompts from files', { fileCount: yamlFiles.length });
-      
+
       for (const file of yamlFiles) {
         try {
           const filePath = path.join(this.storageDir, file);
           const content = await fs.readFile(filePath, 'utf-8');
           const prompt = YAML.parse(content) as PromptRecord;
-          
+
           // Validate that the prompt has required fields
           if (prompt.id && prompt.metadata && prompt.humanPrompt) {
             // Ensure required metadata fields exist
@@ -255,7 +257,7 @@ export class PromptLibraryService {
             if (!prompt.metadata.updated_at) {
               prompt.metadata.updated_at = prompt.metadata.created_at;
             }
-            
+
             this.prompts.set(prompt.id, prompt);
             // Initialize empty ratings for loaded prompts
             if (!this.ratings.has(prompt.id)) {
@@ -263,20 +265,20 @@ export class PromptLibraryService {
             }
             logger.debug('Loaded prompt from file', { promptId: prompt.id });
           } else {
-            logger.warn('Invalid prompt structure in file, missing required fields', { 
-              file, 
-              hasId: !!prompt.id, 
-              hasMetadata: !!prompt.metadata, 
-              hasHumanPrompt: !!prompt.humanPrompt 
+            logger.warn('Invalid prompt structure in file, missing required fields', {
+              file,
+              hasId: !!prompt.id,
+              hasMetadata: !!prompt.metadata,
+              hasHumanPrompt: !!prompt.humanPrompt
             });
           }
         } catch (error) {
           logger.error('Failed to load prompt from file', { file, error });
         }
       }
-      
-      logger.info('Finished loading prompts from files', { 
-        totalLoaded: this.prompts.size 
+
+      logger.info('Finished loading prompts from files', {
+        totalLoaded: this.prompts.size
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -314,16 +316,16 @@ export class PromptLibraryService {
       // Import getRatingService dynamically to avoid circular dependencies
       const { getRatingService } = await import('./rating-service.js');
       const ratingService = getRatingService();
-      
+
       // Clear existing ratings cache
       this.ratings.clear();
-      
+
       // Sync ratings for each prompt
       for (const promptId of this.prompts.keys()) {
         try {
           const ratingResult = await ratingService.getPromptRatings(promptId);
           const ratings = ratingResult.ratings || [];
-          
+
           // Convert rating service format to prompt library format
           const convertedRatings = ratings.map(rating => ({
             id: rating.id,
@@ -333,7 +335,7 @@ export class PromptLibraryService {
             note: rating.note,
             timestamp: rating.createdAt // Rating service returns camelCase
           }));
-          
+
           this.ratings.set(promptId, convertedRatings);
           logger.debug('Synced ratings for prompt', { promptId, ratingsCount: convertedRatings.length });
         } catch (error) {
@@ -342,8 +344,8 @@ export class PromptLibraryService {
           this.ratings.set(promptId, []);
         }
       }
-      
-      logger.info('Finished syncing ratings from rating service', { 
+
+      logger.info('Finished syncing ratings from rating service', {
         totalPrompts: this.prompts.size,
         totalRatings: Array.from(this.ratings.values()).reduce((sum, ratings) => sum + ratings.length, 0)
       });
@@ -360,10 +362,10 @@ export class PromptLibraryService {
       // Import getRatingService dynamically to avoid circular dependencies
       const { getRatingService } = await import('./rating-service.js');
       const ratingService = getRatingService();
-      
+
       const ratingResult = await ratingService.getPromptRatings(promptId);
       const ratings = ratingResult.ratings || [];
-      
+
       // Convert rating service format to prompt library format
       const convertedRatings = ratings.map(rating => ({
         id: rating.id,
@@ -373,7 +375,7 @@ export class PromptLibraryService {
         note: rating.note,
         timestamp: rating.createdAt // Rating service returns camelCase
       }));
-      
+
       this.ratings.set(promptId, convertedRatings);
       logger.debug('Synced ratings for prompt', { promptId, ratingsCount: convertedRatings.length });
     } catch (error) {
@@ -388,15 +390,15 @@ export class PromptLibraryService {
    */
   async saveAllPromptsToFiles(): Promise<void> {
     this.ensureInitialized();
-    
+
     logger.info('Saving all prompts to files', { totalPrompts: this.prompts.size });
-    
-    const savePromises = Array.from(this.prompts.values()).map(prompt => 
+
+    const savePromises = Array.from(this.prompts.values()).map(prompt =>
       this.savePromptToFile(prompt).catch(error => {
         logger.error('Failed to save prompt to file', { promptId: prompt.id, error });
       })
     );
-    
+
     await Promise.all(savePromises);
     logger.info('Finished saving all prompts to files');
   }
@@ -449,7 +451,18 @@ export class PromptLibraryService {
             options: ['JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'Other']
           }
         ],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: 'demo-user',
+            timestamp: '2024-01-15T10:00:00.000Z',
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          }
+        ]
       },
       {
         id: 'sample-prompt-2',
@@ -492,7 +505,36 @@ export class PromptLibraryService {
             sensitive: false
           }
         ],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: 'demo-user',
+            timestamp: '2024-01-15T11:30:00.000Z',
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          },
+          {
+            version: 1,
+            message: 'Prompt enhanced using AI (generation task)',
+            author: 'system',
+            timestamp: '2024-01-15T12:15:00.000Z',
+            changes: {
+              action: 'enhance',
+              details: {
+                taskType: 'generation',
+                questionsGenerated: 1,
+                confidence: 0.92,
+                enhancementModel: 'claude-3-sonnet',
+                enhancementProvider: 'anthropic'
+              }
+            },
+            enhancement_model: 'claude-3-sonnet',
+            enhancement_provider: 'anthropic'
+          }
+        ]
       },
       {
         id: 'sample-prompt-3',
@@ -537,7 +579,48 @@ export class PromptLibraryService {
             options: ['JWT', 'OAuth2', 'API Key', 'Basic Auth']
           }
         ],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: 'demo-user',
+            timestamp: '2024-01-14T09:00:00.000Z',
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          },
+          {
+            version: 1,
+            message: 'Prompt rendered for openai',
+            author: 'user123',
+            timestamp: '2024-01-14T14:20:00.000Z',
+            changes: {
+              action: 'render',
+              details: {
+                provider: 'openai',
+                version: 'original',
+                variablesUsed: ['code_language', 'requirements'],
+                connectionId: 'conn-789'
+              }
+            }
+          },
+          {
+            version: 1,
+            message: 'Rated 4/5 stars',
+            author: 'user456',
+            timestamp: '2024-01-14T16:45:00.000Z',
+            changes: {
+              action: 'rate',
+              details: {
+                score: 4,
+                hasNote: false,
+                totalRatings: 2,
+                averageRating: 4.5
+              }
+            }
+          }
+        ]
       },
       {
         id: 'sample-prompt-4',
@@ -582,7 +665,32 @@ export class PromptLibraryService {
             options: ['PostgreSQL', 'MySQL', 'SQLite', 'SQL Server', 'Oracle']
           }
         ],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: 'demo-user',
+            timestamp: '2024-01-13T15:30:00.000Z',
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          },
+          {
+            version: 1,
+            message: 'Title changed from "Email Marketing Campaign" to "Advanced Email Marketing Campaign", Tags modified',
+            author: 'jane.smith',
+            timestamp: '2024-01-13T16:45:00.000Z',
+            changes: {
+              action: 'update',
+              details: [
+                'Title changed from "Email Marketing Campaign" to "Advanced Email Marketing Campaign"',
+                'Tags modified'
+              ],
+              fieldsChanged: ['metadata']
+            }
+          }
+        ]
       },
       {
         id: 'sample-prompt-5',
@@ -627,7 +735,48 @@ export class PromptLibraryService {
             options: ['Unit', 'Integration', 'System', 'Acceptance', 'Performance']
           }
         ],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: 'demo-user',
+            timestamp: '2024-01-12T08:00:00.000Z',
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          },
+          {
+            version: 1,
+            message: 'Prompt rendered for anthropic',
+            author: 'user789',
+            timestamp: '2024-01-12T10:30:00.000Z',
+            changes: {
+              action: 'render',
+              details: {
+                provider: 'anthropic',
+                version: 'enhanced',
+                variablesUsed: ['research_topic', 'depth_level'],
+                connectionId: 'conn-456'
+              }
+            }
+          },
+          {
+            version: 1,
+            message: 'Rated 5/5 stars with feedback',
+            author: 'user101',
+            timestamp: '2024-01-12T14:15:00.000Z',
+            changes: {
+              action: 'rate',
+              details: {
+                score: 5,
+                hasNote: true,
+                totalRatings: 1,
+                averageRating: 5.0
+              }
+            }
+          }
+        ]
       }
     ];
 
@@ -698,7 +847,18 @@ export class PromptLibraryService {
         },
         humanPrompt: request.humanPrompt,
         variables: [],
-        history: []
+        history: [
+          {
+            version: 1,
+            message: 'Prompt created',
+            author: request.owner,
+            timestamp: now,
+            changes: {
+              action: 'create',
+              details: 'Initial prompt creation'
+            }
+          }
+        ]
       };
 
       this.prompts.set(id, promptRecord);
@@ -746,18 +906,23 @@ export class PromptLibraryService {
         variables: updates.variables || existingPrompt.variables
       };
 
-      // Determine if this is an enhancement update
-      const isEnhancement = updates.humanPrompt && 
-        (updates.humanPrompt.goal?.includes('Enhanced context:') || 
-         updates.humanPrompt.steps?.some(step => step.includes('Enhanced:')));
+      // Determine what changed and create detailed history entry
+      const changes = this.analyzeChanges(existingPrompt, updates);
+      const isEnhancement = updates.humanPrompt &&
+        (updates.humanPrompt.goal?.includes('Enhanced context:') ||
+          updates.humanPrompt.steps?.some(step => step.includes('Enhanced:')));
 
       // Add to history
       const historyEntry: any = {
         version: existingPrompt.version,
-        message: isEnhancement ? 'Prompt enhanced via AI' : 'Prompt updated via API',
+        message: this.generateChangeMessage(changes, isEnhancement || false),
         author: existingPrompt.metadata.owner,
         timestamp: new Date().toISOString(),
-        changes: updates
+        changes: {
+          action: 'update',
+          details: changes,
+          fieldsChanged: Object.keys(updates).filter(key => updates[key as keyof UpdatePromptRequest] !== undefined)
+        }
       };
 
       // Add enhancement model info if this is an enhancement
@@ -943,7 +1108,20 @@ export class PromptLibraryService {
       logger.info('Deleting prompt', { id });
 
       // Ensure prompt exists first
-      await this.getPrompt(id);
+      const prompt = await this.getPrompt(id);
+
+      // Add final history entry before deletion
+      await this.addHistoryEntry(id, {
+        message: 'Prompt deleted',
+        author: prompt.metadata.owner,
+        changes: {
+          action: 'delete',
+          details: {
+            finalVersion: prompt.version,
+            totalHistoryEntries: prompt.history.length
+          }
+        }
+      });
 
       this.prompts.delete(id);
       this.ratings.delete(id);
@@ -973,7 +1151,23 @@ export class PromptLibraryService {
       // Ensure prompt exists first
       const prompt = await this.getPrompt(id);
 
-      // Mock enhancement result
+      // Intelligent question generation logic
+      const taskType = this.detectTaskType(prompt.humanPrompt);
+      const shouldGenerate = this.shouldGenerateQuestions(prompt.humanPrompt);
+
+      logger.info('Question generation analysis', {
+        taskType,
+        shouldGenerate,
+        goalLength: prompt.humanPrompt.goal.length,
+        stepsCount: prompt.humanPrompt.steps.length
+      });
+
+      // Generate intelligent questions only if needed
+      const questions: Question[] = shouldGenerate
+        ? this.generateContextualQuestions(prompt.humanPrompt, taskType, id)
+        : [];
+
+      // Create enhanced structured prompt
       const structuredPrompt: StructuredPrompt = {
         schema_version: 1,
         system: [
@@ -986,49 +1180,58 @@ export class PromptLibraryService {
           { name: 'accuracy', description: 'Ensure all information provided is accurate and relevant' },
           { name: 'completeness', description: 'Address all aspects mentioned in the goal' }
         ],
-        variables: ['input_data', 'context']
+        variables: questions.map(q => q.variable_key)
       };
-
-      // Use hardcoded questions for now (intelligent generation has import issues)
-      const questions: Question[] = [
-        {
-          id: 'q1',
-          prompt_id: id,
-          variable_key: 'use_case',
-          text: 'What specific use case or scenario should this prompt handle?',
-          type: 'string',
-          required: true,
-          help_text: 'Describe the context and scenario'
-        },
-        {
-          id: 'q2',
-          prompt_id: id, 
-          variable_key: 'detail_level',
-          text: 'What level of detail should the output provide?',
-          type: 'string',
-          required: true,
-          options: ['Brief', 'Detailed', 'Comprehensive'],
-          help_text: 'Select the appropriate level of detail'
-        }
-      ];
 
       const result: EnhancementResult = {
         structuredPrompt,
         questions,
-        rationale: 'Enhanced the human prompt by converting it to structured format with clear system instructions, user template, and extracted variables for reusability.',
-        confidence: 0.85,
+        rationale: questions.length > 0
+          ? `Enhanced the prompt and identified ${questions.length} areas where additional context would improve results. The prompt appears to be a ${taskType} task.`
+          : `Enhanced the prompt to structured format. No additional questions needed - the prompt is already well-defined for this ${taskType} task.`,
+        confidence: questions.length === 0 ? 0.95 : 0.75, // Higher confidence when no questions needed
         changes_made: [
-          'Added system instructions for context',
-          'Structured the user template with clear steps',
-          'Extracted variables for input data and context',
-          'Added rules for accuracy and completeness'
+          'Converted to structured format with system instructions',
+          'Organized user template with clear steps',
+          questions.length > 0 ? `Identified ${questions.length} variables for customization` : 'No additional variables needed',
+          'Added accuracy and completeness rules'
         ],
         warnings: [],
         enhancement_model: options?.target_model || 'claude-3-sonnet',
         enhancement_provider: options?.target_provider || 'anthropic'
       };
 
-      logger.info('Prompt enhanced successfully', { id, confidence: result.confidence });
+      // Add enhancement to history if structured prompt was generated
+      if (structuredPrompt) {
+        await this.addHistoryEntry(id, {
+          message: `Prompt enhanced using AI (${taskType} task)`,
+          author: 'system',
+          changes: {
+            action: 'enhance',
+            details: {
+              taskType,
+              questionsGenerated: questions.length,
+              confidence: result.confidence,
+              enhancementModel: result.enhancement_model,
+              enhancementProvider: result.enhancement_provider
+            }
+          },
+          enhancement_model: result.enhancement_model || 'claude-3-sonnet',
+          enhancement_provider: result.enhancement_provider || 'anthropic'
+        });
+
+        // Create a variant with the enhanced content
+        logger.info('About to create enhanced variant', { id, provider: result.enhancement_provider, model: result.enhancement_model });
+        await this.createEnhancedVariant(id, result, prompt);
+        logger.info('Enhanced variant creation completed', { id });
+      }
+
+      logger.info('Prompt enhanced successfully', {
+        id,
+        confidence: result.confidence,
+        questionsGenerated: questions.length,
+        taskType
+      });
       return result;
     } catch (error) {
       logger.error('Failed to enhance prompt:', error);
@@ -1040,13 +1243,87 @@ export class PromptLibraryService {
   }
 
   /**
+   * Create an enhanced variant of a prompt
+   */
+  private async createEnhancedVariant(originalId: string, enhancementResult: EnhancementResult, originalPrompt: PromptRecord): Promise<void> {
+    try {
+      const provider = enhancementResult.enhancement_provider || 'anthropic';
+      const model = enhancementResult.enhancement_model || 'claude-3-sonnet';
+      const variantTag = `${provider}-${model}`;
+      
+      // Create enhanced prompt content
+      const enhancedGoal = `Enhanced context: ${originalPrompt.humanPrompt.goal}`;
+      const enhancedSteps = originalPrompt.humanPrompt.steps.map(step => `Enhanced: ${step}`);
+      
+      // Create variant tags
+      const variantTags = [...(originalPrompt.metadata.tags || []), variantTag, 'enhanced'];
+      
+      // Create the variant prompt
+      const variantPrompt: CreatePromptRequest = {
+        humanPrompt: {
+          goal: enhancedGoal,
+          audience: originalPrompt.humanPrompt.audience,
+          steps: enhancedSteps,
+          output_expectations: originalPrompt.humanPrompt.output_expectations
+        },
+        metadata: {
+          title: `${originalPrompt.metadata.title} (Enhanced)`,
+          summary: `${originalPrompt.metadata.summary} - Enhanced using ${provider} ${model}`,
+          tags: variantTags,
+          tuned_for_provider: provider,
+          preferred_model: model
+        },
+        owner: originalPrompt.metadata.owner
+      };
+
+      // Create the variant
+      const variant = await this.createPrompt(variantPrompt);
+      
+      // Update the variant with variables if there are any questions
+      if (enhancementResult.questions.length > 0) {
+        const variables = enhancementResult.questions.map(q => ({
+          key: q.variable_key,
+          label: q.text,
+          type: q.type as 'string' | 'number' | 'boolean' | 'select' | 'multiselect',
+          required: q.required || true,
+          sensitive: false,
+          ...(q.options && { options: q.options })
+        }));
+        
+        await this.updatePrompt(variant.id, { variables });
+      }
+      
+      logger.info('Enhanced variant created successfully', { 
+        originalId, 
+        variantId: variant.id, 
+        provider, 
+        model 
+      });
+    } catch (error) {
+      logger.error('Failed to create enhanced variant:', error);
+      // Don't throw - enhancement should still succeed even if variant creation fails
+    }
+  }
+
+  /**
    * Render a prompt for a specific provider
    */
   async renderPrompt(id: string, provider: string, options: RenderOptions, userId?: string): Promise<ProviderPayload> {
     this.ensureInitialized();
 
+    const startTime = Date.now();
+
     try {
       logger.info('Rendering prompt', { id, provider });
+
+      // Import WebSocket service dynamically to avoid circular dependencies
+      const { webSocketService } = await import('./websocket-service.js');
+
+      // Notify render started
+      if (options.connectionId && userId) {
+        webSocketService.notifyRenderStarted(id, provider, userId, options.connectionId);
+        webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', 'Loading prompt and validating parameters...');
+      }
 
       // Ensure prompt exists first
       const prompt = await this.getPrompt(id);
@@ -1057,10 +1334,16 @@ export class PromptLibraryService {
         throw new ValidationError(`Invalid provider: ${provider}. Valid providers are: ${validProviders.join(', ')}`);
       }
 
+      // Progress update: preparing prompt
+      if (options.connectionId && userId) {
+        const { webSocketService } = await import('./websocket-service.js');
+        webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', `Preparing prompt for ${provider} provider...`);
+      }
+
       // Determine which version to use
       const useEnhanced = options.version === 'enhanced' && prompt.prompt_structured;
       const noAdaptation = options.version === 'original-no-adapt';
-      
+
       // Mock rendering based on provider and version
       let messages: Array<{ role: string; content: string }>;
       let formattedPrompt: string;
@@ -1068,7 +1351,7 @@ export class PromptLibraryService {
       if (useEnhanced && prompt.prompt_structured) {
         // Use enhanced structured prompt
         const structured = prompt.prompt_structured;
-        
+
         if (provider === 'openai') {
           messages = [
             {
@@ -1106,7 +1389,7 @@ export class PromptLibraryService {
       } else if (noAdaptation) {
         // Use original prompt without any adaptation
         const originalPromptText = this.buildCompleteOriginalPrompt(prompt.humanPrompt);
-        
+
         if (provider === 'openai') {
           messages = [
             {
@@ -1140,13 +1423,13 @@ export class PromptLibraryService {
       } else {
         // Use original human prompt with adaptive rendering
         const isAgentPrompt = this.isAgentPrompt(prompt.humanPrompt, prompt.metadata);
-        
+
         if (isAgentPrompt) {
           // Agent prompt - send complete original prompt for adaptation
           const originalPromptText = this.buildCompleteOriginalPrompt(prompt.humanPrompt);
           const formatInstructions = this.buildFormatAdaptationInstructions(prompt, provider);
           const fullAgentPrompt = `${formatInstructions}\n\n## Original Prompt to Adapt:\n\n${originalPromptText}`;
-          
+
           if (provider === 'openai') {
             messages = [
               {
@@ -1179,7 +1462,7 @@ export class PromptLibraryService {
           const taskDefinition = this.buildTaskDefinition(prompt.humanPrompt);
           const formatInstructions = this.buildTaskFormatInstructions(prompt, provider);
           const fullTaskPrompt = `${formatInstructions}\n\n${taskDefinition}`;
-          
+
           if (provider === 'openai') {
             messages = [
               {
@@ -1208,24 +1491,29 @@ export class PromptLibraryService {
             ];
           }
         }
-        
-        formattedPrompt = provider === 'openai' 
+
+        formattedPrompt = provider === 'openai'
           ? messages.map(m => `${m.role}: ${m.content}`).join('\n\n')
           : messages[0]?.content || '';
       }
 
       // If connectionId is provided and userId is available, use real LLM execution
-      logger.info('Checking LLM execution conditions', { 
-        hasConnectionId: !!options.connectionId, 
+      logger.info('Checking LLM execution conditions', {
+        hasConnectionId: !!options.connectionId,
         connectionId: options.connectionId,
         hasUserId: !!userId,
-        userId: userId 
+        userId: userId
       });
-      
+
       if (options.connectionId && userId) {
         try {
           logger.info('Using real LLM execution', { connectionId: options.connectionId, provider });
-          
+
+          // Progress update: executing LLM
+          const { webSocketService } = await import('./websocket-service.js');
+          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'executing', `Sending request to ${provider} LLM...`);
+          logger.info('Sent render progress update: executing', { promptId: id, provider, userId, connectionId: options.connectionId });
+
           const executionResult = await LLMExecutionService.executePrompt({
             connectionId: options.connectionId,
             userId,
@@ -1237,9 +1525,14 @@ export class PromptLibraryService {
             }
           });
 
+          // Progress update: processing response
+          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'processing', 'Processing LLM response...');
+          logger.info('Sent render progress update: processing', { promptId: id, provider, userId, connectionId: options.connectionId });
+
           const payload: ProviderPayload = {
             provider: executionResult.provider,
             model: executionResult.model,
+            targetModel: options.targetModel, // Include target model for adaptation
             messages,
             parameters: {
               temperature: options.temperature || 0.7,
@@ -1250,35 +1543,66 @@ export class PromptLibraryService {
             ...(executionResult.usage && { usage: executionResult.usage })
           };
 
-          logger.info('Real LLM execution completed', { 
-            id, 
-            provider, 
+          const renderTime = Date.now() - startTime;
+          
+          logger.info('Real LLM execution completed', {
+            id,
+            provider,
             model: executionResult.model,
             responseLength: executionResult.response.length,
-            responsePreview: executionResult.response.substring(0, 100) + '...'
+            responsePreview: executionResult.response.substring(0, 100) + '...',
+            renderTime
           });
+
+          // Progress update: completed
+          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'completing', 'Render completed successfully!');
+          webSocketService.notifyRenderCompleted(id, provider, userId, options.connectionId, payload, renderTime);
+          logger.info('Sent render completion notification', { promptId: id, provider, userId, connectionId: options.connectionId, renderTime });
+
           return payload;
         } catch (error) {
           logger.error('Real LLM execution failed, falling back to mock', { error: (error as Error).message });
+          
+          // Notify error via WebSocket
+          const { webSocketService } = await import('./websocket-service.js');
+          webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
+          
           // Fall through to mock response
         }
       }
 
       // Mock response (fallback or when no connectionId provided)
-      logger.info('Using mock response', { 
+      logger.info('Using mock response', {
         reason: !options.connectionId ? 'no connectionId' : !userId ? 'no userId' : 'LLM execution failed'
       });
-      
+
+      // Determine the appropriate model for the provider
+      const getDefaultModel = (provider: string): string => {
+        switch (provider) {
+          case 'openai':
+            return 'gpt-3.5-turbo';
+          case 'anthropic':
+            return 'claude-3-sonnet-20240229';
+          case 'meta':
+            return 'llama-2-70b-chat';
+          default:
+            return 'default';
+        }
+      };
+
+      const modelToUse = options.model || getDefaultModel(provider);
+
       const payload: ProviderPayload = {
         provider,
-        model: options.model || 'default',
+        model: modelToUse,
+        targetModel: options.targetModel, // Include target model for adaptation
         messages,
         parameters: {
           temperature: options.temperature || 0.7,
           max_tokens: 2000
         },
         formatted_prompt: formattedPrompt,
-        response: `[MOCK RESPONSE] This would be the actual response from ${provider} ${options.model || 'default'}. The prompt has been formatted correctly and would be sent to the real API.`,
+        response: `[MOCK RESPONSE] This would be the actual response from ${provider} ${modelToUse}. The prompt has been formatted correctly and would be sent to the real API.`,
         usage: {
           promptTokens: 100,
           completionTokens: 50,
@@ -1286,10 +1610,36 @@ export class PromptLibraryService {
         }
       };
 
+      // Track render in history
+      await this.addHistoryEntry(id, {
+        message: `Prompt rendered for ${provider}`,
+        author: userId || 'system',
+        changes: {
+          action: 'render',
+          details: {
+            provider,
+            version: useEnhanced ? 'enhanced' : (noAdaptation ? 'original-no-adapt' : 'original'),
+            variablesUsed: Object.keys(options.variables || {}),
+            connectionId: options.connectionId
+          }
+        }
+      });
+
       logger.info('Mock prompt rendered successfully', { id, provider });
       return payload;
     } catch (error) {
       logger.error('Failed to render prompt:', error);
+      
+      // Notify error via WebSocket if we have connection info
+      if (options.connectionId && userId) {
+        try {
+          const { webSocketService } = await import('./websocket-service.js');
+          webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
+        } catch (wsError) {
+          logger.error('Failed to send WebSocket error notification:', wsError);
+        }
+      }
+      
       if (error instanceof NotFoundError || error instanceof ValidationError) {
         throw error;
       }
@@ -1396,6 +1746,21 @@ export class PromptLibraryService {
       filteredRatings.push(rating);
 
       this.ratings.set(promptId, filteredRatings);
+
+      // Add rating to history
+      await this.addHistoryEntry(promptId, {
+        message: `Rated ${ratingData.score}/5 stars${ratingData.note ? ' with feedback' : ''}`,
+        author: userId,
+        changes: {
+          action: 'rate',
+          details: {
+            score: ratingData.score,
+            hasNote: !!ratingData.note,
+            totalRatings: filteredRatings.length,
+            averageRating: filteredRatings.reduce((sum, r) => sum + r.score, 0) / filteredRatings.length
+          }
+        }
+      });
 
       logger.info('Prompt rated successfully', { promptId, userId, score: ratingData.score });
     } catch (error) {
@@ -1508,13 +1873,13 @@ export class PromptLibraryService {
    */
   private substituteVariables(template: string, variables: Record<string, any>): string {
     let result = template;
-    
+
     // Replace variables in the format {{variable_name}}
     Object.entries(variables).forEach(([key, value]) => {
       const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
       result = result.replace(regex, String(value || ''));
     });
-    
+
     return result;
   }
 
@@ -1527,11 +1892,11 @@ export class PromptLibraryService {
       if (metadata.tags.includes('prompt-type:agent')) return true;
       if (metadata.tags.includes('prompt-type:task')) return false;
     }
-    
+
     // 2. Auto-detect based on language patterns
     const goalLower = humanPrompt.goal.toLowerCase();
     const stepsText = humanPrompt.steps.join(' ').toLowerCase();
-    
+
     // Agent-defining keywords (identity/capability focused)
     const agentKeywords = [
       'expert', 'specialist', 'engineer', 'architect', 'masters', 'specializing',
@@ -1539,21 +1904,21 @@ export class PromptLibraryService {
       'example interactions', 'purpose', '## capabilities', '## behavioral',
       'you are', 'i am', 'my expertise', 'my specialization'
     ];
-    
+
     // Task-defining keywords (action/deliverable focused)
     const taskKeywords = [
       'create', 'build', 'generate', 'analyze', 'write', 'develop', 'design',
       'implement', 'test', 'review', 'document', 'plan', 'organize', 'identify'
     ];
-    
-    const hasAgentKeywords = agentKeywords.some(keyword => 
+
+    const hasAgentKeywords = agentKeywords.some(keyword =>
       goalLower.includes(keyword) || stepsText.includes(keyword)
     );
-    
-    const hasTaskKeywords = taskKeywords.some(keyword => 
+
+    const hasTaskKeywords = taskKeywords.some(keyword =>
       goalLower.includes(keyword)
     );
-    
+
     // If both present, prioritize agent keywords
     // If only task keywords, it's likely a task
     return hasAgentKeywords || (!hasTaskKeywords && hasAgentKeywords);
@@ -1564,15 +1929,15 @@ export class PromptLibraryService {
    */
   private buildCompleteOriginalPrompt(humanPrompt: HumanPrompt): string {
     const sections = [];
-    
+
     // Goal section
     sections.push(`**Goal:** ${humanPrompt.goal}`);
-    
+
     // Audience section
     if (humanPrompt.audience) {
       sections.push(`\n**Audience:** ${humanPrompt.audience}`);
     }
-    
+
     // Steps section (contains all the detailed capabilities, traits, etc.)
     if (humanPrompt.steps && humanPrompt.steps.length > 0) {
       sections.push('\n**Capabilities and Knowledge:**');
@@ -1581,12 +1946,12 @@ export class PromptLibraryService {
         sections.push(`\n${step}`);
       });
     }
-    
+
     // Output expectations
     if (humanPrompt.output_expectations?.format) {
       sections.push(`\n**Output Expectations:** ${humanPrompt.output_expectations.format}`);
     }
-    
+
     return sections.join('\n');
   }
 
@@ -1595,30 +1960,30 @@ export class PromptLibraryService {
    */
   private buildTaskDefinition(humanPrompt: HumanPrompt): string {
     const sections = [];
-    
+
     // Preserve original structure
     sections.push(`**Goal:** ${humanPrompt.goal}`);
-    
+
     if (humanPrompt.audience && humanPrompt.audience !== 'General') {
       sections.push(`**Audience:** ${humanPrompt.audience}`);
     }
-    
+
     if (humanPrompt.steps && humanPrompt.steps.length > 0) {
       sections.push('\n**Steps:**');
       humanPrompt.steps.forEach((step, i) => {
         sections.push(`${i + 1}. ${step}`);
       });
     }
-    
+
     if (humanPrompt.output_expectations?.format) {
       sections.push(`\n**Expected Output:** ${humanPrompt.output_expectations.format}`);
     }
-    
+
     // Add completion instructions
     sections.push('\n---');
     sections.push('\n**TASK COMPLETION:**');
     sections.push('Please complete the above task by following each step systematically and delivering the expected output. Start your response by acknowledging the goal and audience, then work through each step to produce the final deliverable.');
-    
+
     return sections.join('\n');
   }
 
@@ -1660,7 +2025,7 @@ export class PromptLibraryService {
    */
   private buildFormatAdaptationInstructions(prompt: PromptRecord, targetProvider: string): string {
     const originalProvider = (prompt.metadata as any)?.tuned_for_provider || 'generic';
-    
+
     const providerFormats = {
       openai: {
         name: 'OpenAI GPT',
@@ -1693,6 +2058,426 @@ This prompt is optimized for ${outputFormat.name}. Respond using ${outputFormat.
 **Task**: Become this agent using ${outputFormat.style}. Preserve ALL content - every capability, trait, tool, example, and methodology exactly as specified below.
 
 **Critical**: This is format adaptation, not summarization. Include everything.`;
+  }
+
+  /**
+   * Detect the task type from the human prompt
+   */
+  private detectTaskType(humanPrompt: HumanPrompt): string {
+    const goalText = humanPrompt.goal.toLowerCase();
+    const stepsText = humanPrompt.steps.join(' ').toLowerCase();
+    const combinedText = `${goalText} ${stepsText}`;
+
+    // Code keywords (check first as they're more specific)
+    if (this.containsKeywords(combinedText, ['code', 'program', 'script', 'function', 'algorithm', 'debug', 'refactor', 'write a function', 'implement'])) {
+      return 'code';
+    }
+
+    // Analysis keywords
+    if (this.containsKeywords(combinedText, ['analyze', 'analysis', 'examine', 'evaluate', 'assess', 'review', 'study'])) {
+      return 'analysis';
+    }
+
+    // Generation keywords (but exclude code-related generation)
+    if (this.containsKeywords(combinedText, ['generate', 'create', 'write', 'produce', 'build', 'make', 'compose']) &&
+      !this.containsKeywords(combinedText, ['function', 'code', 'program', 'script'])) {
+      return 'generation';
+    }
+
+    // Transformation keywords
+    if (this.containsKeywords(combinedText, ['transform', 'convert', 'translate', 'reformat', 'restructure', 'modify'])) {
+      return 'transformation';
+    }
+
+    // Classification keywords
+    if (this.containsKeywords(combinedText, ['classify', 'categorize', 'sort', 'group', 'label', 'tag'])) {
+      return 'classification';
+    }
+
+    // Summarization keywords
+    if (this.containsKeywords(combinedText, ['summarize', 'summary', 'condense', 'brief', 'overview', 'abstract'])) {
+      return 'summarization';
+    }
+
+    // Conversation keywords
+    if (this.containsKeywords(combinedText, ['chat', 'conversation', 'dialogue', 'discuss', 'talk', 'respond'])) {
+      return 'conversation';
+    }
+
+    // Creative keywords
+    if (this.containsKeywords(combinedText, ['creative', 'story', 'poem', 'design', 'brainstorm', 'imagine'])) {
+      return 'creative';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Determine if questions are actually needed for this enhancement
+   */
+  private shouldGenerateQuestions(humanPrompt: HumanPrompt): boolean {
+    // Don't generate questions if the prompt is already very specific
+    if (this.isPromptAlreadySpecific(humanPrompt)) {
+      return false;
+    }
+
+    // Don't generate questions for simple, self-contained tasks
+    if (this.isSelfContainedTask(humanPrompt)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Generate contextual questions based on task type
+   */
+  private generateContextualQuestions(humanPrompt: HumanPrompt, taskType: string, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    switch (taskType) {
+      case 'analysis':
+        questions.push(...this.generateAnalysisQuestions(humanPrompt, promptId));
+        break;
+      case 'generation':
+        questions.push(...this.generateGenerationQuestions(humanPrompt, promptId));
+        break;
+      case 'transformation':
+        questions.push(...this.generateTransformationQuestions(humanPrompt, promptId));
+        break;
+      case 'classification':
+        questions.push(...this.generateClassificationQuestions(humanPrompt, promptId));
+        break;
+      case 'code':
+        questions.push(...this.generateCodeQuestions(humanPrompt, promptId));
+        break;
+      default:
+        // For unknown or simple tasks, generate minimal questions only if prompt is very vague
+        if (this.isPromptVeryVague(humanPrompt)) {
+          questions.push(...this.generateGenericQuestions(humanPrompt, promptId));
+        }
+    }
+
+    return questions;
+  }
+
+  private generateAnalysisQuestions(humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    // Only ask for data if not already specified
+    if (!this.hasDataSpecified(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_analysis_data`,
+        prompt_id: promptId,
+        variable_key: 'analysis_data',
+        text: 'What data or content should be analyzed?',
+        type: 'string',
+        required: true,
+        help_text: 'Provide the specific data, document, or content to analyze'
+      });
+    }
+
+    // Ask for analysis focus if goal is vague
+    if (this.isGoalVague(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_analysis_focus`,
+        prompt_id: promptId,
+        variable_key: 'analysis_focus',
+        text: 'What specific aspects should the analysis focus on?',
+        type: 'string',
+        required: false,
+        help_text: 'e.g., trends, patterns, quality, performance, etc.'
+      });
+    }
+
+    return questions;
+  }
+
+  private generateGenerationQuestions(humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    // Ask for topic/subject if not clear
+    if (!this.hasTopicSpecified(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_generation_topic`,
+        prompt_id: promptId,
+        variable_key: 'generation_topic',
+        text: 'What topic or subject should be generated?',
+        type: 'string',
+        required: true,
+        help_text: 'The main topic, theme, or subject for the generated content'
+      });
+    }
+
+    // Ask for style/tone if not specified
+    if (!this.hasStyleSpecified(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_content_style`,
+        prompt_id: promptId,
+        variable_key: 'content_style',
+        text: 'What style or tone should be used?',
+        type: 'select',
+        required: false,
+        options: ['professional', 'casual', 'academic', 'creative', 'technical', 'friendly'],
+        help_text: 'The writing style or tone for the generated content'
+      });
+    }
+
+    return questions;
+  }
+
+  private generateTransformationQuestions(_humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    // Ask for source format if not clear
+    questions.push({
+      id: `${promptId}_source_format`,
+      prompt_id: promptId,
+      variable_key: 'source_format',
+      text: 'What is the current format of the content?',
+      type: 'string',
+      required: true,
+      help_text: 'The format of the input content (e.g., JSON, CSV, plain text)'
+    });
+
+    // Ask for target format
+    questions.push({
+      id: `${promptId}_target_format`,
+      prompt_id: promptId,
+      variable_key: 'target_format',
+      text: 'What format should the content be transformed to?',
+      type: 'string',
+      required: true,
+      help_text: 'The desired output format'
+    });
+
+    return questions;
+  }
+
+  private generateClassificationQuestions(_humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    // Ask for classification categories if not specified
+    questions.push({
+      id: `${promptId}_classification_categories`,
+      prompt_id: promptId,
+      variable_key: 'classification_categories',
+      text: 'What categories should be used for classification?',
+      type: 'string',
+      required: true,
+      help_text: 'List the categories or labels to classify content into'
+    });
+
+    return questions;
+  }
+
+  private generateCodeQuestions(humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    // Ask for programming language if not specified
+    if (!this.hasLanguageSpecified(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_programming_language`,
+        prompt_id: promptId,
+        variable_key: 'programming_language',
+        text: 'What programming language should be used?',
+        type: 'select',
+        required: true,
+        options: ['JavaScript', 'Python', 'TypeScript', 'Java', 'C#', 'Go', 'Rust', 'Other'],
+        help_text: 'The programming language for the code'
+      });
+    }
+
+    // Ask for specific requirements if the goal is vague
+    if (this.isGoalVague(humanPrompt)) {
+      questions.push({
+        id: `${promptId}_code_requirements`,
+        prompt_id: promptId,
+        variable_key: 'code_requirements',
+        text: 'What are the specific requirements for the code?',
+        type: 'string',
+        required: false,
+        help_text: 'Any specific requirements, constraints, or features needed'
+      });
+    }
+
+    return questions;
+  }
+
+  private generateGenericQuestions(_humanPrompt: HumanPrompt, promptId: string): Question[] {
+    const questions: Question[] = [];
+
+    questions.push({
+      id: `${promptId}_specific_requirements`,
+      prompt_id: promptId,
+      variable_key: 'specific_requirements',
+      text: 'What are the specific requirements or details?',
+      type: 'string',
+      required: false,
+      help_text: 'Any additional details that would help complete the task'
+    });
+
+    return questions;
+  }
+
+  // Helper methods for analysis
+  private containsKeywords(text: string, keywords: string[]): boolean {
+    return keywords.some(keyword => text.includes(keyword));
+  }
+
+  private isPromptAlreadySpecific(humanPrompt: HumanPrompt): boolean {
+    const totalLength = humanPrompt.goal.length + humanPrompt.steps.join(' ').length;
+    const hasDetailedSteps = humanPrompt.steps.length >= 3 && humanPrompt.steps.some(step => step.length > 50);
+    const hasSpecificOutput = humanPrompt.output_expectations.fields.length > 1;
+
+    return totalLength > 300 && hasDetailedSteps && hasSpecificOutput;
+  }
+
+  private isSelfContainedTask(humanPrompt: HumanPrompt): boolean {
+    const goalText = humanPrompt.goal.toLowerCase();
+
+    // Tasks that typically don't need additional input
+    const selfContainedKeywords = [
+      'explain', 'describe', 'list', 'define', 'compare',
+      'what is', 'how to', 'why does', 'when should'
+    ];
+
+    return selfContainedKeywords.some(keyword => goalText.includes(keyword));
+  }
+
+  private hasDataSpecified(humanPrompt: HumanPrompt): boolean {
+    const combinedText = `${humanPrompt.goal} ${humanPrompt.steps.join(' ')}`.toLowerCase();
+    const dataKeywords = ['data', 'file', 'document', 'content', 'text', 'input'];
+    return dataKeywords.some(keyword => combinedText.includes(keyword));
+  }
+
+  private isGoalVague(humanPrompt: HumanPrompt): boolean {
+    return humanPrompt.goal.length < 50 ||
+      (humanPrompt.goal.toLowerCase().includes('analyze') &&
+        !humanPrompt.goal.toLowerCase().includes('for'));
+  }
+
+  private hasTopicSpecified(humanPrompt: HumanPrompt): boolean {
+    const goalText = humanPrompt.goal.toLowerCase();
+    return goalText.includes('about') || goalText.includes('on') || goalText.includes('regarding');
+  }
+
+  private hasStyleSpecified(humanPrompt: HumanPrompt): boolean {
+    const combinedText = `${humanPrompt.goal} ${humanPrompt.steps.join(' ')}`.toLowerCase();
+    const styleKeywords = ['professional', 'casual', 'formal', 'informal', 'technical', 'simple', 'detailed'];
+    return styleKeywords.some(keyword => combinedText.includes(keyword));
+  }
+
+  private hasLanguageSpecified(humanPrompt: HumanPrompt): boolean {
+    const combinedText = `${humanPrompt.goal} ${humanPrompt.steps.join(' ')}`.toLowerCase();
+    const languages = ['javascript', 'python', 'java', 'typescript', 'c#', 'go', 'rust', 'php', 'ruby'];
+    return languages.some(lang => combinedText.includes(lang));
+  }
+
+  private isPromptVeryVague(humanPrompt: HumanPrompt): boolean {
+    return humanPrompt.goal.length < 30 && humanPrompt.steps.length < 2;
+  }
+
+  /**
+   * Add a history entry to a prompt
+   */
+  private async addHistoryEntry(promptId: string, entry: {
+    message: string;
+    author: string;
+    changes: any;
+    enhancement_model?: string;
+    enhancement_provider?: string;
+  }): Promise<void> {
+    try {
+      const prompt = await this.getPrompt(promptId);
+
+      const historyEntry = {
+        version: prompt.version,
+        message: entry.message,
+        author: entry.author,
+        timestamp: new Date().toISOString(),
+        changes: entry.changes,
+        ...(entry.enhancement_model && { enhancement_model: entry.enhancement_model }),
+        ...(entry.enhancement_provider && { enhancement_provider: entry.enhancement_provider })
+      };
+
+      prompt.history.push(historyEntry);
+      prompt.metadata.updated_at = new Date().toISOString();
+
+      this.prompts.set(promptId, prompt);
+      await this.savePromptToFile(prompt);
+
+      logger.debug('History entry added', { promptId, message: entry.message });
+    } catch (error) {
+      logger.error('Failed to add history entry:', error);
+      // Don't throw - history tracking shouldn't break the main operation
+    }
+  }
+
+  /**
+   * Analyze changes between existing prompt and updates
+   */
+  private analyzeChanges(existingPrompt: PromptRecord, updates: UpdatePromptRequest): string[] {
+    const changes: string[] = [];
+
+    if (updates.metadata) {
+      if (updates.metadata.title && updates.metadata.title !== existingPrompt.metadata.title) {
+        changes.push(`Title changed from "${existingPrompt.metadata.title}" to "${updates.metadata.title}"`);
+      }
+      if (updates.metadata.summary && updates.metadata.summary !== existingPrompt.metadata.summary) {
+        changes.push('Summary updated');
+      }
+      if (updates.metadata.tags && JSON.stringify(updates.metadata.tags) !== JSON.stringify(existingPrompt.metadata.tags)) {
+        changes.push('Tags modified');
+      }
+      if ((updates.metadata as any).preferred_model && (updates.metadata as any).preferred_model !== (existingPrompt.metadata as any).preferred_model) {
+        changes.push(`Preferred model changed to ${(updates.metadata as any).preferred_model}`);
+      }
+    }
+
+    if (updates.humanPrompt) {
+      if (updates.humanPrompt.goal && updates.humanPrompt.goal !== existingPrompt.humanPrompt.goal) {
+        changes.push('Goal updated');
+      }
+      if (updates.humanPrompt.audience && updates.humanPrompt.audience !== existingPrompt.humanPrompt.audience) {
+        changes.push('Target audience changed');
+      }
+      if (updates.humanPrompt.steps && JSON.stringify(updates.humanPrompt.steps) !== JSON.stringify(existingPrompt.humanPrompt.steps)) {
+        changes.push('Steps modified');
+      }
+      if (updates.humanPrompt.output_expectations) {
+        changes.push('Output expectations updated');
+      }
+    }
+
+    if (updates.variables && JSON.stringify(updates.variables) !== JSON.stringify(existingPrompt.variables)) {
+      changes.push('Variables modified');
+    }
+
+    return changes;
+  }
+
+  /**
+   * Generate a human-readable change message
+   */
+  private generateChangeMessage(changes: string[], isEnhancement: boolean): string {
+    if (isEnhancement) {
+      return 'Prompt enhanced via AI';
+    }
+
+    if (changes.length === 0) {
+      return 'Prompt updated';
+    }
+
+    if (changes.length === 1) {
+      return changes[0] || 'Prompt updated';
+    }
+
+    if (changes.length <= 3) {
+      return changes.join(', ');
+    }
+
+    return `${changes.length} changes made: ${changes.slice(0, 2).join(', ')} and ${changes.length - 2} more`;
   }
 }
 

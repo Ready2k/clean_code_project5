@@ -101,6 +101,41 @@ export interface WebSocketEvents {
     userId: string;
     timestamp: string;
   };
+
+  // Render events
+  'render:started': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    timestamp: string;
+  };
+  'render:progress': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    status: 'preparing' | 'executing' | 'processing' | 'completing';
+    message: string;
+    timestamp: string;
+  };
+  'render:completed': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    result: any;
+    renderTime: number;
+    timestamp: string;
+  };
+  'render:failed': {
+    promptId: string;
+    provider: string;
+    userId: string;
+    connectionId: string;
+    error: string;
+    timestamp: string;
+  };
 }
 
 class WebSocketService {
@@ -360,6 +395,72 @@ class WebSocketService {
       promptId,
       rating,
       userId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Render events
+  notifyRenderStarted(promptId: string, provider: string, userId: string, connectionId: string): void {
+    this.emitToUser(userId, 'render:started', {
+      promptId,
+      provider,
+      userId,
+      connectionId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  notifyRenderProgress(
+    promptId: string, 
+    provider: string, 
+    userId: string, 
+    connectionId: string, 
+    status: 'preparing' | 'executing' | 'processing' | 'completing', 
+    message: string
+  ): void {
+    this.emitToUser(userId, 'render:progress', {
+      promptId,
+      provider,
+      userId,
+      connectionId,
+      status,
+      message,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  notifyRenderCompleted(
+    promptId: string, 
+    provider: string, 
+    userId: string, 
+    connectionId: string, 
+    result: any, 
+    renderTime: number
+  ): void {
+    this.emitToUser(userId, 'render:completed', {
+      promptId,
+      provider,
+      userId,
+      connectionId,
+      result,
+      renderTime,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  notifyRenderFailed(
+    promptId: string, 
+    provider: string, 
+    userId: string, 
+    connectionId: string, 
+    error: string
+  ): void {
+    this.emitToUser(userId, 'render:failed', {
+      promptId,
+      provider,
+      userId,
+      connectionId,
+      error,
       timestamp: new Date().toISOString()
     });
   }

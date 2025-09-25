@@ -38,6 +38,7 @@ export interface RenderResult {
   metadata: {
     provider: string;
     model?: string | undefined;
+    targetModel?: string | undefined;
     timestamp: Date;
     renderTime: number;
   };
@@ -195,6 +196,7 @@ export class ProviderRegistryService {
         metadata: {
           provider: request.provider,
           model: request.options.model || undefined,
+          targetModel: request.options.targetModel || undefined,
           timestamp: new Date(),
           renderTime
         }

@@ -107,6 +107,7 @@ export interface PromptsResponse {
 // Rendering types
 export interface RenderOptions {
   model?: string;
+  targetModel?: string;
   temperature?: number;
   maxTokens?: number;
   variables?: Record<string, any>;
@@ -130,6 +131,7 @@ export interface RenderResult {
   connectionId: string;
   provider: string;
   model: string;
+  targetModel?: string;
   payload: string | {
     provider: string;
     model?: string;

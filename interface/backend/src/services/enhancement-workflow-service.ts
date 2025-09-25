@@ -299,6 +299,38 @@ export class EnhancementWorkflowService extends EventEmitter {
 
     this.emit('progress', progressData);
     
+    // Notify WebSocket service for real-time updates
+    if (status === 'complete') {
+      try {
+        // Import WebSocket service dynamically to avoid circular dependencies
+        import('./websocket-service.js').then(({ webSocketService }) => {
+          if (webSocketService) {
+            logger.info('Notifying WebSocket service of enhancement completion', { jobId, promptId: job.promptId });
+            webSocketService.notifyEnhancementCompleted(jobId, job.promptId, result);
+          } else {
+            logger.warn('WebSocket service not available for enhancement notification');
+          }
+        }).catch(error => {
+          logger.error('Failed to notify WebSocket service of enhancement completion:', error);
+        });
+      } catch (error) {
+        logger.error('Error importing WebSocket service:', error);
+      }
+    } else if (status === 'failed') {
+      try {
+        import('./websocket-service.js').then(({ webSocketService }) => {
+          if (webSocketService) {
+            logger.info('Notifying WebSocket service of enhancement failure', { jobId, promptId: job.promptId });
+            webSocketService.notifyEnhancementFailed(jobId, job.promptId, error || 'Unknown error');
+          }
+        }).catch(error => {
+          logger.error('Failed to notify WebSocket service of enhancement failure:', error);
+        });
+      } catch (error) {
+        logger.error('Error importing WebSocket service for failure notification:', error);
+      }
+    }
+    
     logger.debug('Enhancement job status updated', { 
       jobId, 
       status, 
