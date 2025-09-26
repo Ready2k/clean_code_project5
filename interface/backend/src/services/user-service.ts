@@ -19,6 +19,7 @@ export class UserService {
   private readonly jwtExpiresIn: string;
   private readonly refreshTokenExpiresIn: string;
   private readonly storageDir: string;
+  private readonly initializationPromise: Promise<void>;
 
   constructor(redisService: RedisService, storageDir?: string) {
     this.redisService = redisService;
@@ -32,7 +33,11 @@ export class UserService {
     }
 
     // Initialize storage and load users
-    this.initializeStorage();
+    this.initializationPromise = this.initializeStorage();
+  }
+
+  public async ready(): Promise<void> {
+    await this.ensureInitialized();
   }
 
   /**
@@ -51,6 +56,10 @@ export class UserService {
     } catch (error) {
       logger.error('Failed to initialize user storage:', error);
     }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    await this.initializationPromise;
   }
 
   /**
@@ -167,14 +176,14 @@ export class UserService {
         const adminUser = await this.createUser(defaultAdmin, true);
         adminUser.role = 'admin'; // Set as admin after creation
         this.users.set(adminUser.id, adminUser);
-        
+
         // Save the updated admin user with admin role
         await this.saveUserToFile(adminUser);
-        
-        logger.info('Default admin user created successfully', { 
+
+        logger.info('Default admin user created successfully', {
           id: adminUser.id,
-          username: adminUser.username, 
-          email: adminUser.email,
+          username: adminUser.username,
+          email: this.sanitizeEmailForLog(adminUser.email),
           role: adminUser.role,
           totalUsers: this.users.size
         });
@@ -200,15 +209,16 @@ export class UserService {
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
+    await this.ensureInitialized();
     await this.validateRegistrationData(data);
 
     const user = await this.createUser(data);
     const tokens = await this.generateTokens(user);
 
-    logger.info('User registered successfully', { 
-      userId: user.id, 
-      username: user.username, 
-      email: user.email 
+    logger.info('User registered successfully', {
+      userId: user.id,
+      username: user.username,
+      email: this.sanitizeEmailForLog(user.email)
     });
 
     return {
@@ -220,13 +230,14 @@ export class UserService {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    await this.ensureInitialized();
     const { email, password } = credentials;
 
-    logger.info('Login attempt', { 
-      email, 
-      passwordLength: password?.length,
-      totalUsers: this.users.size,
-      emailsInIndex: Array.from(this.usersByEmail.keys())
+    const maskedEmail = this.sanitizeEmailForLog(email || '');
+
+    logger.info('Login attempt', {
+      email: maskedEmail,
+      totalUsers: this.users.size
     });
 
     if (!email || !password) {
@@ -235,9 +246,8 @@ export class UserService {
 
     const userId = this.usersByEmail.get(email.toLowerCase());
     if (!userId) {
-      logger.warn('User not found by email', { 
-        email: email.toLowerCase(),
-        availableEmails: Array.from(this.usersByEmail.keys())
+      logger.warn('User not found by email', {
+        email: maskedEmail
       });
       throw new AuthenticationError('Invalid credentials', ErrorCode.INVALID_CREDENTIALS);
     }
@@ -250,7 +260,7 @@ export class UserService {
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      logger.warn('Invalid password', { userId: user.id, email: user.email });
+      logger.warn('Invalid password', { userId: user.id, email: this.sanitizeEmailForLog(user.email) });
       throw new AuthenticationError('Invalid credentials', ErrorCode.INVALID_CREDENTIALS);
     }
 
@@ -267,10 +277,10 @@ export class UserService {
 
     const tokens = await this.generateTokens(user);
 
-    logger.info('User logged in successfully', { 
-      userId: user.id, 
-      username: user.username, 
-      email: user.email 
+    logger.info('User logged in successfully', {
+      userId: user.id,
+      username: user.username,
+      email: this.sanitizeEmailForLog(user.email)
     });
 
     return {
@@ -282,6 +292,7 @@ export class UserService {
   }
 
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
+    await this.ensureInitialized();
     if (!refreshToken) {
       throw new ValidationError('Refresh token is required');
     }
@@ -332,6 +343,7 @@ export class UserService {
   }
 
   async logout(refreshToken: string): Promise<void> {
+    await this.ensureInitialized();
     if (refreshToken) {
       // Blacklist the refresh token
       await this.redisService.setex(
@@ -345,24 +357,29 @@ export class UserService {
   }
 
   async getUserById(id: string): Promise<User | null> {
+    await this.ensureInitialized();
     return this.users.get(id) || null;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
+    await this.ensureInitialized();
     const userId = this.usersByEmail.get(email.toLowerCase());
     return userId ? this.users.get(userId) || null : null;
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
+    await this.ensureInitialized();
     const userId = this.usersByUsername.get(username.toLowerCase());
     return userId ? this.users.get(userId) || null : null;
   }
 
   async getAllUsers(): Promise<User[]> {
+    await this.ensureInitialized();
     return Array.from(this.users.values());
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    await this.ensureInitialized();
     const user = this.users.get(id);
     if (!user) {
       throw new NotFoundError('User not found');
@@ -408,15 +425,16 @@ export class UserService {
     // Save updated user to file
     await this.saveUserToFile(updatedUser);
 
-    logger.info('User updated successfully', { 
-      userId: id, 
-      updatedFields: Object.keys(updates) 
+    logger.info('User updated successfully', {
+      userId: id,
+      updatedFields: Object.keys(updates)
     });
 
     return updatedUser;
   }
 
   async updateUserPassword(id: string, newPassword: string): Promise<void> {
+    await this.ensureInitialized();
     const user = this.users.get(id);
     if (!user) {
       throw new NotFoundError('User not found');
@@ -443,6 +461,7 @@ export class UserService {
   }
 
   async deleteUser(id: string): Promise<void> {
+    await this.ensureInitialized();
     const user = this.users.get(id);
     if (!user) {
       throw new NotFoundError('User not found');
@@ -458,10 +477,10 @@ export class UserService {
     // Delete user file
     await this.deleteUserFile(id);
 
-    logger.info('User deleted successfully', { 
-      userId: id, 
-      username: user.username, 
-      email: user.email 
+    logger.info('User deleted successfully', {
+      userId: id,
+      username: user.username,
+      email: this.sanitizeEmailForLog(user.email)
     });
   }
 
@@ -506,6 +525,7 @@ export class UserService {
   }
 
   private async validateRegistrationData(data: RegisterData): Promise<void> {
+    await this.ensureInitialized();
     const { username, email, password } = data;
 
     if (!username || username.length < 3) {
@@ -605,6 +625,27 @@ export class UserService {
     return sanitizedUser;
   }
 
+  private sanitizeEmailForLog(email: string): string {
+    const [localPart, domain] = email.split('@');
+
+    if (!domain) {
+      if (!localPart) {
+        return 'unknown';
+      }
+      return localPart.length <= 1 ? '*' : `${localPart[0]}***`;
+    }
+
+    if (localPart.length <= 1) {
+      return `*@${domain}`;
+    }
+
+    if (localPart.length === 2) {
+      return `${localPart[0]}*@${domain}`;
+    }
+
+    return `${localPart[0]}***${localPart.slice(-1)}@${domain}`;
+  }
+
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -636,6 +677,7 @@ export async function initializeUserService(redisService: RedisService, storageD
     userServiceInstance = new UserService(redisService, storageDir);
     logger.info('User service initialized');
   }
+  await userServiceInstance.ready();
   return userServiceInstance;
 }
 
