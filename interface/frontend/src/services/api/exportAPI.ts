@@ -1,7 +1,7 @@
 import apiClient from './client';
 
 export interface ExportOptions {
-  format: 'json' | 'yaml' | 'openai' | 'anthropic' | 'meta';
+  format: 'json' | 'yaml' | 'openai' | 'anthropic' | 'meta' | 'microsoft-copilot';
   includeMetadata?: boolean;
   includeHistory?: boolean;
   includeRatings?: boolean;

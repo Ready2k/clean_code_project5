@@ -5,6 +5,7 @@ import { ProviderFactory } from '../provider-factory';
 import { OpenAIAdapter } from '../openai-adapter';
 import { AnthropicAdapter } from '../anthropic-adapter';
 import { MetaAdapter } from '../meta-adapter';
+import { MicrosoftCopilotAdapter } from '../microsoft-copilot-adapter';
 import { StructuredPrompt } from '../../models/prompt';
 import { RenderOptions } from '../../types/common';
 
@@ -20,27 +21,31 @@ describe('Provider Adapter System Integration', () => {
     const openaiAdapter = new OpenAIAdapter();
     const anthropicAdapter = new AnthropicAdapter();
     const metaAdapter = new MetaAdapter();
+    const microsoftCopilotAdapter = new MicrosoftCopilotAdapter();
     
     registry.registerAdapter(openaiAdapter);
     registry.registerAdapter(anthropicAdapter);
     registry.registerAdapter(metaAdapter);
+    registry.registerAdapter(microsoftCopilotAdapter);
 
     // Verify all providers are registered
     expect(registry.hasProvider('openai')).toBe(true);
     expect(registry.hasProvider('anthropic')).toBe(true);
     expect(registry.hasProvider('meta')).toBe(true);
+    expect(registry.hasProvider('microsoft-copilot')).toBe(true);
 
     // List all providers
     const providers = registry.listProviders();
-    expect(providers).toHaveLength(3);
-    expect(providers.map(p => p.id)).toEqual(['openai', 'anthropic', 'meta']);
+    expect(providers).toHaveLength(4);
+    expect(providers.map(p => p.id)).toEqual(['openai', 'anthropic', 'meta', 'microsoft-copilot']);
   });
 
   it('should render same prompt across different providers', () => {
     const registry = ProviderFactory.configureDefaultRegistry([
       new OpenAIAdapter(),
       new AnthropicAdapter(),
-      new MetaAdapter()
+      new MetaAdapter(),
+      new MicrosoftCopilotAdapter()
     ]);
 
     const prompt: StructuredPrompt = {

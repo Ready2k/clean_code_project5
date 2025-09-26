@@ -8,7 +8,7 @@ import archiver from 'archiver';
 import { Readable } from 'stream';
 
 export interface ExportOptions {
-  format: 'json' | 'yaml' | 'openai' | 'anthropic' | 'meta';
+  format: 'json' | 'yaml' | 'openai' | 'anthropic' | 'meta' | 'microsoft-copilot';
   includeMetadata?: boolean;
   includeHistory?: boolean;
   includeRatings?: boolean;
@@ -140,6 +140,11 @@ export class ExportService {
         case 'meta':
           content = await this.exportAsProviderFormat(prompt, 'meta', options);
           filename = `${this.sanitizeFilename(prompt.metadata.title)}_meta.json`;
+          mimeType = 'application/json';
+          break;
+        case 'microsoft-copilot':
+          content = await this.exportAsProviderFormat(prompt, 'microsoft-copilot', options);
+          filename = `${this.sanitizeFilename(prompt.metadata.title)}_microsoft-copilot.json`;
           mimeType = 'application/json';
           break;
         default:
@@ -346,7 +351,7 @@ export class ExportService {
    */
   private async exportAsProviderFormat(
     prompt: PromptRecord, 
-    provider: 'openai' | 'anthropic' | 'meta', 
+    provider: 'openai' | 'anthropic' | 'meta' | 'microsoft-copilot', 
     options: ExportOptions
   ): Promise<string> {
     // Use the existing render functionality to get provider-specific format
@@ -517,6 +522,11 @@ export class ExportService {
         id: 'meta',
         name: 'Meta (Llama)',
         description: 'Meta Llama API compatible format'
+      },
+      {
+        id: 'microsoft-copilot',
+        name: 'Microsoft Copilot',
+        description: 'Microsoft Copilot API compatible format'
       }
     ];
   }

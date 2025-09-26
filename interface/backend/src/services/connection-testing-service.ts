@@ -3,8 +3,10 @@ import {
   ConnectionTestResult, 
   OpenAIConfig, 
   BedrockConfig,
+  MicrosoftCopilotConfig,
   OPENAI_MODELS,
   BEDROCK_MODELS,
+  MICROSOFT_COPILOT_MODELS,
   ConnectionErrorCode
 } from '../types/connections.js';
 import { AppError } from '../types/errors.js';
@@ -88,6 +90,70 @@ export class ConnectionTestingService {
       const errorMessage = this.extractErrorMessage(error);
       
       logger.error('OpenAI connection test failed', {
+        error: errorMessage,
+        latency
+      });
+
+      return {
+        success: false,
+        latency,
+        error: errorMessage,
+        testedAt: new Date()
+      };
+    }
+  }
+
+  /**
+   * Test a Microsoft Copilot connection
+   */
+  public static async testMicrosoftCopilotConnection(config: MicrosoftCopilotConfig): Promise<ConnectionTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      logger.info('Testing Microsoft Copilot connection', {
+        endpoint: config.endpoint,
+        hasApiKey: !!config.apiKey,
+        apiVersion: config.apiVersion || '2024-02-15-preview'
+      });
+
+      // Test the connection by making a simple API call
+      const response = await fetch(`${config.endpoint}/openai/deployments?api-version=${config.apiVersion || '2024-02-15-preview'}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(this.TEST_TIMEOUT)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const availableModels = (data as any)?.data
+        ?.filter((deployment: any) => MICROSOFT_COPILOT_MODELS.includes(deployment.model))
+        ?.map((deployment: any) => deployment.model) || [];
+
+      const latency = Date.now() - startTime;
+      
+      logger.info('Microsoft Copilot connection test successful', {
+        latency,
+        availableModels: availableModels.length
+      });
+
+      return {
+        success: true,
+        latency,
+        availableModels,
+        testedAt: new Date()
+      };
+
+    } catch (error: any) {
+      const latency = Date.now() - startTime;
+      const errorMessage = this.extractErrorMessage(error);
+      
+      logger.error('Microsoft Copilot connection test failed', {
         error: errorMessage,
         latency
       });

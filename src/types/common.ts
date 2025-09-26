@@ -19,6 +19,9 @@ export interface RenderOptions {
   maxTokens?: number;
   systemOverride?: string;
   variables?: Record<string, any>;
+  // Microsoft Copilot specific parameters
+  presencePenalty?: number;
+  frequencyPenalty?: number;
 }
 
 export interface EnhancementContext {

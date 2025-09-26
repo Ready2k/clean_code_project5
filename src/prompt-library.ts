@@ -14,6 +14,7 @@ import { MockLLMService } from './services/mock-llm-service';
 import { OpenAIAdapter } from './adapters/openai-adapter';
 import { AnthropicAdapter } from './adapters/anthropic-adapter';
 import { MetaAdapter } from './adapters/meta-adapter';
+import { MicrosoftCopilotAdapter } from './adapters/microsoft-copilot-adapter';
 
 export interface PromptLibraryConfig {
   storageDir: string;
@@ -217,7 +218,8 @@ export class PromptLibrary {
     const builtInAdapters = [
       { id: 'openai', adapter: new OpenAIAdapter() },
       { id: 'anthropic', adapter: new AnthropicAdapter() },
-      { id: 'meta', adapter: new MetaAdapter() }
+      { id: 'meta', adapter: new MetaAdapter() },
+      { id: 'microsoft-copilot', adapter: new MicrosoftCopilotAdapter() }
     ];
 
     // Filter adapters based on configuration

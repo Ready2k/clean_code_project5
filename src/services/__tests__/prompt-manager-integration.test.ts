@@ -40,7 +40,7 @@ describe('PromptManager Integration Tests', () => {
         model: 'mock-model'
       },
       providers: {
-        enabled: ['openai', 'anthropic', 'meta'],
+        enabled: ['openai', 'anthropic', 'meta', 'microsoft-copilot'],
         disabled: []
       },
       logging: {
@@ -568,6 +568,10 @@ describe('PromptManager Integration Tests', () => {
       const anthropicAdapter = providerRegistry.getAdapter('anthropic');
       expect(anthropicAdapter.supports('claude-3-sonnet-20240229')).toBe(true);
       expect(anthropicAdapter.supports('claude-3-haiku-20240307')).toBe(true);
+
+      const microsoftCopilotAdapter = providerRegistry.getAdapter('microsoft-copilot');
+      expect(microsoftCopilotAdapter.supports('gpt-4')).toBe(true);
+      expect(microsoftCopilotAdapter.supports('gpt-35-turbo')).toBe(true);
 
       // Test invalid model
       await expect(

@@ -7,3 +7,4 @@ export * from './provider-factory';
 export * from './openai-adapter';
 export * from './anthropic-adapter';
 export * from './meta-adapter';
+export * from './microsoft-copilot-adapter';

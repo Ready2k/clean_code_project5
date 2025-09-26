@@ -1,9 +1,9 @@
 export interface LLMConnection {
   id: string;
   name: string;
-  provider: 'openai' | 'bedrock';
+  provider: 'openai' | 'bedrock' | 'microsoft-copilot';
   status: 'active' | 'inactive' | 'error';
-  config: OpenAIConfig | BedrockConfig;
+  config: OpenAIConfig | BedrockConfig | MicrosoftCopilotConfig;
   createdAt: Date;
   updatedAt: Date;
   lastTested?: Date;
@@ -26,6 +26,15 @@ export interface BedrockConfig {
   defaultModel: string;
 }
 
+export interface MicrosoftCopilotConfig {
+  apiKey: string; // Will be encrypted in storage
+  endpoint: string; // Azure OpenAI endpoint
+  apiVersion?: string;
+  deploymentName?: string;
+  models: string[];
+  defaultModel: string;
+}
+
 export interface ConnectionTestResult {
   success: boolean;
   latency?: number;
@@ -36,13 +45,13 @@ export interface ConnectionTestResult {
 
 export interface CreateConnectionRequest {
   name: string;
-  provider: 'openai' | 'bedrock';
-  config: OpenAIConfig | BedrockConfig;
+  provider: 'openai' | 'bedrock' | 'microsoft-copilot';
+  config: OpenAIConfig | BedrockConfig | MicrosoftCopilotConfig;
 }
 
 export interface UpdateConnectionRequest {
   name?: string;
-  config?: Partial<OpenAIConfig | BedrockConfig>;
+  config?: Partial<OpenAIConfig | BedrockConfig | MicrosoftCopilotConfig>;
   status?: 'active' | 'inactive';
 }
 
@@ -68,7 +77,7 @@ export interface AvailableModelsResponse {
 export interface ConnectionRecord {
   id: string;
   name: string;
-  provider: 'openai' | 'bedrock';
+  provider: 'openai' | 'bedrock' | 'microsoft-copilot';
   status: 'active' | 'inactive' | 'error';
   encrypted_config: string; // JSON string of encrypted config
   created_at: Date;
@@ -120,8 +129,19 @@ export const BEDROCK_MODELS = [
   'meta.llama2-70b-chat-v1'
 ] as const;
 
+export const MICROSOFT_COPILOT_MODELS = [
+  'gpt-4',
+  'gpt-4-turbo',
+  'gpt-4-32k',
+  'gpt-35-turbo',
+  'gpt-35-turbo-16k',
+  'text-davinci-003',
+  'code-davinci-002'
+] as const;
+
 export type OpenAIModel = typeof OPENAI_MODELS[number];
 export type BedrockModel = typeof BEDROCK_MODELS[number];
+export type MicrosoftCopilotModel = typeof MICROSOFT_COPILOT_MODELS[number];
 
 // Error types specific to connections
 export enum ConnectionErrorCode {

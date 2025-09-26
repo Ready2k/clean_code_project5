@@ -9,8 +9,10 @@ import {
   ConnectionTestResult,
   OPENAI_MODELS,
   BEDROCK_MODELS,
+  MICROSOFT_COPILOT_MODELS,
   OpenAIConfig,
-  BedrockConfig
+  BedrockConfig,
+  MicrosoftCopilotConfig
 } from '../types/connections.js';
 import { AppError, ValidationError } from '../types/errors.js';
 
@@ -238,6 +240,8 @@ export class ConnectionManagementService extends EventEmitter {
       // Test based on provider type
       if (connection.provider === 'openai') {
         testResult = await ConnectionTestingService.testOpenAIConnection(config as OpenAIConfig);
+      } else if (connection.provider === 'microsoft-copilot') {
+        testResult = await ConnectionTestingService.testMicrosoftCopilotConnection(config as MicrosoftCopilotConfig);
       } else if (connection.provider === 'bedrock') {
         testResult = await ConnectionTestingService.testBedrockConnection(config as BedrockConfig);
       } else {
@@ -295,9 +299,11 @@ export class ConnectionManagementService extends EventEmitter {
   /**
    * Get available models for a provider
    */
-  public getAvailableModels(provider: 'openai' | 'bedrock'): string[] {
+  public getAvailableModels(provider: 'openai' | 'bedrock' | 'microsoft-copilot'): string[] {
     if (provider === 'openai') {
       return [...OPENAI_MODELS];
+    } else if (provider === 'microsoft-copilot') {
+      return [...MICROSOFT_COPILOT_MODELS];
     } else if (provider === 'bedrock') {
       return [...BEDROCK_MODELS];
     } else {
@@ -410,8 +416,8 @@ export class ConnectionManagementService extends EventEmitter {
       throw new ValidationError('Provider is required', 'provider');
     }
     
-    if (!['openai', 'bedrock'].includes(request.provider)) {
-      throw new ValidationError('Provider must be either "openai" or "bedrock"', 'provider');
+    if (!['openai', 'bedrock', 'microsoft-copilot'].includes(request.provider)) {
+      throw new ValidationError('Provider must be "openai", "bedrock", or "microsoft-copilot"', 'provider');
     }
     
     if (!request.config) {
@@ -443,7 +449,7 @@ export class ConnectionManagementService extends EventEmitter {
   /**
    * Set default models for provider configurations
    */
-  private setDefaultModels(provider: 'openai' | 'bedrock', config: any): any {
+  private setDefaultModels(provider: 'openai' | 'bedrock' | 'microsoft-copilot', config: any): any {
     const configCopy = { ...config };
     
     if (provider === 'openai') {
@@ -453,6 +459,14 @@ export class ConnectionManagementService extends EventEmitter {
       }
       if (!openaiConfig.defaultModel) {
         openaiConfig.defaultModel = 'gpt-3.5-turbo';
+      }
+    } else if (provider === 'microsoft-copilot') {
+      const copilotConfig = configCopy as MicrosoftCopilotConfig;
+      if (!copilotConfig.models || copilotConfig.models.length === 0) {
+        copilotConfig.models = [...MICROSOFT_COPILOT_MODELS];
+      }
+      if (!copilotConfig.defaultModel) {
+        copilotConfig.defaultModel = 'gpt-4';
       }
     } else if (provider === 'bedrock') {
       const bedrockConfig = configCopy as BedrockConfig;
