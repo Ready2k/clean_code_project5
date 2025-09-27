@@ -4,6 +4,7 @@ import { getPromptLibraryService, CreatePromptRequest, PromptFilters } from '../
 import { getEnhancementWorkflowService, QuestionnaireResponse } from '../services/enhancement-workflow-service.js';
 import { getProviderRegistryService, RenderRequest } from '../services/provider-registry-service.js';
 import { getExportService, ExportOptions, BulkExportOptions } from '../services/export-service.js';
+import { getWebSocketService } from '../services/websocket-service.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
 // Extend AuthenticatedRequest to include params and query
@@ -282,7 +283,7 @@ export const enhancePrompt = async (req: ExtendedAuthenticatedRequest, res: Resp
       throw new ValidationError(error.details[0]?.message || 'Validation error');
     }
 
-    const enhancementService = getEnhancementWorkflowService();
+    const enhancementService = getEnhancementWorkflowService(getWebSocketService());
     const jobId = await enhancementService.startEnhancement(id, req.user!.userId, value);
 
     res.status(202).json({
@@ -306,7 +307,7 @@ export const getEnhancementStatus = async (req: ExtendedAuthenticatedRequest, re
 
     if (!jobId) {
       // Return all jobs for this user and prompt
-      const enhancementService = getEnhancementWorkflowService();
+      const enhancementService = getEnhancementWorkflowService(getWebSocketService());
       const userJobs = enhancementService.getUserJobs(req.user!.userId);
       const promptJobs = userJobs.filter(job => job.promptId === id);
       
@@ -314,7 +315,7 @@ export const getEnhancementStatus = async (req: ExtendedAuthenticatedRequest, re
       return;
     }
 
-    const enhancementService = getEnhancementWorkflowService();
+    const enhancementService = getEnhancementWorkflowService(getWebSocketService());
     const status = enhancementService.getEnhancementStatus(jobId);
 
     if (!status) {
@@ -347,10 +348,11 @@ export const submitQuestionnaireResponse = async (req: ExtendedAuthenticatedRequ
 
     const response: QuestionnaireResponse = {
       jobId,
-      answers: value.answers
+      responses: value.answers || {},
+      answers: value.answers || {}
     };
 
-    const enhancementService = getEnhancementWorkflowService();
+    const enhancementService = getEnhancementWorkflowService(getWebSocketService());
     await enhancementService.submitQuestionnaireResponse(response);
 
     res.json({

@@ -60,7 +60,9 @@ export const importFromContent = async (req: ImportRequest, res: Response): Prom
       defaultTags: value.defaultTags,
       autoEnhance: value.autoEnhance,
       slugPrefix: value.slugPrefix,
-      validateBeforeImport: value.validateBeforeImport
+      validateBeforeImport: value.validateBeforeImport,
+      forceAsBasePrompt: value.forceAsBasePrompt !== false, // Default to true for imports
+      interactive: false // Disable interactive prompts in API
     };
 
     const importedPrompt = await importService.importFromContent(value.content, options);
@@ -140,7 +142,9 @@ export const importFromUrl = async (req: ImportRequest, res: Response): Promise<
       autoEnhance: value.autoEnhance,
       slugPrefix: value.slugPrefix,
       validateBeforeImport: value.validateBeforeImport,
-      sourceUrl: value.url
+      sourceUrl: value.url,
+      forceAsBasePrompt: value.forceAsBasePrompt !== false, // Default to true for imports
+      interactive: false // Disable interactive prompts in API
     };
 
     const importedPrompt = await importService.importFromContent(content, options);
@@ -204,7 +208,9 @@ export const importFromFile = async (req: ImportRequest, res: Response): Promise
       defaultTags: req.body?.defaultTags ? JSON.parse(req.body.defaultTags) : ['imported-from-file'],
       autoEnhance: req.body?.autoEnhance === 'true',
       slugPrefix: req.body?.slugPrefix,
-      validateBeforeImport: req.body?.validateBeforeImport !== 'false'
+      validateBeforeImport: req.body?.validateBeforeImport !== 'false',
+      forceAsBasePrompt: req.body?.forceAsBasePrompt !== 'false', // Default to true for imports
+      interactive: false // Disable interactive prompts in API
     };
 
     const promptLibraryService = getPromptLibraryService();

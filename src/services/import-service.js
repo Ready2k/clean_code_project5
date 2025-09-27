@@ -77,13 +77,29 @@ export class ImportService {
         }
         // Convert to internal format
         const promptRecord = this.convertToInternalFormat(parsedContent, sourceProvider, options);
+        
+        // Check if imported content has variant characteristics
+        const variantInfo = this.detectVariantCharacteristics(promptRecord);
+        if (variantInfo.isVariant && !options.forceAsBasePrompt) {
+            // Handle variant detection based on user preference
+            const shouldImportAsBase = await this.handleVariantDetection(variantInfo, options);
+            if (!shouldImportAsBase && options.allowVariantImport) {
+                // User chose to import as variant - preserve variant metadata
+                // This would require additional logic to link to base prompt
+                throw new Error('Variant import not yet implemented. Use forceAsBasePrompt: true to import as base prompt.');
+            }
+        }
+        
+        // Clean variant metadata to ensure this becomes a base prompt
+        this.cleanVariantMetadata(promptRecord);
+        
         // Handle conflicts
         if (this.promptManager) {
             const existingPrompt = await this.findExistingPrompt(promptRecord);
             if (existingPrompt) {
                 return this.handleConflict(promptRecord, existingPrompt, options);
             }
-            // Save the imported prompt
+            // Save the imported prompt as a base prompt
             return await this.promptManager.createPrompt(promptRecord.prompt_human, promptRecord.metadata);
         }
         return promptRecord;
@@ -472,6 +488,143 @@ export class ImportService {
             return null;
         }
     }
+    /**
+     * Detect if imported content has variant characteristics
+     */
+    detectVariantCharacteristics(promptRecord) {
+        const variantIndicators = [];
+        const metadata = promptRecord.metadata;
+        const tags = metadata.tags || [];
+        
+        // Check for variant tags
+        const variantTags = ['enhanced'];
+        const providerModelPattern = /^(openai|anthropic|meta|aws|google)-/i;
+        
+        for (const tag of tags) {
+            if (variantTags.includes(tag.toLowerCase())) {
+                variantIndicators.push(`Tag: ${tag}`);
+            }
+            if (providerModelPattern.test(tag)) {
+                variantIndicators.push(`Provider-model tag: ${tag}`);
+            }
+        }
+        
+        // Check for variant metadata fields
+        if (metadata.variant_of) {
+            variantIndicators.push(`Linked to base prompt: ${metadata.variant_of}`);
+        }
+        if (metadata.tuned_for_provider) {
+            variantIndicators.push(`Tuned for provider: ${metadata.tuned_for_provider}`);
+        }
+        if (metadata.preferred_model) {
+            variantIndicators.push(`Preferred model: ${metadata.preferred_model}`);
+        }
+        
+        // Check for variant title patterns
+        const title = metadata.title || '';
+        const variantTitlePatterns = [
+            /\(enhanced\)/i,
+            /\(.*-.*\)/i, // provider-model pattern
+            /enhanced/i,
+            /optimized for/i,
+            /tuned for/i
+        ];
+        
+        for (const pattern of variantTitlePatterns) {
+            if (pattern.test(title)) {
+                variantIndicators.push(`Title pattern: ${title}`);
+                break;
+            }
+        }
+        
+        return {
+            isVariant: variantIndicators.length > 0,
+            indicators: variantIndicators,
+            confidence: Math.min(variantIndicators.length / 3, 1) // 0-1 scale
+        };
+    }
+    
+    /**
+     * Handle variant detection - ask user or use options
+     */
+    async handleVariantDetection(variantInfo, options) {
+        // If user has specified behavior, use it
+        if (options.forceAsBasePrompt === true) {
+            return true; // Import as base prompt
+        }
+        if (options.forceAsVariant === true) {
+            return false; // Import as variant
+        }
+        
+        // If interactive mode is disabled, default to base prompt
+        if (options.interactive === false) {
+            return true;
+        }
+        
+        // In a real implementation, this would show a user prompt
+        // For now, we'll use a callback if provided, otherwise default to base prompt
+        if (options.onVariantDetected && typeof options.onVariantDetected === 'function') {
+            return await options.onVariantDetected(variantInfo);
+        }
+        
+        // Default: import as base prompt (safer option)
+        return true;
+    }
+    
+    /**
+     * Clean variant metadata to ensure prompt becomes a base prompt
+     */
+    cleanVariantMetadata(promptRecord) {
+        const metadata = promptRecord.metadata;
+        
+        // Remove variant-specific metadata fields
+        delete metadata.variant_of;
+        delete metadata.tuned_for_provider;
+        delete metadata.preferred_model;
+        
+        // Clean variant tags
+        if (metadata.tags) {
+            const variantTags = ['enhanced'];
+            const providerModelPattern = /^(openai|anthropic|meta|aws|google)-/i;
+            
+            metadata.tags = metadata.tags.filter(tag => {
+                return !variantTags.includes(tag.toLowerCase()) && 
+                       !providerModelPattern.test(tag);
+            });
+        }
+        
+        // Clean variant title patterns
+        if (metadata.title) {
+            metadata.title = metadata.title
+                .replace(/\s*\(enhanced\)/i, '')
+                .replace(/\s*\([^)]*-[^)]*\)/i, '') // Remove (provider-model) patterns
+                .replace(/\s*-\s*enhanced\s+using\s+.*/i, '') // Remove enhancement descriptions
+                .replace(/\s*-\s*optimized\s+for\s+.*/i, '') // Remove optimization descriptions
+                .trim();
+        }
+        
+        // Clean summary
+        if (metadata.summary) {
+            metadata.summary = metadata.summary
+                .replace(/\s*-\s*enhanced\s+using\s+.*/i, '')
+                .replace(/\s*-\s*optimized\s+for\s+.*/i, '')
+                .trim();
+        }
+        
+        // Ensure imported tag is present
+        if (!metadata.tags) {
+            metadata.tags = [];
+        }
+        if (!metadata.tags.includes('imported')) {
+            metadata.tags.push('imported');
+        }
+        
+        // Add base-prompt tag to clearly indicate this is a base prompt
+        if (!metadata.tags.includes('base-prompt')) {
+            metadata.tags.push('base-prompt');
+        }
+    }
+    
     /**
      * Handle conflict resolution
      */

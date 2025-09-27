@@ -44,16 +44,22 @@ export const useWebSocket = () => {
 
   // Collaborative editing helpers
   const startEditing = useCallback((promptId: string) => {
-    webSocketService.startEditing(promptId);
-  }, []);
+    if (user) {
+      webSocketService.startEditing(promptId, user.id, user.username);
+    }
+  }, [user]);
 
   const stopEditing = useCallback((promptId: string) => {
-    webSocketService.stopEditing(promptId);
-  }, []);
+    if (user) {
+      webSocketService.stopEditing(promptId, user.id);
+    }
+  }, [user]);
 
   const notifyPromptUpdate = useCallback((promptId: string, changes: any) => {
-    webSocketService.notifyPromptUpdate(promptId, changes);
-  }, []);
+    if (user) {
+      webSocketService.notifyPromptUpdate(promptId, user.id, user.username, changes);
+    }
+  }, [user]);
 
   return { 
     emit, 

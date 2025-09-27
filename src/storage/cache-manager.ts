@@ -136,6 +136,40 @@ export class FileSystemCacheManager implements CacheManager {
       entry.accessCount++;
       await fs.writeFile(filePath, JSON.stringify(entry, null, 2), 'utf8');
 
+      // Ensure backward compatibility: if an older cached payload doesn't include
+      // variables_used metadata, attempt to infer it from common places (payload.metadata
+      // or payload.content) so callers expecting variables_used won't break.
+      try {
+        if (entry.payload && (entry.payload as any).variables_used === undefined) {
+          // Try common locations where template or metadata might live
+          const payloadAny = entry.payload as any;
+          let inferred: string[] | null = null;
+
+          // If payload has metadata with _metadata or metadata.original_template, inspect it
+          if (payloadAny._metadata && typeof payloadAny._metadata === 'object') {
+            const meta = payloadAny._metadata;
+            if (typeof meta.template === 'string') {
+              const rawMatches = meta.template.match(/\{\{([^}]+)\}\}/g) || [];
+              const vars = Array.from(new Set(rawMatches.map((m: string) => m.replace(/\{\{|\}\}/g, '').trim()))) as string[];
+              inferred = vars;
+            }
+          }
+
+          // If payload.content exists and is a string (exported JSON may include the template), scan it
+          if (!inferred && payloadAny.content && typeof payloadAny.content === 'string') {
+            const rawMatches = payloadAny.content.match(/\{\{([^}]+)\}\}/g) || [];
+            const vars = Array.from(new Set(rawMatches.map((m: string) => m.replace(/\{\{|\}\}/g, '').trim()))) as string[];
+            inferred = vars.length > 0 ? vars : null;
+          }
+
+          if (inferred) {
+            (entry.payload as any).variables_used = inferred;
+          }
+        }
+      } catch (e) {
+        // Non-fatal: don't block returning the cached payload
+      }
+
       this.stats.hits++;
       return entry.payload;
     } catch {

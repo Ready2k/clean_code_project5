@@ -30,6 +30,41 @@ export interface ImportOptions {
      * Validate imported prompts before saving
      */
     validateBeforeImport?: boolean;
+    /**
+     * Force imported prompts to be created as base prompts (removes variant metadata)
+     */
+    forceAsBasePrompt?: boolean;
+    /**
+     * Allow importing as variants (requires base prompt linking)
+     */
+    allowVariantImport?: boolean;
+    /**
+     * Force imported prompts to be created as variants
+     */
+    forceAsVariant?: boolean;
+    /**
+     * Enable interactive prompts for variant detection
+     */
+    interactive?: boolean;
+    /**
+     * Callback function when variant characteristics are detected
+     */
+    onVariantDetected?: (variantInfo: VariantDetectionInfo) => Promise<boolean> | boolean;
+}
+
+export interface VariantDetectionInfo {
+    /**
+     * Whether variant characteristics were detected
+     */
+    isVariant: boolean;
+    /**
+     * List of detected variant indicators
+     */
+    indicators: string[];
+    /**
+     * Confidence level (0-1) that this is a variant
+     */
+    confidence: number;
 }
 export interface ImportResult {
     /**
@@ -161,6 +196,18 @@ export declare class ImportService {
      * Find existing prompt by slug or title
      */
     private findExistingPrompt;
+    /**
+     * Detect if imported content has variant characteristics
+     */
+    private detectVariantCharacteristics;
+    /**
+     * Handle variant detection - ask user or use options
+     */
+    private handleVariantDetection;
+    /**
+     * Clean variant metadata to ensure prompt becomes a base prompt
+     */
+    private cleanVariantMetadata;
     /**
      * Handle conflict resolution
      */

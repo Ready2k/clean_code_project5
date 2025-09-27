@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"]
+    },
+    "my-service": {
+      "command": "node",
+      "args": ["./path/to/my-service.js"]
+    }
+  }
+}

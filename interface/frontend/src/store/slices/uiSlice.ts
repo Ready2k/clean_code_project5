@@ -121,6 +121,9 @@ const uiSlice = createSlice({
         state.modals[key] = false;
       });
     },
+    setNavigation: (state, action: PayloadAction<string>) => {
+      // This is a dummy reducer, the actual navigation will be handled by a middleware
+    },
   },
 });
 

@@ -10,6 +10,7 @@ import adminReducer from './slices/adminSlice';
 import enhancementReducer from './slices/enhancementSlice';
 import renderingReducer from './slices/renderingSlice';
 import exportReducer from './slices/exportSlice';
+import { navigationMiddleware } from './middleware/navigation';
 
 export const store = configureStore({
   reducer: {
@@ -28,7 +29,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
       },
-    }),
+    }).concat(navigationMiddleware),
   devTools: import.meta.env.MODE !== 'production',
 });
 

@@ -26,7 +26,7 @@ import { initializeRatingService, getRatingService } from './services/rating-ser
 import { initializeExportService, getExportService } from './services/export-service.js';
 import { initializeAPIDocumentationService, getAPIDocumentationService } from './services/api-documentation-service.js';
 import { initializeSystemMonitoringService, getSystemMonitoringService } from './services/system-monitoring-service.js';
-import { webSocketService } from './services/websocket-service.js';
+import { getWebSocketService } from './services/websocket-service.js';
 
 // Load environment variables from parent directory
 dotenv.config({ path: '../.env' });
@@ -163,8 +163,12 @@ async function initializeServices() {
     const redisService = getRedisService();
     await initializeUserService(redisService);
 
+    // Initialize WebSocket service (after Redis is initialized)
+    const webSocketService = getWebSocketService();
+    webSocketService.initialize(io);
+
     // Initialize prompt library service
-    await initializePromptLibraryService({
+    await initializePromptLibraryService(webSocketService, {
       storageDir: process.env['PROMPT_STORAGE_DIR'] || './data/prompts'
     });
 
@@ -199,9 +203,22 @@ async function initializeServices() {
     // Initialize system monitoring service
     await initializeSystemMonitoringService();
 
+    // Initialize enhancement workflow service
+    getEnhancementWorkflowService(webSocketService);
+
+    // Set up real-time enhancement progress updates
+    const enhancementService = getEnhancementWorkflowService(webSocketService);
+    enhancementService.on('progress', (progress) => {
+      io.to(`user:${progress.promptId}`).emit('enhancement:progress', progress);
+    });
+
     // Connect WebSocket service to system monitoring
     const systemMonitoringService = getSystemMonitoringService();
     systemMonitoringService.setWebSocketService(webSocketService);
+
+    // Make io and webSocketService available to routes
+    app.set('io', io);
+    app.set('webSocketService', webSocketService);
 
     logger.info('Services initialized successfully');
   } catch (error) {
@@ -209,19 +226,6 @@ async function initializeServices() {
     process.exit(1);
   }
 }
-
-// Initialize WebSocket service
-webSocketService.initialize(io);
-
-// Set up real-time enhancement progress updates
-const enhancementService = getEnhancementWorkflowService();
-enhancementService.on('progress', (progress) => {
-  io.to(`user:${progress.promptId}`).emit('enhancement:progress', progress);
-});
-
-// Make io and webSocketService available to routes
-app.set('io', io);
-app.set('webSocketService', webSocketService);
 
 // Graceful shutdown
 async function gracefulShutdown() {

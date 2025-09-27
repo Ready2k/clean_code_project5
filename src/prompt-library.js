@@ -10,6 +10,7 @@ import { MockLLMService } from './services/mock-llm-service';
 import { OpenAIAdapter } from './adapters/openai-adapter';
 import { AnthropicAdapter } from './adapters/anthropic-adapter';
 import { MetaAdapter } from './adapters/meta-adapter';
+import { MicrosoftCopilotAdapter } from './adapters/microsoft-copilot-adapter';
 // Main application class
 export class PromptLibrary {
     config;
@@ -139,12 +140,17 @@ export class PromptLibrary {
     async initializeProviderRegistry() {
         console.log('Initializing provider registry...');
         this.providerRegistry = new ConcreteProviderRegistry();
-        // Built-in adapters
-        const builtInAdapters = [
-            { id: 'openai', adapter: new OpenAIAdapter() },
-            { id: 'anthropic', adapter: new AnthropicAdapter() },
-            { id: 'meta', adapter: new MetaAdapter() }
-        ];
+            // Built-in adapters (microsoft-copilot is registered only when explicitly enabled)
+            const builtInAdapters = [
+                            { id: 'openai', adapter: new OpenAIAdapter() },
+                            { id: 'anthropic', adapter: new AnthropicAdapter() },
+                            { id: 'meta', adapter: new MetaAdapter() }
+                    ];
+
+            // Conditionally include Microsoft Copilot if explicitly enabled
+            if (this.config.providers?.enabled && this.config.providers.enabled.includes('microsoft-copilot')) {
+                builtInAdapters.push({ id: 'microsoft-copilot', adapter: new MicrosoftCopilotAdapter() });
+            }
         // Filter adapters based on configuration
         const enabledProviders = this.config.providers?.enabled;
         const disabledProviders = new Set(this.config.providers?.disabled || []);

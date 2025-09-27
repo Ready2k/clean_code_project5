@@ -473,7 +473,7 @@ export class ConnectionTestingService {
   /**
    * Validate connection configuration before testing
    */
-  public static validateConfig(provider: 'openai' | 'bedrock', config: any): void {
+  public static validateConfig(provider: 'openai' | 'bedrock' | 'microsoft-copilot', config: any): void {
     if (provider === 'openai') {
       const openaiConfig = config as OpenAIConfig;
       if (!openaiConfig.apiKey || openaiConfig.apiKey.trim() === '') {
@@ -502,6 +502,22 @@ export class ConnectionTestingService {
       if (!bedrockConfig.region || bedrockConfig.region.trim() === '') {
         throw new AppError(
           'AWS Region is required',
+          400,
+          ConnectionErrorCode.INVALID_CREDENTIALS as any
+        );
+      }
+    } else if (provider === 'microsoft-copilot') {
+      const copilotConfig = config as MicrosoftCopilotConfig;
+      if (!copilotConfig.apiKey || copilotConfig.apiKey.trim() === '') {
+        throw new AppError(
+          'Microsoft Copilot API key is required',
+          400,
+          ConnectionErrorCode.INVALID_API_KEY as any
+        );
+      }
+      if (!copilotConfig.endpoint || copilotConfig.endpoint.trim() === '') {
+        throw new AppError(
+          'Microsoft Copilot endpoint is required',
           400,
           ConnectionErrorCode.INVALID_CREDENTIALS as any
         );

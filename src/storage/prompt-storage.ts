@@ -135,6 +135,8 @@ export class FileSystemPromptStorage implements PromptStorage {
         const structuredPath = this.getStructuredPromptFilePath(promptRecord.slug);
         const structuredYaml = this.structuredPromptToYAML(promptRecord.prompt_structured);
         await fs.writeFile(structuredPath, structuredYaml, 'utf8');
+        // eslint-disable-next-line no-console
+        console.log(`FileSystemPromptStorage.savePrompt: wrote structured prompt file for slug=${promptRecord.slug} at ${structuredPath}`);
       }
     } catch (error) {
       throw new Error(`Failed to save prompt ${promptRecord.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);

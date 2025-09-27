@@ -158,9 +158,6 @@ export interface NotificationData {
 
 class WebSocketService {
   private socket: Socket | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
   private isConnected = false;
   private eventListeners: Map<string, Set<Function>> = new Map();
 
@@ -195,7 +192,7 @@ class WebSocketService {
 
     // Connection events
     this.socket.on('connect', () => {
-      console.log('WebSocket connected');
+
       this.isConnected = true;
       this.reconnectAttempts = 0;
       
@@ -217,23 +214,17 @@ class WebSocketService {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
+
       this.isConnected = false;
-      
-      if (reason === 'io server disconnect') {
-        // Server initiated disconnect, try to reconnect
-        this.handleReconnect();
-      }
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
-      this.handleReconnect();
+
     });
 
     // Connection test events
     this.socket.on('connection:test:started', ({ connectionId }) => {
-      console.log('Connection test started:', connectionId);
+
       store.dispatch(setConnectionStatus({ id: connectionId, status: 'inactive' }));
       
       store.dispatch(addNotification({
@@ -248,7 +239,7 @@ class WebSocketService {
     });
 
     this.socket.on('connection:test:completed', ({ connectionId, result }) => {
-      console.log('Connection test completed:', connectionId, result);
+
       const status = result.success ? 'active' : 'error';
       store.dispatch(setConnectionStatus({ id: connectionId, status }));
       
@@ -264,7 +255,7 @@ class WebSocketService {
     });
 
     this.socket.on('connection:test:failed', ({ connectionId, error }) => {
-      console.log('Connection test failed:', connectionId, error);
+
       store.dispatch(setConnectionStatus({ id: connectionId, status: 'error' }));
       
       store.dispatch(addNotification({
@@ -279,7 +270,7 @@ class WebSocketService {
 
     // Enhancement events
     this.socket.on('enhancement:progress', (progress) => {
-      console.log('Enhancement progress update:', progress);
+
       store.dispatch(updateJobProgress(progress));
     });
 
@@ -307,7 +298,7 @@ class WebSocketService {
           label: 'View Results',
           action: () => {
             // Navigate to prompt detail view
-            window.location.href = `/prompts/${promptId}`;
+            store.dispatch(setNavigation(`/prompts/${promptId}`));
           }
         }]
       }));
@@ -326,7 +317,7 @@ class WebSocketService {
 
     // System events
     this.socket.on('system:status:update', (statusUpdate) => {
-      console.log('System status update:', statusUpdate);
+
       store.dispatch(updateSystemStatus(statusUpdate));
     });
 
@@ -391,10 +382,9 @@ class WebSocketService {
           duration: 5000,
           actions: [{
             label: 'Refresh',
-            action: () => {
-              window.location.reload();
-            }
-          }]
+                      action: () => {
+                        store.dispatch(fetchPrompt(promptId));
+                      }          }]
         }));
       }
     });
@@ -462,7 +452,7 @@ class WebSocketService {
 
     // Render events
     this.socket.on('render:started', ({ promptId, provider, userId: renderUserId, connectionId, timestamp }) => {
-      console.log('WebSocket: render:started received', { promptId, provider, renderUserId, connectionId });
+
       if (renderUserId === userId) {
         this.emitToListeners('render:started', { promptId, provider, userId: renderUserId, connectionId, timestamp });
         
@@ -479,7 +469,7 @@ class WebSocketService {
     });
 
     this.socket.on('render:progress', ({ promptId, provider, userId: renderUserId, connectionId, status, message, timestamp }) => {
-      console.log('WebSocket: render:progress received', { promptId, provider, renderUserId, connectionId, status, message });
+
       if (renderUserId === userId) {
         this.emitToListeners('render:progress', { promptId, provider, userId: renderUserId, connectionId, status, message, timestamp });
         
@@ -496,7 +486,7 @@ class WebSocketService {
     });
 
     this.socket.on('render:completed', ({ promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp }) => {
-      console.log('WebSocket: render:completed received', { promptId, provider, renderUserId, connectionId, renderTime });
+
       if (renderUserId === userId) {
         this.emitToListeners('render:completed', { promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp });
         
@@ -528,40 +518,12 @@ class WebSocketService {
     });
   }
 
-  private handleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
-      store.dispatch(addNotification({
-        id: `ws-reconnect-failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'error',
-        title: 'Connection Lost',
-        message: 'Unable to reconnect to real-time updates',
-        timestamp: new Date().toISOString(),
-        autoHide: false,
-        actions: [{
-          label: 'Retry',
-          action: () => {
-            this.reconnectAttempts = 0;
-            this.handleReconnect();
-          }
-        }]
-      }));
-      return;
-    }
 
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
-    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms`);
-    
-    setTimeout(() => {
-      this.socket?.connect();
-    }, delay);
-  }
 
   disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
+      this.socket.removeAllListeners();
       this.socket = null;
       this.isConnected = false;
     }
@@ -614,28 +576,28 @@ class WebSocketService {
   }
 
   // Collaborative editing methods
-  startEditing(promptId: string): void {
+  startEditing(promptId: string, userId: string, username: string): void {
     this.emit('prompt:editing:started', {
       promptId,
-      userId: '', // Will be filled by backend
-      username: '', // Will be filled by backend
+      userId,
+      username,
       timestamp: new Date().toISOString()
     });
   }
 
-  stopEditing(promptId: string): void {
+  stopEditing(promptId: string, userId: string): void {
     this.emit('prompt:editing:stopped', {
       promptId,
-      userId: '', // Will be filled by backend
+      userId,
       timestamp: new Date().toISOString()
     });
   }
 
-  notifyPromptUpdate(promptId: string, changes: any): void {
+  notifyPromptUpdate(promptId: string, userId: string, username: string, changes: any): void {
     this.emit('prompt:updated', {
       promptId,
-      userId: '', // Will be filled by backend
-      username: '', // Will be filled by backend
+      userId,
+      username,
       changes,
       timestamp: new Date().toISOString()
     });

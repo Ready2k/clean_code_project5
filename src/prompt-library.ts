@@ -214,13 +214,17 @@ export class PromptLibrary {
     console.log('Initializing provider registry...');
     this.providerRegistry = new ConcreteProviderRegistry();
     
-    // Built-in adapters
-    const builtInAdapters = [
+    // Built-in adapters (microsoft-copilot is registered only when explicitly enabled)
+    const builtInAdapters: { id: string; adapter: any }[] = [
       { id: 'openai', adapter: new OpenAIAdapter() },
       { id: 'anthropic', adapter: new AnthropicAdapter() },
-      { id: 'meta', adapter: new MetaAdapter() },
-      { id: 'microsoft-copilot', adapter: new MicrosoftCopilotAdapter() }
+      { id: 'meta', adapter: new MetaAdapter() }
     ];
+
+    // Conditionally include Microsoft Copilot if explicitly enabled
+    if (this.config.providers?.enabled && this.config.providers.enabled.includes('microsoft-copilot')) {
+      builtInAdapters.push({ id: 'microsoft-copilot', adapter: new MicrosoftCopilotAdapter() });
+    }
 
     // Filter adapters based on configuration
     const enabledProviders = this.config.providers?.enabled;

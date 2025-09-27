@@ -114,6 +114,16 @@ export class FileSystemPromptManager implements PromptManager {
     const existingPrompt = await this.storage.loadPrompt(id);
     const oldPrompt = new PromptRecordClass(existingPrompt);
 
+    // Debug: log if an update includes a structured prompt
+    try {
+      if ((updates as any).prompt_structured) {
+        // eslint-disable-next-line no-console
+        console.log(`FileSystemPromptManager.updatePrompt: attaching prompt_structured for prompt id=${id}`);
+      }
+    } catch (e) {
+      // ignore
+    }
+
     // Create updated prompt
     const updatedPrompt = new PromptRecordClass({
       ...existingPrompt,
@@ -314,6 +324,19 @@ export class FileSystemPromptManager implements PromptManager {
     // Check for cached render
     const cachedRender = await this.storage.getCachedRender(id, provider, prompt.version);
     if (cachedRender && this.isRenderOptionsCompatible(cachedRender, options)) {
+      // Ensure cached render includes variables_used (backfill if older cache entries lack it)
+      try {
+        if ((cachedRender as any).variables_used === undefined) {
+          // Use the original structured prompt template to infer variables, not the substituted prompt
+          const originalTemplate = prompt.prompt_structured?.user_template || '';
+          const templateVariables = this.variableManager.extractVariableNames(originalTemplate);
+          const providedVars = options && options.variables ? Object.keys(options.variables) : null;
+          (cachedRender as any).variables_used = providedVars ? templateVariables.filter(v => providedVars.includes(v)) : templateVariables;
+        }
+      } catch (e) {
+        // Non-fatal: continue returning cached render even if augmentation fails
+      }
+
       return cachedRender;
     }
 
@@ -339,6 +362,28 @@ export class FileSystemPromptManager implements PromptManager {
     const payloadValidation = adapter.validate(payload);
     if (!payloadValidation.isValid) {
       throw new Error(`Invalid render output: ${payloadValidation.errors.join(', ')}`);
+    }
+
+    // Attach list of variables used in this render (if available)
+    try {
+      const usedVars = this.variableManager.extractVariableNames(structuredPrompt.user_template || '');
+      // Attach to payload metadata for downstream consumers
+      if (!payload.metadata) payload.metadata = {} as any;
+      (payload as any).variables_used = usedVars;
+    } catch (e) {
+      // Non-fatal: continue without variables_used
+    }
+
+    // Attach variables_used metadata to payload so callers/tests can inspect which variables were used
+    try {
+      const templateVariables = this.variableManager.extractVariableNames(structuredPrompt.user_template);
+      // Only include variables that have been provided in options.variables
+      const providedVars = options.variables ? Object.keys(options.variables) : null;
+      (payload as any).variables_used = providedVars ? templateVariables.filter(v => providedVars.includes(v)) : templateVariables;
+    } catch (err) {
+      // If extraction fails for any reason, don't block rendering; just skip attaching variables_used
+      // eslint-disable-next-line no-console
+      console.warn('Failed to attach variables_used metadata:', err);
     }
 
     // Cache the render result

@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger.js';
 import { ServiceUnavailableError, NotFoundError, ValidationError } from '../types/errors.js';
 import { LLMExecutionService } from './llm-execution-service.js';
+import { WebSocketService } from './websocket-service.js';
 import path from 'path';
 import fs from 'fs/promises';
 import * as YAML from 'yaml';
@@ -182,7 +183,10 @@ export class PromptLibraryService {
   private ratings = new Map<string, Rating[]>();
   private storageDir: string;
 
-  constructor(config?: { storageDir?: string }) {
+  private webSocketService: WebSocketService;
+
+  constructor(webSocketService: WebSocketService, config?: { storageDir?: string }) {
+    this.webSocketService = webSocketService;
     this.storageDir = config?.storageDir || path.resolve(process.cwd(), 'data/prompts');
   }
 
@@ -1316,13 +1320,10 @@ export class PromptLibraryService {
     try {
       logger.info('Rendering prompt', { id, provider });
 
-      // Import WebSocket service dynamically to avoid circular dependencies
-      const { webSocketService } = await import('./websocket-service.js');
-
       // Notify render started
       if (options.connectionId && userId) {
-        webSocketService.notifyRenderStarted(id, provider, userId, options.connectionId);
-        webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', 'Loading prompt and validating parameters...');
+        this.webSocketService.notifyRenderStarted(id, provider, userId, options.connectionId);
+        this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', 'Loading prompt and validating parameters...');
       }
 
       // Ensure prompt exists first
@@ -1336,8 +1337,7 @@ export class PromptLibraryService {
 
       // Progress update: preparing prompt
       if (options.connectionId && userId) {
-        const { webSocketService } = await import('./websocket-service.js');
-        webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', `Preparing prompt for ${provider} provider...`);
+        this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'preparing', `Preparing prompt for ${provider} provider...`);
       }
 
       // Determine which version to use
@@ -1510,8 +1510,7 @@ export class PromptLibraryService {
           logger.info('Using real LLM execution', { connectionId: options.connectionId, provider });
 
           // Progress update: executing LLM
-          const { webSocketService } = await import('./websocket-service.js');
-          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'executing', `Sending request to ${provider} LLM...`);
+          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'executing', `Sending request to ${provider} LLM...`);
           logger.info('Sent render progress update: executing', { promptId: id, provider, userId, connectionId: options.connectionId });
 
           const executionResult = await LLMExecutionService.executePrompt({
@@ -1526,7 +1525,7 @@ export class PromptLibraryService {
           });
 
           // Progress update: processing response
-          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'processing', 'Processing LLM response...');
+          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'processing', 'Processing LLM response...');
           logger.info('Sent render progress update: processing', { promptId: id, provider, userId, connectionId: options.connectionId });
 
           const payload: ProviderPayload = {
@@ -1555,8 +1554,8 @@ export class PromptLibraryService {
           });
 
           // Progress update: completed
-          webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'completing', 'Render completed successfully!');
-          webSocketService.notifyRenderCompleted(id, provider, userId, options.connectionId, payload, renderTime);
+          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'completing', 'Render completed successfully!');
+          this.webSocketService.notifyRenderCompleted(id, provider, userId, options.connectionId, payload, renderTime);
           logger.info('Sent render completion notification', { promptId: id, provider, userId, connectionId: options.connectionId, renderTime });
 
           return payload;
@@ -1564,8 +1563,7 @@ export class PromptLibraryService {
           logger.error('Real LLM execution failed, falling back to mock', { error: (error as Error).message });
           
           // Notify error via WebSocket
-          const { webSocketService } = await import('./websocket-service.js');
-          webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
+          this.webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
           
           // Fall through to mock response
         }
@@ -1632,12 +1630,7 @@ export class PromptLibraryService {
       
       // Notify error via WebSocket if we have connection info
       if (options.connectionId && userId) {
-        try {
-          const { webSocketService } = await import('./websocket-service.js');
-          webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
-        } catch (wsError) {
-          logger.error('Failed to send WebSocket error notification:', wsError);
-        }
+        this.webSocketService.notifyRenderFailed(id, provider, userId, options.connectionId, (error as Error).message);
       }
       
       if (error instanceof NotFoundError || error instanceof ValidationError) {
@@ -2489,19 +2482,19 @@ let promptLibraryService: PromptLibraryService | null = null;
  */
 export function getPromptLibraryService(): PromptLibraryService {
   if (!promptLibraryService) {
-    promptLibraryService = new PromptLibraryService();
+    throw new Error('PromptLibraryService not initialized. Call initializePromptLibraryService first.');
   }
   return promptLibraryService;
 }
 
-/**
- * Initialize the prompt library service
- */
-export async function initializePromptLibraryService(config?: { storageDir?: string }): Promise<void> {
+export async function initializePromptLibraryService(
+  webSocketService: WebSocketService,
+  config?: { storageDir?: string }
+): Promise<void> {
   if (promptLibraryService) {
     await promptLibraryService.shutdown();
   }
 
-  promptLibraryService = new PromptLibraryService(config);
+  promptLibraryService = new PromptLibraryService(webSocketService, config);
   await promptLibraryService.initialize();
 }
