@@ -17,6 +17,7 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { PromptsPage } from './pages/prompts/PromptsPage';
+import { EnhancedPromptsPage } from './pages/prompts/EnhancedPromptsPage';
 import { ConnectionsPage } from './pages/connections/ConnectionsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AccessibilitySettings } from './components/common/AccessibilitySettings';
@@ -89,7 +90,7 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <PromptsPage />
+                      <EnhancedPromptsPage />
                     </Layout>
                   </ProtectedRoute>
                 }

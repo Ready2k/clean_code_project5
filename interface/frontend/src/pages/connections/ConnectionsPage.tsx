@@ -259,88 +259,184 @@ export const ConnectionsPage: React.FC = () => {
       ) : (
         <Grid container spacing={3}>
           {(connections || []).map((connection) => (
-            <Grid item xs={12} md={6} lg={4} key={connection.id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    {getStatusIcon(connection.status)}
-                    <Typography variant="h6" sx={{ ml: 1, flexGrow: 1 }}>
-                      {connection.name}
-                    </Typography>
-                    <Chip
-                      label={connection.provider.toUpperCase()}
-                      size="small"
-                      variant="outlined"
-                    />
+            <Grid item xs={12} md={8} lg={6} key={connection.id}>
+              <Card 
+                sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: 4,
+                  }
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1, p: 4 }}>
+                  {/* Header with provider logo and status */}
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <Box 
+                        sx={{ 
+                          width: 56, 
+                          height: 56, 
+                          borderRadius: 3, 
+                          bgcolor: connection.provider === 'openai' ? '#10a37f' : 
+                                   connection.provider === 'bedrock' ? '#ff9900' : 'primary.main',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          mr: 3,
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '1.5rem',
+                          boxShadow: 2
+                        }}
+                      >
+                        {connection.provider === 'openai' ? '🤖' :
+                         connection.provider === 'bedrock' ? '☁️' : '🔗'}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography 
+                          variant="h5" 
+                          sx={{ 
+                            fontWeight: 600,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            mb: 0.5
+                          }}
+                        >
+                          {connection.name}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                          {connection.provider.toUpperCase()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ ml: 2 }}>
+                      {getStatusIcon(connection.status)}
+                    </Box>
                   </Box>
 
-                  <Box sx={{ mb: 2 }}>
+                  {/* Status Badge */}
+                  <Box sx={{ mb: 4 }}>
                     <Chip
                       label={connection.status.toUpperCase()}
-                      size="small"
+                      size="medium"
                       color={getStatusColor(connection.status) as any}
                       variant="filled"
+                      sx={{ fontWeight: 600, px: 2, py: 0.5 }}
                     />
                   </Box>
 
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Created: {new Date(connection.createdAt).toLocaleDateString()}
-                  </Typography>
+                  {/* Connection Details */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        Created:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={600}>
+                        {new Date(connection.createdAt).toLocaleDateString()}
+                      </Typography>
+                    </Box>
 
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Last tested: {formatLastTested(connection.lastTested)}
-                  </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        Last tested:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={600}>
+                        {formatLastTested(connection.lastTested)}
+                      </Typography>
+                    </Box>
 
-                  {connection.provider === 'openai' && (
-                    <Typography variant="body2" color="textSecondary">
-                      Default model: {(connection.config as any).defaultModel}
-                    </Typography>
+                    {connection.provider === 'openai' && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                          Default model:
+                        </Typography>
+                        <Chip 
+                          label={(connection.config as any).defaultModel} 
+                          size="medium" 
+                          variant="outlined"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                    )}
+
+                    {connection.provider === 'bedrock' && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                          Region:
+                        </Typography>
+                        <Chip 
+                          label={(connection.config as any).region} 
+                          size="medium" 
+                          variant="outlined"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Test Results */}
+                  {getTestResultInfo(connection.id) && (
+                    <Box sx={{ mt: 3, p: 3, bgcolor: 'background.default', borderRadius: 2 }}>
+                      {getTestResultInfo(connection.id)}
+                    </Box>
                   )}
-
-                  {connection.provider === 'bedrock' && (
-                    <Typography variant="body2" color="textSecondary">
-                      Region: {(connection.config as any).region}
-                    </Typography>
-                  )}
-
-                  {getTestResultInfo(connection.id)}
                 </CardContent>
 
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                  <Box>
-                    <Tooltip title="Test connection">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleTestConnectionAction(connection.id)}
-                        disabled={isLoading}
-                      >
-                        <TestIcon />
-                      </IconButton>
-                    </Tooltip>
+                <CardActions sx={{ justifyContent: 'space-between', px: 4, pb: 4, pt: 2 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<TestIcon />}
+                    onClick={() => handleTestConnectionAction(connection.id)}
+                    disabled={isLoading}
+                    sx={{ minWidth: 120, py: 1.5 }}
+                  >
+                    Test
+                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="View test details">
                       <IconButton
-                        size="small"
+                        size="medium"
                         onClick={() => handleTestConnection(connection)}
                         disabled={!testResults[connection.id]}
+                        sx={{ 
+                          bgcolor: testResults[connection.id] ? 'action.hover' : 'transparent',
+                          '&:hover': { bgcolor: 'action.selected' },
+                          width: 44,
+                          height: 44
+                        }}
                       >
                         <CheckCircleIcon />
                       </IconButton>
                     </Tooltip>
-                  </Box>
-                  <Box>
                     <Tooltip title="Edit connection">
                       <IconButton
-                        size="small"
+                        size="medium"
                         onClick={() => handleEditConnection(connection)}
+                        sx={{ 
+                          '&:hover': { bgcolor: 'action.selected' },
+                          width: 44,
+                          height: 44
+                        }}
                       >
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete connection">
                       <IconButton
-                        size="small"
+                        size="medium"
                         onClick={() => handleDeleteConnection(connection)}
                         color="error"
+                        sx={{ 
+                          '&:hover': { bgcolor: 'error.light', color: 'error.contrastText' },
+                          width: 44,
+                          height: 44
+                        }}
                       >
                         <DeleteIcon />
                       </IconButton>

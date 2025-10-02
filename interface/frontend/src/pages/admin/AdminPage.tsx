@@ -474,25 +474,26 @@ export const AdminPage: React.FC = () => {
         <Box>
           {/* System Status Overview */}
           {systemStatus && (
-            <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid container spacing={4} sx={{ mb: 4 }}>
               <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <DashboardIcon sx={{ mr: 1 }} />
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                      <DashboardIcon sx={{ mr: 2, color: 'primary.main' }} />
                       <Typography variant="h6">System Status</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <Chip 
                         label={systemStatus.status.toUpperCase()} 
                         color={getStatusColor(systemStatus.status) as any}
-                        sx={{ mr: 2 }}
+                        sx={{ mr: 2, fontWeight: 600 }}
+                        size="medium"
                       />
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body1" color="text.secondary">
                         Version: {systemStatus.version}
                       </Typography>
                     </Box>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body1" color="text.secondary">
                       Uptime: {formatUptime(systemStatus.uptime)}
                     </Typography>
                   </CardContent>
@@ -500,22 +501,22 @@ export const AdminPage: React.FC = () => {
               </Grid>
               
               <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <SpeedIcon sx={{ mr: 1 }} />
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                      <SpeedIcon sx={{ mr: 2, color: 'primary.main' }} />
                       <Typography variant="h6">Performance</Typography>
                     </Box>
                     {systemStats && (
-                      <Box>
-                        <Typography variant="body2">
-                          Requests/min: {systemStats.performance.requestsPerMinute}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Typography variant="body1">
+                          Requests/min: <strong>{systemStats.performance.requestsPerMinute}</strong>
                         </Typography>
-                        <Typography variant="body2">
-                          Avg Response: {systemStats.performance.averageResponseTime.toFixed(2)}ms
+                        <Typography variant="body1">
+                          Avg Response: <strong>{systemStats.performance.averageResponseTime.toFixed(2)}ms</strong>
                         </Typography>
-                        <Typography variant="body2">
-                          Error Rate: {systemStats.performance.errorRate.toFixed(2)}%
+                        <Typography variant="body1">
+                          Error Rate: <strong>{systemStats.performance.errorRate.toFixed(2)}%</strong>
                         </Typography>
                       </Box>
                     )}
@@ -527,33 +528,62 @@ export const AdminPage: React.FC = () => {
 
           {/* Services Status */}
           {systemStatus && (
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2 }}>Service Health</Typography>
-                <Grid container spacing={2}>
+            <Card sx={{ mb: 4 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 3 }}>Service Health</Typography>
+                <Grid container spacing={3}>
                   {Object.entries(systemStatus.services).map(([serviceName, service]) => (
-                    <Grid item xs={12} sm={6} md={4} key={serviceName}>
-                      <Box sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="subtitle2" sx={{ textTransform: 'capitalize', mr: 1 }}>
+                    <Grid item xs={12} sm={6} lg={2.4} key={serviceName}>
+                      <Box 
+                        sx={{ 
+                          p: 3, 
+                          border: 1, 
+                          borderColor: 'divider', 
+                          borderRadius: 2,
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: 120,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            boxShadow: 2,
+                            borderColor: 'primary.main'
+                          }
+                        }}
+                      >
+                        <Box>
+                          <Typography 
+                            variant="h6" 
+                            sx={{ 
+                              textTransform: 'capitalize', 
+                              mb: 2,
+                              fontWeight: 600
+                            }}
+                          >
                             {serviceName}
                           </Typography>
-                          <Chip 
-                            label={service.status} 
-                            color={getStatusColor(service.status) as any}
-                            size="small"
-                          />
+                          <Box sx={{ mb: 2 }}>
+                            <Chip 
+                              label={service.status.toUpperCase()} 
+                              color={getStatusColor(service.status) as any}
+                              size="medium"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </Box>
                         </Box>
-                        {service.responseTime && (
-                          <Typography variant="body2" color="text.secondary">
-                            Response: {service.responseTime}ms
-                          </Typography>
-                        )}
-                        {service.error && (
-                          <Typography variant="body2" color="error">
-                            Error: {service.error}
-                          </Typography>
-                        )}
+                        <Box>
+                          {service.responseTime !== undefined && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                              {service.responseTime}ms
+                            </Typography>
+                          )}
+                          {service.error && (
+                            <Typography variant="body2" color="error" sx={{ fontSize: '0.8rem' }}>
+                              {service.error}
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
                     </Grid>
                   ))}
@@ -564,22 +594,23 @@ export const AdminPage: React.FC = () => {
 
           {/* System Resources */}
           {systemStats && (
-            <Grid container spacing={3}>
+            <Grid container spacing={4}>
               <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <MemoryIcon sx={{ mr: 1 }} />
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                      <MemoryIcon sx={{ mr: 2, color: 'primary.main' }} />
                       <Typography variant="h6">Memory Usage</Typography>
                     </Box>
-                    <Box sx={{ mb: 1 }}>
+                    <Box sx={{ mb: 2 }}>
                       <LinearProgress 
                         variant="determinate" 
                         value={systemStats.system.memory.usage} 
                         color={systemStats.system.memory.usage > 80 ? 'error' : 'primary'}
+                        sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
-                    <Typography variant="body2">
+                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
                       {formatBytes(systemStats.system.memory.used)} / {formatBytes(systemStats.system.memory.total)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -590,20 +621,21 @@ export const AdminPage: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <ComputerIcon sx={{ mr: 1 }} />
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                      <ComputerIcon sx={{ mr: 2, color: 'primary.main' }} />
                       <Typography variant="h6">CPU Usage</Typography>
                     </Box>
-                    <Box sx={{ mb: 1 }}>
+                    <Box sx={{ mb: 2 }}>
                       <LinearProgress 
                         variant="determinate" 
                         value={systemStats.system.cpu.usage} 
                         color={systemStats.system.cpu.usage > 80 ? 'error' : 'primary'}
+                        sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
-                    <Typography variant="body2">
+                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
                       {systemStats.system.cpu.usage.toFixed(1)}% used
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -614,20 +646,21 @@ export const AdminPage: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <StorageIcon sx={{ mr: 1 }} />
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                      <StorageIcon sx={{ mr: 2, color: 'primary.main' }} />
                       <Typography variant="h6">Disk Usage</Typography>
                     </Box>
-                    <Box sx={{ mb: 1 }}>
+                    <Box sx={{ mb: 2 }}>
                       <LinearProgress 
                         variant="determinate" 
                         value={systemStats.system.disk.usage} 
                         color={systemStats.system.disk.usage > 80 ? 'error' : 'primary'}
+                        sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
-                    <Typography variant="body2">
+                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
                       {formatBytes(systemStats.system.disk.used)} / {formatBytes(systemStats.system.disk.total)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
