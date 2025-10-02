@@ -7,16 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-02-10
+
+### Security
+- **CRITICAL**: Resolved all npm security vulnerabilities (0 vulnerabilities across all packages)
+- Updated esbuild to latest secure version (>0.24.2)
+- Removed vulnerable react-syntax-highlighter dependency
+- Fixed prismjs DOM clobbering vulnerability
+- Implemented comprehensive security audit process
+
+### Updated Dependencies
+- **TypeScript**: Updated to 5.9.3 across all packages
+- **Vite**: Updated to 7.1.8 for improved build security
+- **Vitest**: Updated to 3.2.4 for modern testing features
+- **ESLint**: Updated to 9.36.0 with modern flat configuration
+- **Express**: Updated to 4.21.2 for backend security
+- **React Types**: Updated to latest versions for better type safety
+- **Winston**: Updated logging library to latest version
+
+### Code Quality Improvements
+- **ESLint Configuration**: Migrated to ESLint 9.x flat config format
+- **TypeScript Strict Mode**: Enhanced type safety across codebase
+- **Deprecated Code Removal**: Replaced `require()` with ES6 imports
+- **Modern Standards**: Updated to use latest JavaScript/TypeScript patterns
+- **Build Process**: All builds now compile cleanly without warnings
+
+### Documentation
+- **Security Standards**: Added comprehensive security and maintenance guidelines
+- **Project Standards**: Updated with latest package versions and security practices
+- **README**: Enhanced with security features and modern dependency versions
+- **Steering Documents**: Updated Kiro steering docs with current standards
+
+### Infrastructure
+- **Docker**: Updated base images and configurations
+- **CI/CD**: Enhanced with security scanning and modern tooling
+- **Monitoring**: Improved logging and security event tracking
+
 ### Added
-- Professional web interface with React and Material-UI
+- Professional web interface with React 18 and Material-UI
 - Real-time collaboration features with WebSocket support
 - Comprehensive monitoring and observability setup
 - Docker containerization for easy deployment
+- Security maintenance standards and procedures
 
 ### Changed
 - Enhanced documentation with comprehensive guides
 - Improved error handling across all services
 - Updated project structure for better maintainability
+- Modernized all build and development tooling
 
 ## [1.0.0] - 2024-09-24
 

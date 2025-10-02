@@ -93,18 +93,20 @@ Project standards and guidelines are maintained in `.kiro/steering/`:
 ## 🏗️ Architecture
 
 ### Frontend Stack
-- **React 18** with TypeScript
+- **React 18** with TypeScript 5.9.3
 - **Material-UI (MUI)** for components
 - **Redux Toolkit** for state management
 - **React Router** for navigation
-- **Vite** for build tooling
+- **Vite 7.1.8** for fast build tooling
+- **Vitest 3.2.4** for testing
 
 ### Backend Stack
-- **Node.js** with Express
-- **TypeScript** for type safety
-- **PostgreSQL** for user data
-- **Redis** for caching and sessions
-- **Socket.io** for real-time features
+- **Node.js** with Express 4.21.2
+- **TypeScript 5.9.3** for type safety
+- **PostgreSQL 15** for user data
+- **Redis 7** for caching and sessions
+- **Socket.io 4.7.4** for real-time features
+- **ESLint 9.36.0** with modern flat config
 
 ### Project Structure
 ```
@@ -164,12 +166,14 @@ npm run docker:down
 
 ## 🔒 Security Features
 
+- **Zero Vulnerabilities** - All npm packages audited and secure
 - **Encryption at Rest** - AES-256-GCM for sensitive data
 - **Encryption in Transit** - TLS 1.3 for all communications
-- **JWT Authentication** - Secure token-based auth
-- **Role-based Access Control** - Granular permissions
-- **Input Validation** - Comprehensive sanitization
-- **Rate Limiting** - API abuse prevention
+- **JWT Authentication** - Secure token-based auth with refresh rotation
+- **Role-based Access Control** - Granular permissions system
+- **Input Validation** - Comprehensive sanitization and type checking
+- **Rate Limiting** - API abuse prevention with configurable limits
+- **Modern Dependencies** - Latest secure versions of all packages
 
 ## 📊 System Requirements
 

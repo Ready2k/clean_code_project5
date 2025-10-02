@@ -7,7 +7,7 @@
 
 import { ExportService } from '../services/export-service.js';
 import { PromptRecord } from '../services/prompt-library-service.js';
-import { promises as fs } from 'fs';
+import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
 
 // Mock prompt data for demonstration
@@ -251,11 +251,11 @@ async function demonstrateExportFunctionality() {
     
     // Save the archive
     const archivePath = path.join('./demo-exports', bulkExport.filename);
-    const writeStream = require('fs').createWriteStream(archivePath);
+    const writeStream = createWriteStream(archivePath);
     bulkExport.stream.pipe(writeStream);
     
-    await new Promise((resolve, reject) => {
-      writeStream.on('finish', resolve);
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', () => resolve());
       writeStream.on('error', reject);
     });
     

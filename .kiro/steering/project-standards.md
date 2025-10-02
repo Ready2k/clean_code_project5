@@ -65,28 +65,34 @@ inclusion: always
 ### Security Considerations
 - Never commit API keys or secrets
 - Use environment variables for configuration
-- Validate all user inputs
+- Validate all user inputs with proper type checking
 - Implement proper error handling without exposing internals
-- Use JWT tokens for authentication with proper expiration
+- Use JWT tokens for authentication with proper expiration and refresh rotation
 - Implement role-based access control (RBAC)
 - Encrypt sensitive data at rest using AES-256-GCM
 - Use TLS 1.3 for all network communications
+- Maintain zero npm security vulnerabilities through regular audits
+- Use modern, secure package versions and remove deprecated dependencies
+- Follow ESLint security rules and TypeScript strict mode
 
 ## Web Interface Standards
 
 ### Frontend Development
-- Use React 18 with TypeScript for type safety
+- Use React 18 with TypeScript 5.9.3 for type safety
 - Material-UI (MUI) for consistent component design
 - Redux Toolkit for state management
 - React Router for client-side routing
-- Vite for fast development and optimized builds
+- Vite 7.1.8 for fast development and optimized builds
+- Vitest 3.2.4 for modern testing framework
+- ESLint 9.x with flat configuration format
 
 ### Backend Development
-- Express.js with TypeScript for API services
-- PostgreSQL for persistent data storage
-- Redis for caching and session management
-- Socket.io for real-time features
-- OpenAPI/Swagger for API documentation
+- Express.js 4.21.2 with TypeScript 5.9.3 for API services
+- PostgreSQL 15 for persistent data storage
+- Redis 7 for caching and session management
+- Socket.io 4.7.4 for real-time features
+- OpenAPI/Swagger for comprehensive API documentation
+- Modern ES modules throughout codebase
 
 ### Development Workflow
 - Use Docker Compose for local development environment
