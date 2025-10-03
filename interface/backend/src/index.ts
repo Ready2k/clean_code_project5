@@ -15,6 +15,13 @@ import { adminRoutes } from './routes/admin.js';
 import { ratingRoutes } from './routes/ratings.js';
 import { exportRoutes } from './routes/export.js';
 import { importRoutes } from './routes/import.js';
+import { providerRoutes } from './routes/providers.js';
+import { modelRoutes } from './routes/models.js';
+import { templateRoutes } from './routes/templates.js';
+import healthMonitoringRoutes from './routes/health-monitoring.js';
+import usageAnalyticsRoutes from './routes/usage-analytics.js';
+import migrationUtilitiesRoutes from './routes/migration-utilities.js';
+import { migrationRoutes } from './routes/migration.js';
 import { authenticateToken } from './middleware/auth.js';
 import { recordMetrics, trackAPIUsage, trackSecurityEvents } from './middleware/metrics.js';
 import { initializePromptLibraryService, getPromptLibraryService } from './services/prompt-library-service.js';
@@ -27,6 +34,12 @@ import { initializeExportService, getExportService } from './services/export-ser
 import { initializeAPIDocumentationService, getAPIDocumentationService } from './services/api-documentation-service.js';
 import { initializeSystemMonitoringService, getSystemMonitoringService } from './services/system-monitoring-service.js';
 import { getWebSocketService } from './services/websocket-service.js';
+import { initializeDatabaseService } from './services/database-service.js';
+import { getMigrationService } from './services/migration-service.js';
+import { initializeRegistryMonitoring } from './services/registry-monitoring-service.js';
+import { initializeHealthMonitoring } from './services/provider-health-monitoring-service.js';
+import { initializeUsageAnalytics } from './services/provider-usage-analytics-service.js';
+import { getProviderMigrationUtilitiesService } from './services/provider-migration-utilities-service.js';
 
 // Load environment variables from parent directory
 dotenv.config({ path: '../.env' });
@@ -137,6 +150,15 @@ app.use('/api/ratings', authenticateToken, ratingRoutes);
 app.use('/api/export', authenticateToken, exportRoutes);
 app.use('/api/import', authenticateToken, importRoutes);
 
+// Dynamic provider management routes (admin only)
+app.use('/api/admin/providers', authenticateToken, providerRoutes);
+app.use('/api/admin/models', authenticateToken, modelRoutes);
+app.use('/api/admin/provider-templates', authenticateToken, templateRoutes);
+app.use('/api/admin/health-monitoring', authenticateToken, healthMonitoringRoutes);
+app.use('/api/admin/usage-analytics', authenticateToken, usageAnalyticsRoutes);
+app.use('/api/admin/migration-utilities', authenticateToken, migrationUtilitiesRoutes);
+app.use('/api/admin/migration', authenticateToken, migrationRoutes);
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -155,6 +177,27 @@ app.use(errorHandler);
 async function initializeServices() {
   try {
     logger.info('Initializing services...');
+
+    // Initialize database service if DATABASE_URL is provided
+    if (process.env['DATABASE_URL']) {
+      const dbUrl = new URL(process.env['DATABASE_URL']);
+      await initializeDatabaseService({
+        host: dbUrl.hostname,
+        port: parseInt(dbUrl.port) || 5432,
+        database: dbUrl.pathname.slice(1), // Remove leading slash
+        user: dbUrl.username,
+        password: dbUrl.password,
+        ssl: process.env['NODE_ENV'] === 'production'
+      });
+
+      // Run database migrations
+      const migrationService = getMigrationService();
+      await migrationService.initialize();
+      await migrationService.migrate();
+      logger.info('Database migrations completed successfully');
+    } else {
+      logger.info('No DATABASE_URL provided, skipping database initialization');
+    }
 
     // Initialize Redis service first (required by user service)
     await initializeRedisService();
@@ -220,6 +263,48 @@ async function initializeServices() {
     app.set('io', io);
     app.set('webSocketService', webSocketService);
 
+    // Initialize registry monitoring service (after all other services)
+    await initializeRegistryMonitoring({
+      refreshInterval: parseInt(process.env['REGISTRY_REFRESH_INTERVAL'] || '300000'), // 5 minutes
+      healthCheckInterval: parseInt(process.env['REGISTRY_HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
+      enableAutoRefresh: process.env['REGISTRY_AUTO_REFRESH'] !== 'false',
+      enableHealthMonitoring: process.env['REGISTRY_HEALTH_MONITORING'] !== 'false'
+    });
+
+    // Initialize provider health monitoring service
+    await initializeHealthMonitoring({
+      healthCheckInterval: parseInt(process.env['HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
+      performanceMetricsInterval: parseInt(process.env['METRICS_INTERVAL'] || '60000'), // 1 minute
+      alertThresholds: {
+        responseTimeMs: parseInt(process.env['ALERT_RESPONSE_TIME_MS'] || '5000'),
+        errorRatePercent: parseInt(process.env['ALERT_ERROR_RATE_PERCENT'] || '10'),
+        uptimePercent: parseInt(process.env['ALERT_UPTIME_PERCENT'] || '95')
+      },
+      retentionDays: parseInt(process.env['HEALTH_DATA_RETENTION_DAYS'] || '30'),
+      enableAlerting: process.env['ENABLE_HEALTH_ALERTING'] !== 'false',
+      enableMetricsCollection: process.env['ENABLE_METRICS_COLLECTION'] !== 'false'
+    });
+
+    // Initialize provider usage analytics service
+    await initializeUsageAnalytics({
+      aggregationInterval: parseInt(process.env['ANALYTICS_AGGREGATION_INTERVAL'] || '300000'), // 5 minutes
+      retentionDays: parseInt(process.env['ANALYTICS_RETENTION_DAYS'] || '90'), // 90 days
+      enableRecommendations: process.env['ENABLE_USAGE_RECOMMENDATIONS'] !== 'false',
+      enableRealTimeTracking: process.env['ENABLE_REALTIME_TRACKING'] !== 'false'
+    });
+
+    // Initialize provider migration utilities service
+    const migrationUtilitiesService = getProviderMigrationUtilitiesService({
+      batchSize: parseInt(process.env['MIGRATION_BATCH_SIZE'] || '10'),
+      validateBeforeMigration: process.env['MIGRATION_VALIDATE_BEFORE'] !== 'false',
+      createBackup: process.env['MIGRATION_CREATE_BACKUP'] !== 'false',
+      enableRollback: process.env['MIGRATION_ENABLE_ROLLBACK'] !== 'false',
+      dryRun: process.env['MIGRATION_DRY_RUN'] === 'true'
+    });
+    
+    // Initialize migration database tables
+    await migrationUtilitiesService.initializeTables();
+
     logger.info('Services initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize services:', error);
@@ -256,6 +341,33 @@ async function gracefulShutdown() {
 
     const systemMonitoringService = getSystemMonitoringService();
     await systemMonitoringService.shutdown();
+
+    // Shutdown health monitoring service
+    try {
+      const { getProviderHealthMonitoringService } = await import('./services/provider-health-monitoring-service.js');
+      const healthMonitoringService = getProviderHealthMonitoringService();
+      await healthMonitoringService.stop();
+    } catch (error) {
+      logger.debug('Health monitoring service not initialized or already shut down');
+    }
+
+    // Shutdown usage analytics service
+    try {
+      const { getProviderUsageAnalyticsService } = await import('./services/provider-usage-analytics-service.js');
+      const usageAnalyticsService = getProviderUsageAnalyticsService();
+      await usageAnalyticsService.stop();
+    } catch (error) {
+      logger.debug('Usage analytics service not initialized or already shut down');
+    }
+
+    // Shutdown database service if initialized
+    try {
+      const { shutdownDatabaseService } = await import('./services/database-service.js');
+      await shutdownDatabaseService();
+    } catch (error) {
+      // Database service might not be initialized
+      logger.debug('Database service not initialized or already shut down');
+    }
 
     logger.info('Graceful shutdown completed');
     process.exit(0);

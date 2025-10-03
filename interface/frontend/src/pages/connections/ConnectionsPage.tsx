@@ -197,7 +197,7 @@ export const ConnectionsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 4, maxWidth: 1400, mx: 'auto' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
           LLM Connections
@@ -257,15 +257,18 @@ export const ConnectionsPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={4} sx={{ justifyContent: 'flex-start' }}>
           {(connections || []).map((connection) => (
-            <Grid item xs={12} md={8} lg={6} key={connection.id}>
+            <Grid item xs={12} sm={12} md={10} lg={8} xl={6} key={connection.id}>
               <Card 
                 sx={{ 
                   height: '100%', 
                   display: 'flex', 
                   flexDirection: 'column',
                   transition: 'all 0.2s ease-in-out',
+                  minWidth: 400,
+                  maxWidth: 600,
+                  mx: 'auto',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: 4,

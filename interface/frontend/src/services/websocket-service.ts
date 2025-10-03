@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { store } from '../store';
 import { setConnectionStatus } from '../store/slices/connectionsSlice';
 import { updateJobProgress } from '../store/slices/enhancementSlice';
-import { addNotification } from '../store/slices/uiSlice';
+import { addNotification, removeNotification } from '../store/slices/uiSlice';
 import { updateSystemStatus } from '../store/slices/systemSlice';
 
 export interface WebSocketEvents {
@@ -159,7 +159,9 @@ export interface NotificationData {
 class WebSocketService {
   private socket: Socket | null = null;
   private isConnected = false;
+  private reconnectAttempts = 0;
   private eventListeners: Map<string, Set<Function>> = new Map();
+  private renderStates: Map<string, { status: string; timestamp: number }> = new Map();
 
   connect(token: string, userId: string): void {
     if (this.socket?.connected) {
@@ -172,7 +174,7 @@ class WebSocketService {
       this.socket.removeAllListeners();
     }
 
-    const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const serverUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     
     this.socket = io(serverUrl, {
       auth: { token },
@@ -293,14 +295,7 @@ class WebSocketService {
         title: 'Enhancement Complete',
         message: 'AI enhancement completed successfully',
         timestamp: new Date().toISOString(),
-        autoHide: false,
-        actions: [{
-          label: 'View Results',
-          action: () => {
-            // Navigate to prompt detail view
-            store.dispatch(setNavigation(`/prompts/${promptId}`));
-          }
-        }]
+        autoHide: false
       }));
     });
 
@@ -379,12 +374,7 @@ class WebSocketService {
           message: `${username} updated this prompt`,
           timestamp,
           autoHide: true,
-          duration: 5000,
-          actions: [{
-            label: 'Refresh',
-                      action: () => {
-                        store.dispatch(fetchPrompt(promptId));
-                      }          }]
+          duration: 5000
         }));
       }
     });
@@ -415,13 +405,7 @@ class WebSocketService {
         title: 'Export Complete',
         message: 'Your export is ready for download',
         timestamp,
-        autoHide: false,
-        actions: [{
-          label: 'Download',
-          action: () => {
-            window.open(downloadUrl, '_blank');
-          }
-        }]
+        autoHide: false
       }));
     });
 
@@ -454,7 +438,17 @@ class WebSocketService {
     this.socket.on('render:started', ({ promptId, provider, userId: renderUserId, connectionId, timestamp }) => {
 
       if (renderUserId === userId) {
+        const renderKey = `${promptId}-${connectionId}`;
+        
+        // Track render state
+        this.renderStates.set(renderKey, { status: 'started', timestamp: Date.now() });
+        
         this.emitToListeners('render:started', { promptId, provider, userId: renderUserId, connectionId, timestamp });
+        
+        // Clear any existing render notifications for this prompt/connection
+        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-completed-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-failed-${promptId}-${connectionId}`));
         
         store.dispatch(addNotification({
           id: `render-started-${promptId}-${connectionId}`,
@@ -471,24 +465,49 @@ class WebSocketService {
     this.socket.on('render:progress', ({ promptId, provider, userId: renderUserId, connectionId, status, message, timestamp }) => {
 
       if (renderUserId === userId) {
-        this.emitToListeners('render:progress', { promptId, provider, userId: renderUserId, connectionId, status, message, timestamp });
+        const renderKey = `${promptId}-${connectionId}`;
+        const currentState = this.renderStates.get(renderKey);
         
-        // Update existing notification or create new one
-        store.dispatch(addNotification({
-          id: `render-progress-${promptId}-${connectionId}`,
-          type: 'info',
-          title: 'Rendering Progress',
-          message: message,
-          timestamp,
-          autoHide: false // Keep showing until completed
-        }));
+        // Only process progress events if we have a valid render state and it's not completed
+        if (currentState && currentState.status !== 'completed' && currentState.status !== 'failed') {
+          // Update render state
+          this.renderStates.set(renderKey, { status: 'progress', timestamp: Date.now() });
+          
+          this.emitToListeners('render:progress', { promptId, provider, userId: renderUserId, connectionId, status, message, timestamp });
+          
+          // Only show progress notifications for meaningful stages, not completion messages
+          if (status !== 'completing' && !message.includes('completed successfully')) {
+            // Clear the started notification and update with progress
+            store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
+            
+            // Update existing notification or create new one
+            store.dispatch(addNotification({
+              id: `render-progress-${promptId}-${connectionId}`,
+              type: 'info',
+              title: 'Rendering Progress',
+              message: message,
+              timestamp,
+              autoHide: false // Keep showing until completed
+            }));
+          }
+        }
       }
     });
 
     this.socket.on('render:completed', ({ promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp }) => {
 
       if (renderUserId === userId) {
+        const renderKey = `${promptId}-${connectionId}`;
+        
+        // Mark render as completed
+        this.renderStates.set(renderKey, { status: 'completed', timestamp: Date.now() });
+        
         this.emitToListeners('render:completed', { promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp });
+        
+        // Clear all previous render notifications for this prompt/connection
+        store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-failed-${promptId}-${connectionId}`));
         
         store.dispatch(addNotification({
           id: `render-completed-${promptId}-${connectionId}`,
@@ -499,12 +518,22 @@ class WebSocketService {
           autoHide: true,
           duration: 5000
         }));
+        
+        // Clean up render state after a delay
+        setTimeout(() => {
+          this.renderStates.delete(renderKey);
+        }, 10000);
       }
     });
 
     this.socket.on('render:failed', ({ promptId, provider, userId: renderUserId, connectionId, error, timestamp }) => {
       if (renderUserId === userId) {
         this.emitToListeners('render:failed', { promptId, provider, userId: renderUserId, connectionId, error, timestamp });
+        
+        // Clear all previous render notifications for this prompt/connection
+        store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
+        store.dispatch(removeNotification(`render-completed-${promptId}-${connectionId}`));
         
         store.dispatch(addNotification({
           id: `render-failed-${promptId}-${connectionId}`,

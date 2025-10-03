@@ -1,0 +1,250 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with Dynamic Provider Support
+  postgres:
+    image: postgres:15-alpine
+    container_name: prompt-library-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-prompt_library}
+      POSTGRES_USER: ${DB_USER:-prompt_library_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ../backend/src/scripts/production-migration.sql:/docker-entrypoint-initdb.d/02-dynamic-providers.sql
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - prompt-library-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-prompt_library_user} -d ${DB_NAME:-prompt_library}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis for Caching Provider Registry
+  redis:
+    image: redis:7-alpine
+    container_name: prompt-library-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: >
+      redis-server 
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - prompt-library-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend Application with Dynamic Provider Support
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/production/backend.Dockerfile
+    container_name: prompt-library-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-prompt_library_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-prompt_library}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      
+      # Dynamic Provider Configuration
+      DYNAMIC_PROVIDERS_ENABLED: "true"
+      PROVIDER_TEMPLATES_ENABLED: "true"
+      PROVIDER_IMPORT_EXPORT_ENABLED: "true"
+      PROVIDER_ANALYTICS_ENABLED: "true"
+      
+      # Provider Registry Configuration
+      PROVIDER_REGISTRY_CACHE_TTL: ${PROVIDER_REGISTRY_CACHE_TTL:-300}
+      PROVIDER_REGISTRY_REFRESH_INTERVAL: ${PROVIDER_REGISTRY_REFRESH_INTERVAL:-3600}
+      PROVIDER_HEALTH_CHECK_INTERVAL: ${PROVIDER_HEALTH_CHECK_INTERVAL:-300}
+      
+      # Performance Configuration
+      API_RATE_LIMIT_WINDOW: ${API_RATE_LIMIT_WINDOW:-900000}
+      API_RATE_LIMIT_MAX: ${API_RATE_LIMIT_MAX:-100}
+      API_TIMEOUT: ${API_TIMEOUT:-30000}
+      
+      # Monitoring Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MONITORING_ENABLED: "true"
+      HEALTH_CHECK_ENABLED: "true"
+      AUDIT_LOGGING_ENABLED: "true"
+      
+      # External Service Defaults
+      OPENAI_DEFAULT_BASE_URL: "https://api.openai.com/v1"
+      ANTHROPIC_DEFAULT_BASE_URL: "https://api.anthropic.com/v1"
+      BEDROCK_DEFAULT_REGION: "us-east-1"
+      
+    volumes:
+      - backend_logs:/app/logs
+      - backend_backups:/app/backups
+      - backend_temp:/app/temp
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - prompt-library-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/production/frontend.Dockerfile
+    container_name: prompt-library-frontend
+    environment:
+      VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
+      VITE_DYNAMIC_PROVIDERS_ENABLED: "true"
+      VITE_PROVIDER_MANAGEMENT_ENABLED: "true"
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - prompt-library-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: prompt-library-nginx
+    volumes:
+      - ../docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../docker/nginx/security.conf:/etc/nginx/conf.d/security.conf:ro
+      - nginx_logs:/var/log/nginx
+      - ssl_certs:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - prompt-library-network
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring and Metrics (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prompt-library-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - prompt-library-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Log Aggregation (Optional)
+  loki:
+    image: grafana/loki:latest
+    container_name: prompt-library-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ../monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - prompt-library-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana Dashboard (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: prompt-library-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - prompt-library-network
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_backups:
+    driver: local
+  backend_temp:
+    driver: local
+  nginx_logs:
+    driver: local
+  ssl_certs:
+    driver: local
+  prometheus_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  prompt-library-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

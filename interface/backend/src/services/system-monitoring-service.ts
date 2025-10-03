@@ -6,6 +6,7 @@ import { getConnectionManagementService } from './connection-management-service.
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { getSystemMetricsCollector } from '../utils/system-metrics.js';
 
 export interface SystemStatus {
   status: 'healthy' | 'degraded' | 'down';
@@ -721,58 +722,44 @@ export class SystemMonitoringService extends EventEmitter {
    * Get system information
    */
   private async getSystemInfo(): Promise<SystemStats['system']> {
-    // Use mock data in demo mode for more reasonable values
-    const isDemoMode = process.env['DEMO_MODE'] === 'true' || process.env['ENABLE_MOCK_DATA'] === 'true';
-
-    if (isDemoMode) {
-      // Mock data for demo - more reasonable values
-      const mockTotalMem = 8 * 1024 * 1024 * 1024; // 8GB
-      const mockUsedMem = 3.2 * 1024 * 1024 * 1024; // 3.2GB (40% usage)
-      const mockFreeMem = mockTotalMem - mockUsedMem;
+    try {
+      const metricsCollector = getSystemMetricsCollector();
+      const metrics = await metricsCollector.collectMetrics();
 
       return {
-        uptime: Math.floor(Math.random() * 86400) + 3600, // 1-24 hours
+        uptime: os.uptime(),
+        memory: metrics.memory,
+        cpu: metrics.cpu,
+        disk: metrics.disk
+      };
+    } catch (error) {
+      logger.warn('Failed to collect real system metrics, using fallback data:', error);
+      
+      // Fallback to basic OS metrics
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = totalMem - freeMem;
+
+      return {
+        uptime: os.uptime(),
         memory: {
-          total: mockTotalMem,
-          used: mockUsedMem,
-          free: mockFreeMem,
-          usage: (mockUsedMem / mockTotalMem) * 100
+          total: totalMem,
+          used: usedMem,
+          free: freeMem,
+          usage: (usedMem / totalMem) * 100
         },
         cpu: {
-          usage: Math.random() * 30 + 10, // 10-40% CPU usage
-          loadAverage: [0.5, 0.7, 0.9]
+          usage: await this.getCPUUsage(),
+          loadAverage: os.loadavg()
         },
         disk: {
-          total: 100 * 1024 * 1024 * 1024, // 100GB
-          used: 45 * 1024 * 1024 * 1024,   // 45GB (45% usage)
-          free: 55 * 1024 * 1024 * 1024,   // 55GB
+          total: 100 * 1024 * 1024 * 1024, // 100GB fallback
+          used: 45 * 1024 * 1024 * 1024,   // 45GB fallback
+          free: 55 * 1024 * 1024 * 1024,   // 55GB fallback
           usage: 45
         }
       };
     }
-
-    // Real system data for production
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
-
-    // Get disk usage for data directory
-    const diskUsage = await this.getDiskUsage(this.config.storage.dataDirectory);
-
-    return {
-      uptime: os.uptime(),
-      memory: {
-        total: totalMem,
-        used: usedMem,
-        free: freeMem,
-        usage: (usedMem / totalMem) * 100
-      },
-      cpu: {
-        usage: await this.getCPUUsage(),
-        loadAverage: os.loadavg()
-      },
-      disk: diskUsage
-    };
   }
 
   /**
@@ -845,47 +832,13 @@ export class SystemMonitoringService extends EventEmitter {
   private startMetricsCollection(): void {
     this.metricsInterval = setInterval(async () => {
       try {
-        const isDemoMode = process.env['DEMO_MODE'] === 'true' || process.env['ENABLE_MOCK_DATA'] === 'true';
-
-        let memoryData;
-        let cpuData;
-
-        if (isDemoMode) {
-          // Mock data for demo
-          const mockTotalMem = 8 * 1024 * 1024 * 1024; // 8GB
-          const mockUsedMem = (3 + Math.random() * 1.5) * 1024 * 1024 * 1024; // 3-4.5GB varying
-          const mockFreeMem = mockTotalMem - mockUsedMem;
-
-          memoryData = {
-            total: mockTotalMem,
-            used: mockUsedMem,
-            free: mockFreeMem,
-            usage: (mockUsedMem / mockTotalMem) * 100
-          };
-
-          cpuData = {
-            usage: Math.random() * 30 + 10, // 10-40% varying
-            loadAverage: [0.5 + Math.random() * 0.5, 0.7 + Math.random() * 0.3, 0.9 + Math.random() * 0.2]
-          };
-        } else {
-          // Real system data
-          memoryData = {
-            total: os.totalmem(),
-            used: os.totalmem() - os.freemem(),
-            free: os.freemem(),
-            usage: ((os.totalmem() - os.freemem()) / os.totalmem()) * 100
-          };
-
-          cpuData = {
-            usage: await this.getCPUUsage(),
-            loadAverage: os.loadavg()
-          };
-        }
+        const metricsCollector = getSystemMetricsCollector();
+        const systemMetrics = await metricsCollector.collectMetrics();
 
         const metrics: SystemMetrics = {
           timestamp: new Date().toISOString(),
-          cpu: cpuData,
-          memory: memoryData,
+          cpu: systemMetrics.cpu,
+          memory: systemMetrics.memory,
           requests: {
             total: this.performanceCounters.requests,
             successful: this.performanceCounters.successfulRequests,
@@ -903,8 +856,52 @@ export class SystemMonitoringService extends EventEmitter {
         if (this.metrics.length > 1000) {
           this.metrics = this.metrics.slice(-1000);
         }
+
+        // Log container info if available
+        if (systemMetrics.container && this.metrics.length === 1) {
+          logger.info('Container metrics available', {
+            containerId: systemMetrics.container.id,
+            containerName: systemMetrics.container.name,
+            memoryLimit: systemMetrics.container.memoryLimit ? 
+              `${Math.round(systemMetrics.container.memoryLimit / 1024 / 1024)}MB` : 'unlimited'
+          });
+        }
       } catch (error) {
         logger.error('Failed to collect metrics:', error);
+        
+        // Fallback to basic metrics
+        try {
+          const metrics: SystemMetrics = {
+            timestamp: new Date().toISOString(),
+            cpu: {
+              usage: await this.getCPUUsage(),
+              loadAverage: os.loadavg()
+            },
+            memory: {
+              total: os.totalmem(),
+              used: os.totalmem() - os.freemem(),
+              free: os.freemem(),
+              usage: ((os.totalmem() - os.freemem()) / os.totalmem()) * 100
+            },
+            requests: {
+              total: this.performanceCounters.requests,
+              successful: this.performanceCounters.successfulRequests,
+              failed: this.performanceCounters.failedRequests,
+              averageResponseTime: this.performanceCounters.requests > 0
+                ? this.performanceCounters.totalResponseTime / this.performanceCounters.requests
+                : 0
+            },
+            services: {}
+          };
+
+          this.metrics.push(metrics);
+
+          if (this.metrics.length > 1000) {
+            this.metrics = this.metrics.slice(-1000);
+          }
+        } catch (fallbackError) {
+          logger.error('Failed to collect fallback metrics:', fallbackError);
+        }
       }
     }, 60000); // Collect every minute
   }

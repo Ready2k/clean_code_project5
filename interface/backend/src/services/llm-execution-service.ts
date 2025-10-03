@@ -51,9 +51,9 @@ export class LLMExecutionService {
       // Execute based on provider
       switch (connection.provider) {
         case 'openai':
-          return await this.executeOpenAI(connection, request);
+          return await this.executeOpenAI(connection as LLMConnection, request);
         case 'bedrock':
-          return await this.executeBedrock(connection, request);
+          return await this.executeBedrock(connection as LLMConnection, request);
         default:
           throw new ValidationError(`Unsupported provider: ${connection.provider}`);
       }

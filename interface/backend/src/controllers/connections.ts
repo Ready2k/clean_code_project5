@@ -7,7 +7,8 @@ import {
   ConnectionListResponse,
   ConnectionResponse,
   ConnectionTestResponse,
-  AvailableModelsResponse
+  AvailableModelsResponse,
+  LLMConnection
 } from '../types/connections.js';
 import { logger } from '../utils/logger.js';
 import { AppError, ValidationError } from '../types/errors.js';
@@ -104,7 +105,7 @@ export const getConnection = async (req: ExtendedAuthenticatedRequest, res: Resp
     const connection = await connectionService.getConnection(userId, connectionId);
 
     const response: ConnectionResponse = {
-      connection
+      connection: connection as LLMConnection
     };
 
     logger.info('Retrieved connection', {
@@ -145,7 +146,7 @@ export const updateConnection = async (req: ExtendedAuthenticatedRequest, res: R
     const connection = await connectionService.updateConnection(userId, connectionId, updateRequest);
 
     const response: ConnectionResponse = {
-      connection
+      connection: connection as LLMConnection
     };
 
     logger.info('Updated connection', {

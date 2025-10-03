@@ -20,31 +20,83 @@ const initialState: RenderingState = {
   selectedRenders: [],
 };
 
+// Track active render requests to prevent duplicates
+const activeRenderRequests = new Map<string, Promise<any>>();
+
 // Async thunks
 export const renderPrompt = createAsyncThunk(
   'rendering/renderPrompt',
   async (
     { promptId, connectionId, provider, options }: 
     { promptId: string; connectionId: string; provider: string; options: RenderOptions },
-    { rejectWithValue }
+    { rejectWithValue, getState }
   ) => {
-    try {
-      const result = await promptsAPI.renderPrompt(promptId, provider, {
-        connectionId,
-        ...options,
-      });
-      return {
-        id: `${promptId}-${connectionId}-${Date.now()}`,
+    // Create a unique key for this render request
+    const renderKey = `${promptId}-${connectionId}-${provider}`;
+    
+    // Check if this exact render is already in progress
+    if (activeRenderRequests.has(renderKey)) {
+      console.log('Duplicate render request detected, waiting for existing request', {
         promptId,
         connectionId,
-        provider,
-        model: result.metadata?.model || options.model,
-        targetModel: result.metadata?.targetModel || options.targetModel,
-        payload: result.payload,
-        variables: options.variables || {},
-        createdAt: new Date().toISOString(),
-        success: true,
-      } as RenderResult;
+        provider
+      });
+      
+      try {
+        // Wait for the existing request to complete
+        const existingResult = await activeRenderRequests.get(renderKey);
+        return existingResult;
+      } catch (error) {
+        // If the existing request failed, we'll proceed with a new one
+        activeRenderRequests.delete(renderKey);
+      }
+    }
+
+    // Create the render promise
+    const renderPromise = (async () => {
+      try {
+        console.log('Starting new render request', {
+          promptId,
+          connectionId,
+          provider
+        });
+
+        const result = await promptsAPI.renderPrompt(promptId, provider, {
+          connectionId,
+          ...options,
+        });
+
+        const renderResult = {
+          id: `${promptId}-${connectionId}-${Date.now()}`,
+          promptId,
+          connectionId,
+          provider,
+          model: result.metadata?.model || options.model,
+          targetModel: result.metadata?.targetModel || options.targetModel,
+          payload: result.payload,
+          variables: options.variables || {},
+          createdAt: new Date().toISOString(),
+          success: true,
+        } as RenderResult;
+
+        console.log('Render request completed successfully', {
+          promptId,
+          connectionId,
+          provider
+        });
+
+        return renderResult;
+      } finally {
+        // Always clean up the active request entry
+        activeRenderRequests.delete(renderKey);
+      }
+    })();
+
+    // Store the promise in the active requests map
+    activeRenderRequests.set(renderKey, renderPromise);
+
+    try {
+      return await renderPromise;
     } catch (error: any) {
       return rejectWithValue({
         id: `${promptId}-${connectionId}-${Date.now()}`,
@@ -122,17 +174,23 @@ const renderingSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Render prompt
-      .addCase(renderPrompt.pending, (state) => {
+      .addCase(renderPrompt.pending, (state, action) => {
         state.isLoading = true;
         state.error = null;
-        const tempId = `temp-${Date.now()}`;
-        state.activeRenders.push(tempId);
+        const { promptId, connectionId } = action.meta.arg;
+        const tempId = `${promptId}-${connectionId}-pending`;
+        // Only add if not already present to prevent duplicates
+        if (!state.activeRenders.includes(tempId)) {
+          state.activeRenders.push(tempId);
+        }
       })
       .addCase(renderPrompt.fulfilled, (state, action) => {
         state.isLoading = false;
         const result = action.payload;
         state.renders[result.id] = result;
-        state.activeRenders = state.activeRenders.filter(id => !id.startsWith('temp-'));
+        const { promptId, connectionId } = action.meta.arg;
+        const tempId = `${promptId}-${connectionId}-pending`;
+        state.activeRenders = state.activeRenders.filter(id => id !== tempId);
       })
       .addCase(renderPrompt.rejected, (state, action) => {
         state.isLoading = false;
@@ -141,7 +199,9 @@ const renderingSlice = createSlice({
         if (result) {
           state.renders[result.id] = result;
         }
-        state.activeRenders = state.activeRenders.filter(id => !id.startsWith('temp-'));
+        const { promptId, connectionId } = action.meta.arg;
+        const tempId = `${promptId}-${connectionId}-pending`;
+        state.activeRenders = state.activeRenders.filter(id => id !== tempId);
       });
   },
 });

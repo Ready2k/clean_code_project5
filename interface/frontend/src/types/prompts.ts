@@ -111,6 +111,7 @@ export interface RenderOptions {
   temperature?: number;
   maxTokens?: number;
   variables?: Record<string, any>;
+  version?: 'original' | 'enhanced' | 'original-no-adapt';
 }
 
 export interface ProviderPayload {
@@ -141,6 +142,7 @@ export interface RenderResult {
     }>;
     parameters?: Record<string, any>;
     formatted_prompt: string;
+    response?: string;
   };
   variables: Record<string, any>;
   createdAt: string;

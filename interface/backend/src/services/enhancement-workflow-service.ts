@@ -8,7 +8,7 @@ export interface EnhancementJob {
   id: string;
   promptId: string;
   userId: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+  status: 'pending' | 'analyzing' | 'enhancing' | 'generating_questions' | 'completed' | 'failed';
   progress: number;
   message: string;
   createdAt: Date;
@@ -19,6 +19,7 @@ export interface EnhancementJob {
 
 export interface EnhancementProgress {
   jobId: string;
+  promptId: string;
   status: EnhancementJob['status'];
   progress: number;
   message: string;
@@ -144,6 +145,7 @@ export class EnhancementWorkflowService extends EventEmitter {
 
     return {
       jobId: job.id,
+      promptId: job.promptId,
       status: job.status,
       progress: job.progress,
       message: job.message,
@@ -174,19 +176,19 @@ export class EnhancementWorkflowService extends EventEmitter {
    * Process enhancement job
    */
   private async processEnhancement(jobId: string, value: any): Promise<void> {
-    this.updateJobStatus(jobId, 'in-progress', 10, 'Starting enhancement process');
+    this.updateJobStatus(jobId, 'analyzing', 10, 'Starting enhancement process');
     
     try {
       // Simulate enhancement process
-      this.updateJobStatus(jobId, 'in-progress', 30, 'Analyzing prompt structure');
+      this.updateJobStatus(jobId, 'analyzing', 30, 'Analyzing prompt structure');
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      this.updateJobStatus(jobId, 'in-progress', 60, 'Generating enhancements');
+      this.updateJobStatus(jobId, 'enhancing', 60, 'Generating enhancements');
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      this.updateJobStatus(jobId, 'in-progress', 90, 'Finalizing results');
+      this.updateJobStatus(jobId, 'enhancing', 90, 'Finalizing results');
       
       const result: EnhancementResult = {
         structuredPrompt: {

@@ -141,7 +141,7 @@ export const systemAPI = {
       createdAt: string;
     };
   }> {
-    const response = await apiClient.post('/system/backup');
+    const response = await apiClient.post('/system/maintenance/backup');
     return response.data;
   },
 
@@ -154,7 +154,7 @@ export const systemAPI = {
       oldEventsRemoved: number;
     };
   }> {
-    const response = await apiClient.post('/system/cleanup');
+    const response = await apiClient.post('/system/maintenance/cleanup');
     return response.data;
   },
 };

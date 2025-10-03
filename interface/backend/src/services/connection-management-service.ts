@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 import { ConnectionStorageService } from './connection-storage-service.js';
 import { ConnectionTestingService } from './connection-testing-service.js';
+import { getDynamicProviderService } from './dynamic-provider-service.js';
+// Removed unused provider registry service import
 import { 
   LLMConnection, 
   CreateConnectionRequest, 
@@ -14,13 +16,29 @@ import {
   BedrockConfig,
   MicrosoftCopilotConfig
 } from '../types/connections.js';
-import { AppError, ValidationError } from '../types/errors.js';
+import {
+  ExtendedLLMConnection,
+  ExtendedCreateConnectionRequest,
+  ExtendedConnectionTestResult,
+  DynamicConnectionConfig,
+  ConnectionMigrationPlan,
+  ConnectionMigrationResult,
+  BatchMigrationRequest,
+  BatchMigrationResult,
+  CompatibilityCheckResult,
+  ExtendedConnectionService,
+  isLegacyConnection,
+  isDynamicConnection,
+  ExtendedConnectionErrorCode
+} from '../types/extended-connections.js';
+// Removed unused dynamic provider imports
+import { AppError, ValidationError, NotFoundError } from '../types/errors.js';
 
 export interface ConnectionManagementServiceConfig {
   storageDir?: string;
 }
 
-export class ConnectionManagementService extends EventEmitter {
+export class ConnectionManagementService extends EventEmitter implements ExtendedConnectionService {
   private storageService: ConnectionStorageService;
   private initialized = false;
 
@@ -46,42 +64,149 @@ export class ConnectionManagementService extends EventEmitter {
   }
 
   /**
-   * Create a new LLM connection
+   * Create a new LLM connection (legacy method for backward compatibility)
    */
   public async createConnection(
     userId: string, 
     request: CreateConnectionRequest
   ): Promise<LLMConnection> {
+    // Convert to extended request and delegate
+    const extendedRequest: ExtendedCreateConnectionRequest = {
+      name: request.name,
+      provider: request.provider,
+      config: request.config
+    };
+    
+    const extendedConnection = await this.createLegacyConnection(userId, extendedRequest);
+    
+    // Convert back to legacy format for backward compatibility
+    return {
+      id: extendedConnection.id,
+      name: extendedConnection.name,
+      provider: extendedConnection.provider!,
+      config: extendedConnection.config!,
+      status: extendedConnection.status,
+      createdAt: extendedConnection.createdAt,
+      updatedAt: extendedConnection.updatedAt,
+      lastTested: extendedConnection.lastTested || new Date(),
+      userId: extendedConnection.userId
+    };
+  }
+
+  /**
+   * Create a legacy connection (for backward compatibility)
+   */
+  public async createLegacyConnection(
+    userId: string, 
+    request: ExtendedCreateConnectionRequest
+  ): Promise<ExtendedLLMConnection> {
     this.ensureInitialized();
     
     try {
       // Validate the request
-      this.validateCreateConnectionRequest(request);
+      this.validateExtendedCreateConnectionRequest(request);
       
-      // Validate provider-specific configuration
-      ConnectionTestingService.validateConfig(request.provider, request.config);
+      if (request.provider && request.config) {
+        // Legacy provider connection
+        ConnectionTestingService.validateConfig(request.provider, request.config);
+        
+        // Set default models if not provided
+        const configWithDefaults = this.setDefaultModels(request.provider, request.config);
+        
+        // Create the connection
+        const connection = await this.storageService.createExtendedConnection(userId, {
+          ...request,
+          config: configWithDefaults,
+          connectionType: 'legacy'
+        });
+        
+        logger.info('Created new legacy connection', {
+          connectionId: connection.id,
+          name: connection.name,
+          provider: connection.provider,
+          userId
+        });
+        
+        this.emit('connectionCreated', { connection, userId });
+        return connection;
+      } else {
+        throw new ValidationError('Legacy connection requires provider and config');
+      }
       
-      // Set default models if not provided
-      const configWithDefaults = this.setDefaultModels(request.provider, request.config);
+    } catch (error) {
+      logger.error('Failed to create legacy connection:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a dynamic provider connection
+   */
+  public async createDynamicConnection(
+    userId: string, 
+    providerId: string, 
+    config: DynamicConnectionConfig
+  ): Promise<ExtendedLLMConnection> {
+    this.ensureInitialized();
+    
+    try {
+      // Validate provider exists and is active
+      const dynamicProviderService = getDynamicProviderService();
+      const provider = await dynamicProviderService.getProvider(providerId);
+      
+      if (provider.status !== 'active') {
+        throw new AppError(
+          `Provider ${provider.name} is not active`,
+          400,
+          ExtendedConnectionErrorCode.DYNAMIC_PROVIDER_INACTIVE as any
+        );
+      }
+
+      // Validate dynamic configuration
+      this.validateDynamicConnectionConfig(config);
+      
+      // Get available models for the provider
+      const models = await dynamicProviderService.getProviderModels(providerId);
+      const availableModelIds = models.map(m => m.identifier);
+      
+      // Set default model if not specified
+      if (!config.modelPreferences?.defaultModel && models.length > 0) {
+        const defaultModel = models.find(m => m.isDefault) || models[0];
+        config.modelPreferences = {
+          ...config.modelPreferences,
+          defaultModel: defaultModel?.identifier || ''
+        };
+      }
       
       // Create the connection
-      const connection = await this.storageService.createConnection(userId, {
-        ...request,
-        config: configWithDefaults
+      const connection = await this.storageService.createExtendedConnection(userId, {
+        name: `${provider.name} Connection`,
+        providerId,
+        dynamicConfig: config,
+        selectedModels: config.modelPreferences?.preferredModels || availableModelIds,
+        connectionType: 'dynamic'
       });
       
-      logger.info('Created new connection', {
+      logger.info('Created new dynamic connection', {
         connectionId: connection.id,
         name: connection.name,
-        provider: connection.provider,
+        providerId,
         userId
+      });
+      
+      // Test connection asynchronously
+      this.testConnectionAsync(userId, connection.id).catch(error => {
+        logger.warn('Initial connection test failed', {
+          connectionId: connection.id,
+          error: error.message
+        });
       });
       
       this.emit('connectionCreated', { connection, userId });
       return connection;
       
     } catch (error) {
-      logger.error('Failed to create connection:', error);
+      logger.error('Failed to create dynamic connection:', error);
       throw error;
     }
   }
@@ -128,23 +253,33 @@ export class ConnectionManagementService extends EventEmitter {
   }
 
   /**
-   * Get a specific connection by ID
+   * Get a specific connection by ID (legacy method for backward compatibility)
    */
-  public async getConnection(userId: string, connectionId: string): Promise<LLMConnection> {
+  public async getConnection(userId: string, connectionId: string): Promise<ExtendedLLMConnection> {
+    const extendedConnection = await this.getExtendedConnection(userId, connectionId);
+    
+    return extendedConnection;
+  }
+
+  /**
+   * Get a specific extended connection by ID
+   */
+  public async getExtendedConnection(userId: string, connectionId: string): Promise<ExtendedLLMConnection> {
     this.ensureInitialized();
     
     try {
-      const connection = await this.storageService.getConnection(userId, connectionId);
+      const connection = await this.storageService.getExtendedConnection(userId, connectionId);
       
-      logger.debug('Retrieved connection', {
+      logger.debug('Retrieved extended connection', {
         connectionId,
         userId,
-        name: connection.name
+        name: connection.name,
+        type: connection.connectionType
       });
       
       return connection;
     } catch (error) {
-      logger.error('Failed to get connection:', error);
+      logger.error('Failed to get extended connection:', error);
       throw error;
     }
   }
@@ -156,7 +291,7 @@ export class ConnectionManagementService extends EventEmitter {
     userId: string,
     connectionId: string,
     request: UpdateConnectionRequest
-  ): Promise<LLMConnection> {
+  ): Promise<ExtendedLLMConnection> {
     this.ensureInitialized();
     
     try {
@@ -181,7 +316,7 @@ export class ConnectionManagementService extends EventEmitter {
       });
       
       this.emit('connectionUpdated', { connection, userId });
-      return connection;
+      return { ...connection, connectionType: 'legacy' as const } as ExtendedLLMConnection;
       
     } catch (error) {
       logger.error('Failed to update connection:', error);
@@ -216,39 +351,53 @@ export class ConnectionManagementService extends EventEmitter {
   }
 
   /**
-   * Test a connection
+   * Test a connection (legacy method for backward compatibility)
    */
   public async testConnection(userId: string, connectionId: string): Promise<ConnectionTestResult> {
+    const extendedResult = await this.testExtendedConnection(userId, connectionId);
+    
+    // Convert to legacy format
+    return {
+      success: extendedResult.success,
+      latency: extendedResult.latency || 0,
+      error: extendedResult.error || '',
+      availableModels: extendedResult.availableModels || [],
+      testedAt: extendedResult.testedAt
+    };
+  }
+
+  /**
+   * Test an extended connection (supports both legacy and dynamic providers)
+   */
+  public async testExtendedConnection(userId: string, connectionId: string): Promise<ExtendedConnectionTestResult> {
     this.ensureInitialized();
     
     try {
-      // Get the connection and its decrypted config
-      const connection = await this.storageService.getConnection(userId, connectionId);
-      const config = await this.storageService.getDecryptedConfig(userId, connectionId);
+      // Get the extended connection
+      const connection = await this.getExtendedConnection(userId, connectionId);
       
-      logger.info('Testing connection', {
+      logger.info('Testing extended connection', {
         connectionId,
         userId,
-        provider: connection.provider,
+        type: connection.connectionType,
         name: connection.name
       });
       
       this.emit('connectionTestStarted', { connectionId, userId });
       
-      let testResult: ConnectionTestResult;
+      let testResult: ExtendedConnectionTestResult;
       
-      // Test based on provider type
-      if (connection.provider === 'openai') {
-        testResult = await ConnectionTestingService.testOpenAIConnection(config as OpenAIConfig);
-      } else if (connection.provider === 'microsoft-copilot') {
-        testResult = await ConnectionTestingService.testMicrosoftCopilotConnection(config as MicrosoftCopilotConfig);
-      } else if (connection.provider === 'bedrock') {
-        testResult = await ConnectionTestingService.testBedrockConnection(config as BedrockConfig);
+      if (isLegacyConnection(connection)) {
+        // Test legacy connection
+        testResult = await this.testLegacyConnection(userId, connectionId, connection);
+      } else if (isDynamicConnection(connection)) {
+        // Test dynamic connection
+        testResult = await this.testDynamicConnection(userId, connectionId, connection);
       } else {
         throw new AppError(
-          `Unsupported provider: ${connection.provider}`,
+          'Invalid connection type',
           400,
-          'UNSUPPORTED_PROVIDER' as any
+          'INVALID_CONNECTION_TYPE' as any
         );
       }
       
@@ -260,7 +409,7 @@ export class ConnectionManagementService extends EventEmitter {
         testResult.error
       );
       
-      logger.info('Connection test completed', {
+      logger.info('Extended connection test completed', {
         connectionId,
         userId,
         success: testResult.success,
@@ -277,7 +426,7 @@ export class ConnectionManagementService extends EventEmitter {
       return testResult;
       
     } catch (error) {
-      logger.error('Failed to test connection:', error);
+      logger.error('Failed to test extended connection:', error);
       
       // Update connection status to error
       try {
@@ -293,6 +442,168 @@ export class ConnectionManagementService extends EventEmitter {
       
       this.emit('connectionTestFailed', { connectionId, userId, error });
       throw error;
+    }
+  }
+
+  /**
+   * Test a legacy connection
+   */
+  private async testLegacyConnection(
+    userId: string, 
+    connectionId: string, 
+    connection: ExtendedLLMConnection
+  ): Promise<ExtendedConnectionTestResult> {
+    const config = await this.storageService.getDecryptedConfig(userId, connectionId);
+    
+    let baseResult: ConnectionTestResult;
+    
+    // Test based on provider type
+    if (connection.provider === 'openai') {
+      baseResult = await ConnectionTestingService.testOpenAIConnection(config as OpenAIConfig);
+    } else if (connection.provider === 'microsoft-copilot') {
+      baseResult = await ConnectionTestingService.testMicrosoftCopilotConnection(config as MicrosoftCopilotConfig);
+    } else if (connection.provider === 'bedrock') {
+      baseResult = await ConnectionTestingService.testBedrockConnection(config as BedrockConfig);
+    } else {
+      throw new AppError(
+        `Unsupported legacy provider: ${connection.provider}`,
+        400,
+        'UNSUPPORTED_PROVIDER' as any
+      );
+    }
+    
+    // Enhance with provider information
+    return {
+      ...baseResult,
+      providerInfo: {
+        id: connection.provider!,
+        name: connection.provider!,
+        capabilities: ['legacy']
+      }
+    };
+  }
+
+  /**
+   * Test a dynamic connection
+   */
+  private async testDynamicConnection(
+    _userId: string, 
+    _connectionId: string, 
+    connection: ExtendedLLMConnection
+  ): Promise<ExtendedConnectionTestResult> {
+    const dynamicProviderService = getDynamicProviderService();
+    
+    // Get provider information
+    const provider = await dynamicProviderService.getProvider(connection.providerId!);
+    
+    if (provider.status !== 'active') {
+      return {
+        success: false,
+        error: `Provider ${provider.name} is not active`,
+        testedAt: new Date(),
+        providerInfo: {
+          id: provider.id,
+          name: provider.name,
+          capabilities: Object.keys(provider.capabilities)
+        }
+      };
+    }
+    
+    // Test provider connectivity
+    const providerTestResult = await dynamicProviderService.testProvider(connection.providerId!);
+    
+    if (!providerTestResult.success) {
+      return {
+        success: false,
+        error: providerTestResult.error || 'Provider test failed',
+        latency: providerTestResult.latency || 0,
+        testedAt: new Date(),
+        providerInfo: {
+          id: provider.id,
+          name: provider.name,
+          capabilities: Object.keys(provider.capabilities)
+        }
+      };
+    }
+    
+    // Test model availability
+    const models = await dynamicProviderService.getProviderModels(connection.providerId!);
+    const selectedModels = connection.selectedModels || [];
+    
+    const modelTests = await Promise.all(
+      selectedModels.map(async (modelId) => {
+        const model = models.find(m => m.identifier === modelId);
+        if (!model) {
+          return {
+            identifier: modelId,
+            name: modelId,
+            available: false,
+            error: 'Model not found'
+          };
+        }
+        
+        try {
+          const modelTestResult = await dynamicProviderService.testModel(model.id);
+          return {
+            identifier: model.identifier,
+            name: model.name,
+            available: modelTestResult.success,
+            latency: modelTestResult.latency || 0,
+            error: modelTestResult.error || ''
+          };
+        } catch (error) {
+          return {
+            identifier: model.identifier,
+            name: model.name,
+            available: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+        }
+      })
+    );
+    
+    const availableModels = modelTests.filter(m => m.available);
+    const avgLatency = modelTests
+      .filter(m => m.latency)
+      .reduce((sum, m) => sum + (m.latency || 0), 0) / modelTests.length;
+    
+    return {
+      success: providerTestResult.success && availableModels.length > 0,
+      latency: providerTestResult.latency || 0,
+      availableModels: availableModels.map(m => m.identifier),
+      testedAt: new Date(),
+      providerInfo: {
+        id: provider.id,
+        name: provider.name,
+        capabilities: Object.keys(provider.capabilities)
+      },
+      modelAvailability: {
+        total: modelTests.length,
+        available: availableModels.length,
+        unavailable: modelTests.length - availableModels.length,
+        models: modelTests
+      },
+      performance: {
+        averageLatency: avgLatency || 0,
+        minLatency: Math.min(...modelTests.map(m => m.latency || 0)),
+        maxLatency: Math.max(...modelTests.map(m => m.latency || 0)),
+        successRate: availableModels.length / modelTests.length
+      }
+    };
+  }
+
+  /**
+   * Test connection asynchronously (for background testing)
+   */
+  private async testConnectionAsync(userId: string, connectionId: string): Promise<void> {
+    try {
+      await this.testExtendedConnection(userId, connectionId);
+    } catch (error) {
+      logger.warn('Async connection test failed', {
+        userId,
+        connectionId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 
@@ -400,10 +711,503 @@ export class ConnectionManagementService extends EventEmitter {
     }
   }
 
+  // ============================================================================
+  // Migration Methods
+  // ============================================================================
+
   /**
-   * Validate create connection request
+   * Plan migration from legacy to dynamic provider
    */
-  private validateCreateConnectionRequest(request: CreateConnectionRequest): void {
+  public async planMigration(connectionId: string, targetProviderId?: string): Promise<ConnectionMigrationPlan> {
+    this.ensureInitialized();
+    
+    try {
+      // Get the connection (assuming it's a legacy connection)
+      const connection = await this.storageService.getExtendedConnection('', connectionId); // Admin access
+      
+      if (!isLegacyConnection(connection)) {
+        throw new AppError(
+          'Connection is not a legacy connection',
+          400,
+          'INVALID_CONNECTION_TYPE' as any
+        );
+      }
+      
+      // Determine target provider
+      let targetProvider: string;
+      if (targetProviderId) {
+        targetProvider = targetProviderId;
+      } else {
+        // Use default mapping
+        const dynamicProviderService = getDynamicProviderService();
+        const result = await dynamicProviderService.getProviders();
+        const providers = result.providers;
+        const matchingProvider = providers.find((p: any) => 
+          p.identifier === connection.provider && p.isSystem
+        );
+        
+        if (!matchingProvider) {
+          throw new NotFoundError(`No matching dynamic provider found for ${connection.provider}`);
+        }
+        
+        targetProvider = matchingProvider.id;
+      }
+      
+      // Create migration plan
+      const plan: ConnectionMigrationPlan = {
+        connectionId,
+        currentProvider: connection.provider!,
+        targetProviderId: targetProvider,
+        estimatedDuration: 60, // 1 minute
+        migrationSteps: [
+          {
+            step: 1,
+            description: 'Validate current connection configuration',
+            action: 'validate',
+            estimated: 10,
+            reversible: true
+          },
+          {
+            step: 2,
+            description: 'Create backup of current connection',
+            action: 'backup',
+            estimated: 5,
+            reversible: false
+          },
+          {
+            step: 3,
+            description: 'Convert configuration to dynamic provider format',
+            action: 'convert',
+            estimated: 15,
+            reversible: true
+          },
+          {
+            step: 4,
+            description: 'Test new dynamic provider connection',
+            action: 'test',
+            estimated: 20,
+            reversible: true
+          },
+          {
+            step: 5,
+            description: 'Activate dynamic provider connection',
+            action: 'activate',
+            estimated: 10,
+            reversible: true
+          }
+        ],
+        risks: [
+          {
+            level: 'low',
+            description: 'Temporary service interruption during migration',
+            mitigation: 'Migration is performed quickly with automatic rollback on failure'
+          },
+          {
+            level: 'medium',
+            description: 'Configuration incompatibility with dynamic provider',
+            mitigation: 'Validation step checks compatibility before migration'
+          }
+        ]
+      };
+      
+      return plan;
+      
+    } catch (error) {
+      logger.error('Failed to plan migration:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate a connection from legacy to dynamic provider
+   */
+  public async migrateConnection(connectionId: string, plan: ConnectionMigrationPlan): Promise<ConnectionMigrationResult> {
+    this.ensureInitialized();
+    
+    try {
+      logger.info('Starting connection migration', {
+        connectionId,
+        targetProvider: plan.targetProviderId
+      });
+      
+      // Get the legacy connection
+      const connection = await this.storageService.getExtendedConnection('', connectionId);
+      
+      if (!isLegacyConnection(connection)) {
+        throw new AppError(
+          'Connection is not a legacy connection',
+          400,
+          'INVALID_CONNECTION_TYPE' as any
+        );
+      }
+      
+      // Step 1: Validate current configuration
+      await this.testExtendedConnection(connection.userId, connectionId);
+      
+      // Step 2: Create backup
+      const backupId = await this.storageService.createConnectionBackup(connectionId);
+      
+      try {
+        // Step 3: Convert configuration
+        const dynamicConfig = await this.convertLegacyToDynamicConfig(connection);
+        
+        // Step 4: Test new configuration
+        const dynamicProviderService = getDynamicProviderService();
+        const testResult = await dynamicProviderService.testProvider(plan.targetProviderId);
+        
+        if (!testResult.success) {
+          throw new AppError(
+            `Target provider test failed: ${testResult.error}`,
+            400,
+            ExtendedConnectionErrorCode.MIGRATION_FAILED as any
+          );
+        }
+        
+        // Step 5: Update connection to dynamic
+        await this.storageService.migrateConnectionToDynamic(
+          connectionId,
+          plan.targetProviderId,
+          dynamicConfig,
+          backupId
+        );
+        
+        logger.info('Connection migration completed successfully', {
+          connectionId,
+          targetProvider: plan.targetProviderId,
+          backupId
+        });
+        
+        return {
+          connectionId,
+          success: true,
+          migratedAt: new Date(),
+          newProviderId: plan.targetProviderId,
+          backupId
+        };
+        
+      } catch (error) {
+        // Rollback on failure
+        logger.warn('Migration failed, attempting rollback', {
+          connectionId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        
+        try {
+          await this.storageService.restoreConnectionFromBackup(connectionId, backupId);
+        } catch (rollbackError) {
+          logger.error('Rollback failed', {
+            connectionId,
+            backupId,
+            rollbackError
+          });
+        }
+        
+        return {
+          connectionId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+      
+    } catch (error) {
+      logger.error('Failed to migrate connection:', error);
+      return {
+        connectionId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Batch migrate multiple connections
+   */
+  public async batchMigrate(request: BatchMigrationRequest): Promise<BatchMigrationResult> {
+    this.ensureInitialized();
+    
+    const startTime = Date.now();
+    const results: ConnectionMigrationResult[] = [];
+    let successful = 0;
+    let failed = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let backupsCreated = 0;
+    
+    logger.info('Starting batch migration', {
+      connectionCount: request.connectionIds.length,
+      dryRun: request.options?.dryRun
+    });
+    
+    for (const connectionId of request.connectionIds) {
+      try {
+        // Plan migration
+        const targetProviderId = request.targetProviderMappings?.[connectionId];
+        const plan = await this.planMigration(connectionId, targetProviderId);
+        
+        if (request.options?.dryRun) {
+          // Dry run - just validate
+          results.push({
+            connectionId,
+            success: true,
+            warnings: ['Dry run - no actual migration performed']
+          });
+          successful++;
+          continue;
+        }
+        
+        if (request.options?.validateOnly) {
+          // Validation only
+          await this.storageService.getExtendedConnection('', connectionId);
+          await this.checkCompatibility(connectionId, plan.targetProviderId);
+          
+          results.push({
+            connectionId,
+            success: true,
+            warnings: ['Validation only - no migration performed']
+          });
+          successful++;
+          continue;
+        }
+        
+        // Perform actual migration
+        const result = await this.migrateConnection(connectionId, plan);
+        results.push(result);
+        
+        if (result.success) {
+          successful++;
+          if (result.backupId) {
+            backupsCreated++;
+          }
+        } else {
+          failed++;
+          if (result.error) {
+            errors.push(`${connectionId}: ${result.error}`);
+          }
+        }
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        if (request.options?.continueOnError) {
+          results.push({
+            connectionId,
+            success: false,
+            error: errorMessage
+          });
+          failed++;
+          errors.push(`${connectionId}: ${errorMessage}`);
+        } else {
+          // Stop on first error
+          results.push({
+            connectionId,
+            success: false,
+            error: errorMessage
+          });
+          failed++;
+          errors.push(`${connectionId}: ${errorMessage}`);
+          break;
+        }
+      }
+    }
+    
+    const duration = Date.now() - startTime;
+    
+    logger.info('Batch migration completed', {
+      total: request.connectionIds.length,
+      successful,
+      failed,
+      skipped,
+      duration
+    });
+    
+    return {
+      totalConnections: request.connectionIds.length,
+      successful,
+      failed,
+      skipped,
+      results,
+      summary: {
+        duration,
+        backupsCreated,
+        errors,
+        warnings
+      }
+    };
+  }
+
+  /**
+   * Check compatibility between connection and target provider
+   */
+  public async checkCompatibility(connectionId: string, targetProviderId: string): Promise<CompatibilityCheckResult> {
+    try {
+      const connection = await this.storageService.getExtendedConnection('', connectionId);
+      const dynamicProviderService = getDynamicProviderService();
+      const targetProvider = await dynamicProviderService.getProvider(targetProviderId);
+      
+      const issues: any[] = [];
+      const recommendations: string[] = [];
+      
+      if (isLegacyConnection(connection)) {
+        // Check if legacy provider maps to target provider
+        if (connection.provider !== targetProvider.identifier) {
+          issues.push({
+            type: 'warning',
+            field: 'provider',
+            message: `Provider mismatch: ${connection.provider} -> ${targetProvider.identifier}`,
+            resolution: 'Configuration will be converted automatically'
+          });
+        }
+        
+        // Check model compatibility
+        const models = await dynamicProviderService.getProviderModels(targetProviderId);
+        const legacyModels = connection.config?.models || [];
+        const incompatibleModels = legacyModels.filter(model => 
+          !models.some(m => m.identifier === model)
+        );
+        
+        if (incompatibleModels.length > 0) {
+          issues.push({
+            type: 'warning',
+            field: 'models',
+            message: `Some models not available: ${incompatibleModels.join(', ')}`,
+            resolution: 'Models will be mapped to compatible alternatives'
+          });
+          recommendations.push('Review model mappings after migration');
+        }
+      }
+      
+      return {
+        compatible: issues.filter(i => i.type === 'error').length === 0,
+        issues,
+        recommendations,
+        migrationRequired: true
+      };
+      
+    } catch (error) {
+      return {
+        compatible: false,
+        issues: [{
+          type: 'error',
+          field: 'general',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          resolution: 'Fix the error before attempting migration'
+        }],
+        recommendations: [],
+        migrationRequired: false
+      };
+    }
+  }
+
+  /**
+   * Get provider mappings for migration
+   */
+  public async getProviderMappings(): Promise<any[]> {
+    const dynamicProviderService = getDynamicProviderService();
+    const result = await dynamicProviderService.getProviders();
+    const providers = result.providers;
+    
+    return [
+      {
+        legacyProvider: 'openai',
+        dynamicProviderId: providers.find((p: any) => p.identifier === 'openai')?.id || '',
+        configMapping: [
+          { legacyField: 'apiKey', dynamicField: 'credentials.apiKey', required: true },
+          { legacyField: 'organizationId', dynamicField: 'credentials.organizationId', required: false },
+          { legacyField: 'baseUrl', dynamicField: 'settings.baseUrl', required: false }
+        ],
+        modelMapping: []
+      },
+      {
+        legacyProvider: 'bedrock',
+        dynamicProviderId: providers.find((p: any) => p.identifier === 'bedrock')?.id || '',
+        configMapping: [
+          { legacyField: 'accessKeyId', dynamicField: 'credentials.accessKeyId', required: true },
+          { legacyField: 'secretAccessKey', dynamicField: 'credentials.secretAccessKey', required: true },
+          { legacyField: 'region', dynamicField: 'credentials.region', required: true }
+        ],
+        modelMapping: []
+      },
+      {
+        legacyProvider: 'microsoft-copilot',
+        dynamicProviderId: providers.find((p: any) => p.identifier === 'microsoft-copilot')?.id || '',
+        configMapping: [
+          { legacyField: 'apiKey', dynamicField: 'credentials.apiKey', required: true },
+          { legacyField: 'endpoint', dynamicField: 'settings.baseUrl', required: true },
+          { legacyField: 'apiVersion', dynamicField: 'settings.apiVersion', required: false }
+        ],
+        modelMapping: []
+      }
+    ];
+  }
+
+  /**
+   * Convert legacy configuration to dynamic configuration
+   */
+  private async convertLegacyToDynamicConfig(connection: ExtendedLLMConnection): Promise<DynamicConnectionConfig> {
+    if (!isLegacyConnection(connection)) {
+      throw new AppError('Connection is not a legacy connection', 400, 'INVALID_CONNECTION_TYPE' as any);
+    }
+    
+    const config = connection.config;
+    
+    if (connection.provider === 'openai') {
+      const openaiConfig = config as OpenAIConfig;
+      return {
+        credentials: {
+          apiKey: openaiConfig.apiKey,
+          organizationId: openaiConfig.organizationId
+        },
+        settings: openaiConfig.baseUrl ? {
+          baseUrl: openaiConfig.baseUrl
+        } : {},
+        modelPreferences: {
+          preferredModels: openaiConfig.models,
+          defaultModel: openaiConfig.defaultModel
+        }
+      };
+    } else if (connection.provider === 'bedrock') {
+      const bedrockConfig = config as BedrockConfig;
+      return {
+        credentials: {
+          accessKeyId: bedrockConfig.accessKeyId,
+          secretAccessKey: bedrockConfig.secretAccessKey,
+          region: bedrockConfig.region
+        },
+        modelPreferences: {
+          preferredModels: bedrockConfig.models,
+          defaultModel: bedrockConfig.defaultModel
+        }
+      };
+    } else if (connection.provider === 'microsoft-copilot') {
+      const copilotConfig = config as MicrosoftCopilotConfig;
+      return {
+        credentials: {
+          apiKey: copilotConfig.apiKey
+        },
+        settings: {
+          ...(copilotConfig.endpoint && { baseUrl: copilotConfig.endpoint }),
+          ...(copilotConfig.apiVersion && { apiVersion: copilotConfig.apiVersion })
+        },
+        modelPreferences: {
+          preferredModels: copilotConfig.models,
+          defaultModel: copilotConfig.defaultModel
+        }
+      };
+    } else {
+      throw new AppError(`Unsupported legacy provider: ${connection.provider}`, 400, 'UNSUPPORTED_PROVIDER' as any);
+    }
+  }
+
+  // ============================================================================
+  // Validation Methods
+  // ============================================================================
+
+
+  /**
+   * Validate extended create connection request
+   */
+  private validateExtendedCreateConnectionRequest(request: ExtendedCreateConnectionRequest): void {
     if (!request.name || request.name.trim() === '') {
       throw new ValidationError('Connection name is required', 'name');
     }
@@ -412,17 +1216,33 @@ export class ConnectionManagementService extends EventEmitter {
       throw new ValidationError('Connection name must be 100 characters or less', 'name');
     }
     
-    if (!request.provider) {
-      throw new ValidationError('Provider is required', 'provider');
+    // Validate legacy provider request
+    if (request.provider && request.config) {
+      if (!['openai', 'bedrock', 'microsoft-copilot'].includes(request.provider)) {
+        throw new ValidationError('Provider must be "openai", "bedrock", or "microsoft-copilot"', 'provider');
+      }
     }
     
-    if (!['openai', 'bedrock', 'microsoft-copilot'].includes(request.provider)) {
-      throw new ValidationError('Provider must be "openai", "bedrock", or "microsoft-copilot"', 'provider');
+    // Validate dynamic provider request
+    if (request.providerId && request.dynamicConfig) {
+      this.validateDynamicConnectionConfig(request.dynamicConfig);
     }
     
-    if (!request.config) {
-      throw new ValidationError('Configuration is required', 'config');
+    // Ensure either legacy or dynamic configuration is provided
+    if (!(request.provider && request.config) && !(request.providerId && request.dynamicConfig)) {
+      throw new ValidationError('Either legacy provider configuration or dynamic provider configuration is required');
     }
+  }
+
+  /**
+   * Validate dynamic connection configuration
+   */
+  private validateDynamicConnectionConfig(config: DynamicConnectionConfig): void {
+    if (!config.credentials || typeof config.credentials !== 'object') {
+      throw new ValidationError('Dynamic connection credentials are required', 'credentials');
+    }
+    
+    // Additional validation can be added based on provider requirements
   }
 
   /**

@@ -1513,6 +1513,10 @@ export class PromptLibraryService {
           this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'executing', `Sending request to ${provider} LLM...`);
           logger.info('Sent render progress update: executing', { promptId: id, provider, userId, connectionId: options.connectionId });
 
+          // Progress update: processing (send BEFORE execution starts)
+          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'processing', 'Processing LLM response...');
+          logger.info('Sent render progress update: processing', { promptId: id, provider, userId, connectionId: options.connectionId });
+
           const executionResult = await LLMExecutionService.executePrompt({
             connectionId: options.connectionId,
             userId,
@@ -1523,10 +1527,6 @@ export class PromptLibraryService {
               ...(options.model && { model: options.model })
             }
           });
-
-          // Progress update: processing response
-          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'processing', 'Processing LLM response...');
-          logger.info('Sent render progress update: processing', { promptId: id, provider, userId, connectionId: options.connectionId });
 
           const payload: ProviderPayload = {
             provider: executionResult.provider,
@@ -1553,8 +1553,7 @@ export class PromptLibraryService {
             renderTime
           });
 
-          // Progress update: completed
-          this.webSocketService.notifyRenderProgress(id, provider, userId, options.connectionId, 'completing', 'Render completed successfully!');
+          // Send completion notification directly (skip the "completed successfully" progress message)
           this.webSocketService.notifyRenderCompleted(id, provider, userId, options.connectionId, payload, renderTime);
           logger.info('Sent render completion notification', { promptId: id, provider, userId, connectionId: options.connectionId, renderTime });
 

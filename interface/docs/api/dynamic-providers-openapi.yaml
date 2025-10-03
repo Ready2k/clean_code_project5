@@ -1,0 +1,1580 @@
+openapi: 3.0.3
+info:
+  title: Dynamic Provider Management API
+  description: |
+    API endpoints for managing dynamic LLM providers, models, and templates in the Prompt Library system.
+    
+    ## Overview
+    The Dynamic Provider Management API allows administrators to:
+    - Add, configure, and manage LLM providers dynamically
+    - Define and manage models for each provider
+    - Create and apply provider templates for quick setup
+    - Monitor provider health and performance
+    - Import/export provider configurations
+    
+    ## Authentication
+    All endpoints require admin-level authentication using JWT Bearer tokens:
+    ```
+    Authorization: Bearer <admin-jwt-token>
+    ```
+    
+    ## Error Handling
+    All errors follow a consistent format with appropriate HTTP status codes:
+    - 400: Bad Request - Invalid input data
+    - 401: Unauthorized - Missing or invalid authentication
+    - 403: Forbidden - Insufficient permissions (admin required)
+    - 404: Not Found - Resource not found
+    - 409: Conflict - Resource already exists or conflicts
+    - 422: Unprocessable Entity - Validation errors
+    - 500: Internal Server Error - Server-side errors
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@promptlibrary.com
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+  - url: https://api.promptlibrary.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Provider Management Endpoints
+  /admin/providers:
+    get:
+      tags:
+        - Provider Management
+      summary: List all providers
+      description: |
+        Retrieve a list of all configured providers with optional filtering and pagination.
+        
+        **Usage Example:**
+        ```bash
+        curl -H "Authorization: Bearer <token>" \
+             "http://localhost:8000/api/admin/providers?status=active&page=1&limit=10"
+        ```
+      parameters:
+        - name: status
+          in: query
+          description: Filter by provider status
+          schema:
+            type: string
+            enum: [active, inactive, testing]
+        - name: isSystem
+          in: query
+          description: Filter by system providers
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Search in provider name or description
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Providers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Provider'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+              example:
+                data:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    identifier: "openai-custom"
+                    name: "Custom OpenAI Provider"
+                    description: "Custom OpenAI configuration for enterprise"
+                    apiEndpoint: "https://api.openai.com/v1"
+                    authMethod: "api_key"
+                    status: "active"
+                    isSystem: false
+                    modelCount: 5
+                    lastTested: "2025-02-10T12:00:00Z"
+                    testResult:
+                      success: true
+                      responseTime: 245
+                pagination:
+                  page: 1
+                  limit: 20
+                  total: 15
+                  totalPages: 1
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags:
+        - Provider Management
+      summary: Create new provider
+      description: |
+        Create a new LLM provider configuration with authentication and capabilities.
+        
+        **Usage Example:**
+        ```bash
+        curl -X POST -H "Authorization: Bearer <token>" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "identifier": "custom-anthropic",
+               "name": "Custom Anthropic",
+               "description": "Custom Anthropic configuration",
+               "apiEndpoint": "https://api.anthropic.com",
+               "authMethod": "api_key",
+               "authConfig": {
+                 "type": "api_key",
+                 "fields": {"apiKey": "your-api-key"},
+                 "headers": {"x-api-key": "{{apiKey}}"}
+               },
+               "capabilities": {
+                 "supportsSystemMessages": true,
+                 "maxContextLength": 200000,
+                 "supportedRoles": ["system", "user", "assistant"],
+                 "supportsStreaming": true,
+                 "supportsTools": true
+               }
+             }' \
+             "http://localhost:8000/api/admin/providers"
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderRequest'
+      responses:
+        '201':
+          description: Provider created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          description: Provider with identifier already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/providers/{id}:
+    get:
+      tags:
+        - Provider Management
+      summary: Get provider by ID
+      description: Retrieve detailed information about a specific provider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Provider retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    put:
+      tags:
+        - Provider Management
+      summary: Update provider
+      description: |
+        Update an existing provider configuration. System providers cannot be deleted but can be modified.
+        
+        **Note:** Changing provider configuration will trigger registry refresh and may affect active connections.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProviderRequest'
+      responses:
+        '200':
+          description: Provider updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    delete:
+      tags:
+        - Provider Management
+      summary: Delete provider
+      description: |
+        Delete a provider configuration. System providers cannot be deleted.
+        Will fail if there are active connections using this provider.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Provider deleted successfully
+        '400':
+          description: Cannot delete provider (has active connections or is system provider)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/providers/{id}/test:
+    post:
+      tags:
+        - Provider Management
+      summary: Test provider connectivity
+      description: |
+        Test provider connectivity, authentication, and basic functionality.
+        This endpoint will make actual API calls to validate the provider configuration.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Provider test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderTestResult'
+              example:
+                success: true
+                responseTime: 245
+                availableModels: ["gpt-4", "gpt-3.5-turbo"]
+                capabilities:
+                  supportsSystemMessages: true
+                  maxContextLength: 128000
+                  supportsStreaming: true
+                errors: []
+                testedAt: "2025-02-10T12:00:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # Model Management Endpoints
+  /admin/providers/{providerId}/models:
+    get:
+      tags:
+        - Model Management
+      summary: List provider models
+      description: Retrieve all models configured for a specific provider
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by model status
+          schema:
+            type: string
+            enum: [active, inactive, deprecated]
+      responses:
+        '200':
+          description: Models retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Model'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags:
+        - Model Management
+      summary: Create new model
+      description: |
+        Add a new model to a provider configuration.
+        
+        **Usage Example:**
+        ```bash
+        curl -X POST -H "Authorization: Bearer <token>" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "identifier": "gpt-4-turbo",
+               "name": "GPT-4 Turbo",
+               "description": "Latest GPT-4 model with improved performance",
+               "contextLength": 128000,
+               "capabilities": {
+                 "supportsSystemMessages": true,
+                 "supportsStreaming": true,
+                 "supportsTools": true,
+                 "supportsFunctionCalling": true
+               }
+             }' \
+             "http://localhost:8000/api/admin/providers/{providerId}/models"
+        ```
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelRequest'
+      responses:
+        '201':
+          description: Model created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/models/{id}:
+    get:
+      tags:
+        - Model Management
+      summary: Get model by ID
+      description: Retrieve detailed information about a specific model
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Model retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    put:
+      tags:
+        - Model Management
+      summary: Update model
+      description: Update an existing model configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateModelRequest'
+      responses:
+        '200':
+          description: Model updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    delete:
+      tags:
+        - Model Management
+      summary: Delete model
+      description: |
+        Delete a model configuration. Will fail if the model is currently in use by active connections.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Model deleted successfully
+        '400':
+          description: Cannot delete model (currently in use)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/models/{id}/test:
+    post:
+      tags:
+        - Model Management
+      summary: Test model availability
+      description: |
+        Test if a specific model is available and functional by making a test API call.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Model test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelTestResult'
+              example:
+                success: true
+                responseTime: 1250
+                actualCapabilities:
+                  supportsSystemMessages: true
+                  maxContextLength: 128000
+                  supportsStreaming: true
+                errors: []
+                testedAt: "2025-02-10T12:00:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # Template Management Endpoints
+  /admin/provider-templates:
+    get:
+      tags:
+        - Template Management
+      summary: List provider templates
+      description: |
+        Retrieve all available provider templates, including system and custom templates.
+      parameters:
+        - name: isSystem
+          in: query
+          description: Filter by system templates
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderTemplate'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags:
+        - Template Management
+      summary: Create custom template
+      description: |
+        Create a new custom provider template for reuse.
+        
+        **Usage Example:**
+        ```bash
+        curl -X POST -H "Authorization: Bearer <token>" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "name": "Custom OpenAI Template",
+               "description": "Template for OpenAI with custom settings",
+               "providerConfig": {
+                 "apiEndpoint": "https://api.openai.com/v1",
+                 "authMethod": "api_key",
+                 "capabilities": {
+                   "supportsSystemMessages": true,
+                   "maxContextLength": 128000,
+                   "supportsStreaming": true
+                 }
+               },
+               "defaultModels": [
+                 {
+                   "identifier": "gpt-4",
+                   "name": "GPT-4",
+                   "contextLength": 8192
+                 }
+               ]
+             }' \
+             "http://localhost:8000/api/admin/provider-templates"
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/provider-templates/{id}:
+    get:
+      tags:
+        - Template Management
+      summary: Get template by ID
+      description: Retrieve detailed information about a specific template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderTemplate'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    put:
+      tags:
+        - Template Management
+      summary: Update template
+      description: Update an existing template. System templates cannot be modified.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    delete:
+      tags:
+        - Template Management
+      summary: Delete template
+      description: Delete a custom template. System templates cannot be deleted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Template deleted successfully
+        '400':
+          description: Cannot delete system template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/provider-templates/{id}/apply:
+    post:
+      tags:
+        - Template Management
+      summary: Apply template
+      description: |
+        Create a new provider by applying a template with custom parameters.
+        
+        **Usage Example:**
+        ```bash
+        curl -X POST -H "Authorization: Bearer <token>" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "identifier": "my-openai-provider",
+               "name": "My OpenAI Provider",
+               "customizations": {
+                 "apiKey": "your-api-key-here",
+                 "organizationId": "your-org-id"
+               }
+             }' \
+             "http://localhost:8000/api/admin/provider-templates/{id}/apply"
+        ```
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyTemplateRequest'
+      responses:
+        '201':
+          description: Provider created from template successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # Import/Export Endpoints
+  /admin/providers/export:
+    post:
+      tags:
+        - Import/Export
+      summary: Export provider configurations
+      description: |
+        Export provider configurations to JSON format for backup or migration.
+        Sensitive authentication data is excluded from exports.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                providerIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific provider IDs to export (optional, exports all if not specified)
+                includeModels:
+                  type: boolean
+                  default: true
+                  description: Whether to include model configurations
+                includeTemplates:
+                  type: boolean
+                  default: false
+                  description: Whether to include custom templates
+      responses:
+        '200':
+          description: Export completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/providers/import:
+    post:
+      tags:
+        - Import/Export
+      summary: Import provider configurations
+      description: |
+        Import provider configurations from JSON format.
+        Handles conflicts and validates all configurations before import.
+        
+        **Usage Example:**
+        ```bash
+        curl -X POST -H "Authorization: Bearer <token>" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "data": {
+                 "providers": [...],
+                 "models": [...],
+                 "templates": [...]
+               },
+               "options": {
+                 "conflictResolution": "merge",
+                 "validateOnly": false
+               }
+             }' \
+             "http://localhost:8000/api/admin/providers/import"
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+      responses:
+        '200':
+          description: Import completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '422':
+          description: Validation errors in import data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # Registry Management Endpoints
+  /admin/providers/refresh-registry:
+    post:
+      tags:
+        - Registry Management
+      summary: Refresh provider registry
+      description: |
+        Manually refresh the provider registry to pick up configuration changes.
+        This is automatically done when providers are modified, but can be triggered manually.
+      responses:
+        '200':
+          description: Registry refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Provider registry refreshed successfully"
+                  providersLoaded:
+                    type: integer
+                    example: 8
+                  modelsLoaded:
+                    type: integer
+                    example: 25
+                  refreshedAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/providers/registry-status:
+    get:
+      tags:
+        - Registry Management
+      summary: Get registry status
+      description: Get current status and health information about the provider registry
+      responses:
+        '200':
+          description: Registry status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryStatus'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Provider Schemas
+    Provider:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique provider identifier
+        identifier:
+          type: string
+          description: Provider identifier (unique, used in code)
+          example: "openai-custom"
+        name:
+          type: string
+          description: Display name for the provider
+          example: "Custom OpenAI Provider"
+        description:
+          type: string
+          description: Provider description
+        apiEndpoint:
+          type: string
+          format: uri
+          description: API endpoint URL
+          example: "https://api.openai.com/v1"
+        authMethod:
+          type: string
+          enum: [api_key, oauth2, aws_iam, custom]
+          description: Authentication method
+        authConfig:
+          $ref: '#/components/schemas/AuthConfig'
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+        status:
+          type: string
+          enum: [active, inactive, testing]
+          description: Provider status
+        isSystem:
+          type: boolean
+          description: Whether this is a system provider
+        modelCount:
+          type: integer
+          description: Number of models configured for this provider
+        createdBy:
+          type: string
+          description: Username of creator
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastTested:
+          type: string
+          format: date-time
+          description: Last connectivity test timestamp
+        testResult:
+          $ref: '#/components/schemas/ProviderTestResult'
+
+    CreateProviderRequest:
+      type: object
+      required:
+        - identifier
+        - name
+        - apiEndpoint
+        - authMethod
+        - authConfig
+        - capabilities
+      properties:
+        identifier:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: Provider identifier (lowercase, alphanumeric, hyphens only)
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        apiEndpoint:
+          type: string
+          format: uri
+        authMethod:
+          type: string
+          enum: [api_key, oauth2, aws_iam, custom]
+        authConfig:
+          $ref: '#/components/schemas/AuthConfig'
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+
+    UpdateProviderRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        apiEndpoint:
+          type: string
+          format: uri
+        authMethod:
+          type: string
+          enum: [api_key, oauth2, aws_iam, custom]
+        authConfig:
+          $ref: '#/components/schemas/AuthConfig'
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+        status:
+          type: string
+          enum: [active, inactive, testing]
+
+    AuthConfig:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [api_key, oauth2, aws_iam, custom]
+        fields:
+          type: object
+          additionalProperties: true
+          description: Authentication fields (API keys, tokens, etc.)
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: HTTP headers for authentication
+        testEndpoint:
+          type: string
+          format: uri
+          description: Endpoint for testing connectivity
+
+    ProviderCapabilities:
+      type: object
+      required:
+        - supportsSystemMessages
+        - maxContextLength
+        - supportedRoles
+        - supportsStreaming
+        - supportsTools
+      properties:
+        supportsSystemMessages:
+          type: boolean
+        maxContextLength:
+          type: integer
+          minimum: 1
+        supportedRoles:
+          type: array
+          items:
+            type: string
+          example: ["system", "user", "assistant"]
+        supportsStreaming:
+          type: boolean
+        supportsTools:
+          type: boolean
+        supportedAuthMethods:
+          type: array
+          items:
+            type: string
+        rateLimits:
+          $ref: '#/components/schemas/RateLimitConfig'
+
+    RateLimitConfig:
+      type: object
+      properties:
+        requestsPerMinute:
+          type: integer
+        tokensPerMinute:
+          type: integer
+        concurrentRequests:
+          type: integer
+
+    ProviderTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        responseTime:
+          type: integer
+          description: Response time in milliseconds
+        availableModels:
+          type: array
+          items:
+            type: string
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+        errors:
+          type: array
+          items:
+            type: string
+        testedAt:
+          type: string
+          format: date-time
+
+    # Model Schemas
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        identifier:
+          type: string
+          description: Model identifier used in API calls
+          example: "gpt-4"
+        name:
+          type: string
+          description: Display name for the model
+          example: "GPT-4"
+        description:
+          type: string
+        contextLength:
+          type: integer
+          minimum: 1
+          description: Maximum context length in tokens
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        pricingInfo:
+          $ref: '#/components/schemas/PricingInfo'
+        status:
+          type: string
+          enum: [active, inactive, deprecated]
+        isDefault:
+          type: boolean
+          description: Whether this is the default model for the provider
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateModelRequest:
+      type: object
+      required:
+        - identifier
+        - name
+        - contextLength
+        - capabilities
+      properties:
+        identifier:
+          type: string
+          pattern: '^[a-zA-Z0-9._-]+$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        contextLength:
+          type: integer
+          minimum: 1
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        pricingInfo:
+          $ref: '#/components/schemas/PricingInfo'
+        isDefault:
+          type: boolean
+          default: false
+
+    UpdateModelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        contextLength:
+          type: integer
+          minimum: 1
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        pricingInfo:
+          $ref: '#/components/schemas/PricingInfo'
+        status:
+          type: string
+          enum: [active, inactive, deprecated]
+        isDefault:
+          type: boolean
+
+    ModelCapabilities:
+      type: object
+      required:
+        - supportsSystemMessages
+        - maxContextLength
+        - supportedRoles
+        - supportsStreaming
+        - supportsTools
+        - supportsFunctionCalling
+      properties:
+        supportsSystemMessages:
+          type: boolean
+        maxContextLength:
+          type: integer
+        supportedRoles:
+          type: array
+          items:
+            type: string
+        supportsStreaming:
+          type: boolean
+        supportsTools:
+          type: boolean
+        supportsFunctionCalling:
+          type: boolean
+        supportsVision:
+          type: boolean
+        supportsAudio:
+          type: boolean
+
+    PricingInfo:
+      type: object
+      properties:
+        inputTokenPrice:
+          type: number
+          description: Price per 1000 input tokens
+        outputTokenPrice:
+          type: number
+          description: Price per 1000 output tokens
+        currency:
+          type: string
+          default: "USD"
+
+    ModelTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        responseTime:
+          type: integer
+          description: Response time in milliseconds
+        actualCapabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        errors:
+          type: array
+          items:
+            type: string
+        testedAt:
+          type: string
+          format: date-time
+
+    # Template Schemas
+    ProviderTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Template name
+        description:
+          type: string
+        providerConfig:
+          type: object
+          description: Template provider configuration
+        defaultModels:
+          type: array
+          items:
+            type: object
+          description: Default model configurations
+        isSystem:
+          type: boolean
+          description: Whether this is a system template
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTemplateRequest:
+      type: object
+      required:
+        - name
+        - providerConfig
+        - defaultModels
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        providerConfig:
+          type: object
+        defaultModels:
+          type: array
+          items:
+            type: object
+
+    UpdateTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        providerConfig:
+          type: object
+        defaultModels:
+          type: array
+          items:
+            type: object
+
+    ApplyTemplateRequest:
+      type: object
+      required:
+        - identifier
+        - name
+      properties:
+        identifier:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        customizations:
+          type: object
+          additionalProperties: true
+          description: Custom values to override template defaults
+
+    # Import/Export Schemas
+    ExportResult:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            providers:
+              type: array
+              items:
+                $ref: '#/components/schemas/Provider'
+            models:
+              type: array
+              items:
+                $ref: '#/components/schemas/Model'
+            templates:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProviderTemplate'
+        metadata:
+          type: object
+          properties:
+            exportedAt:
+              type: string
+              format: date-time
+            exportedBy:
+              type: string
+            version:
+              type: string
+
+    ImportRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          properties:
+            providers:
+              type: array
+              items:
+                type: object
+            models:
+              type: array
+              items:
+                type: object
+            templates:
+              type: array
+              items:
+                type: object
+        options:
+          type: object
+          properties:
+            conflictResolution:
+              type: string
+              enum: [merge, replace, skip]
+              default: merge
+            validateOnly:
+              type: boolean
+              default: false
+              description: Only validate, don't actually import
+
+    ImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        summary:
+          type: object
+          properties:
+            providersImported:
+              type: integer
+            modelsImported:
+              type: integer
+            templatesImported:
+              type: integer
+            conflicts:
+              type: integer
+            errors:
+              type: integer
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [provider, model, template]
+              identifier:
+                type: string
+              action:
+                type: string
+                enum: [created, updated, skipped, error]
+              message:
+                type: string
+
+    # Registry Schemas
+    RegistryStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, error]
+        providersLoaded:
+          type: integer
+        modelsLoaded:
+          type: integer
+        lastRefresh:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          items:
+            type: string
+        performance:
+          type: object
+          properties:
+            averageResponseTime:
+              type: integer
+            successRate:
+              type: number
+
+    # Common Schemas
+    PaginationInfo:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            field:
+              type: string
+            suggestions:
+              type: array
+              items:
+                type: string
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "Validation failed"
+            validationErrors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+                  value:
+                    type: string
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+
+  responses:
+    BadRequestError:
+      description: Bad Request - Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    UnauthorizedError:
+      description: Unauthorized - Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden - Insufficient permissions (admin required)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Not Found - Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

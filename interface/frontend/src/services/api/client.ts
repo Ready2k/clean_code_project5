@@ -22,7 +22,7 @@ class APIClientClass {
 
   constructor() {
     this.client = axios.create({
-      baseURL: (import.meta.env?.VITE_API_URL as string) || '/api',
+      baseURL: ((import.meta.env?.VITE_API_URL as string) || (import.meta.env?.VITE_API_BASE_URL as string) || 'http://localhost:8000') + '/api',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

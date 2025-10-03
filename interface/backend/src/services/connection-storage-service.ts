@@ -11,6 +11,13 @@ import {
   OpenAIConfig,
   BedrockConfig
 } from '../types/connections.js';
+import {
+  ExtendedLLMConnection,
+  ExtendedConnectionRecord,
+  ExtendedCreateConnectionRequest,
+  ExtendedUpdateConnectionRequest,
+  DynamicConnectionConfig
+} from '../types/extended-connections.js';
 import { NotFoundError, ConflictError } from '../types/errors.js';
 
 export class ConnectionStorageService {
@@ -573,6 +580,327 @@ export class ConnectionStorageService {
     } catch (error) {
       logger.error('Failed to cleanup corrupted connections:', error);
     }
+  }
+
+  // ============================================================================
+  // Extended Connection Methods
+  // ============================================================================
+
+  /**
+   * Create an extended connection (supports both legacy and dynamic providers)
+   */
+  public async createExtendedConnection(
+    userId: string, 
+    request: ExtendedCreateConnectionRequest & { connectionType: 'legacy' | 'dynamic' }
+  ): Promise<ExtendedLLMConnection> {
+    try {
+      // Check if connection with same name already exists for this user
+      const existingConnection = Array.from(this.connections.values())
+        .find(conn => conn.user_id === userId && conn.name === request.name);
+      
+      if (existingConnection) {
+        throw new ConflictError(`Connection with name '${request.name}' already exists`);
+      }
+
+      let encryptedConfig: string | undefined;
+      let encryptedDynamicConfig: string | undefined;
+
+      if (request.connectionType === 'legacy' && request.config) {
+        encryptedConfig = EncryptionService.encryptConfig(request.config);
+      } else if (request.connectionType === 'dynamic' && request.dynamicConfig) {
+        encryptedDynamicConfig = EncryptionService.encryptConfig(request.dynamicConfig);
+      }
+
+      // Create extended connection record
+      const connectionRecord: ExtendedConnectionRecord = {
+        id: uuidv4(),
+        name: request.name,
+        connection_type: request.connectionType,
+        status: 'inactive', // Start as inactive until tested
+        created_at: new Date(),
+        updated_at: new Date(),
+        user_id: userId,
+        
+        // Legacy fields
+        ...(request.provider && { provider: request.provider }),
+        ...(encryptedConfig && { encrypted_config: encryptedConfig }),
+        
+        // Dynamic fields
+        ...(request.providerId && { provider_id: request.providerId }),
+        ...(encryptedDynamicConfig && { encrypted_dynamic_config: encryptedDynamicConfig }),
+        ...(request.selectedModels && { selected_models: JSON.stringify(request.selectedModels) }),
+        ...(request.dynamicConfig?.modelPreferences?.defaultModel && { default_model: request.dynamicConfig.modelPreferences.defaultModel })
+      };
+
+      // Store the connection (using the same map for now, but with extended record)
+      this.connections.set(connectionRecord.id, connectionRecord as any);
+      await this.saveConnections();
+
+      logger.info('Created new extended connection', {
+        connectionId: connectionRecord.id,
+        name: request.name,
+        type: request.connectionType,
+        userId
+      });
+
+      return this.extendedRecordToConnection(connectionRecord);
+    } catch (error) {
+      logger.error('Failed to create extended connection:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get an extended connection by ID
+   */
+  public async getExtendedConnection(userId: string, connectionId: string): Promise<ExtendedLLMConnection> {
+    try {
+      const record = this.connections.get(connectionId) as ExtendedConnectionRecord;
+      
+      if (!record) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      // Allow admin access (empty userId) for migration operations
+      if (userId && record.user_id !== userId) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      return this.extendedRecordToConnection(record);
+    } catch (error) {
+      logger.error('Failed to get extended connection:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an extended connection
+   */
+  public async updateExtendedConnection(
+    userId: string,
+    connectionId: string,
+    request: ExtendedUpdateConnectionRequest
+  ): Promise<ExtendedLLMConnection> {
+    try {
+      const record = this.connections.get(connectionId) as ExtendedConnectionRecord;
+      
+      if (!record) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      if (record.user_id !== userId) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      // Update fields
+      if (request.name !== undefined) {
+        record.name = request.name;
+      }
+      
+      if (request.status !== undefined) {
+        record.status = request.status;
+      }
+
+      // Update legacy config if provided
+      if (request.config && record.encrypted_config) {
+        const existingConfig = EncryptionService.decryptConfig(record.encrypted_config);
+        const updatedConfig = { ...(existingConfig || {}), ...request.config };
+        record.encrypted_config = EncryptionService.encryptConfig(updatedConfig);
+      }
+
+      // Update dynamic config if provided
+      if (request.dynamicConfig && record.encrypted_dynamic_config) {
+        const existingConfig = EncryptionService.decryptConfig(record.encrypted_dynamic_config);
+        const updatedConfig = { ...(existingConfig || {}), ...request.dynamicConfig };
+        record.encrypted_dynamic_config = EncryptionService.encryptConfig(updatedConfig);
+      }
+
+      // Update model selections
+      if (request.selectedModels !== undefined) {
+        record.selected_models = JSON.stringify(request.selectedModels);
+      }
+
+      if (request.defaultModel !== undefined) {
+        record.default_model = request.defaultModel;
+      }
+
+      record.updated_at = new Date();
+
+      await this.saveConnections();
+
+      logger.info('Updated extended connection', {
+        connectionId,
+        userId,
+        updatedFields: Object.keys(request)
+      });
+
+      return this.extendedRecordToConnection(record);
+    } catch (error) {
+      logger.error('Failed to update extended connection:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate a connection to dynamic provider
+   */
+  public async migrateConnectionToDynamic(
+    connectionId: string,
+    providerId: string,
+    dynamicConfig: DynamicConnectionConfig,
+    backupId: string
+  ): Promise<void> {
+    try {
+      const record = this.connections.get(connectionId) as ExtendedConnectionRecord;
+      
+      if (!record) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      // Store migration info
+      if (record.provider) {
+        record.migrated_from = record.provider;
+      }
+      record.migrated_at = new Date();
+      record.migration_backup_id = backupId;
+
+      // Clear legacy fields
+      delete record.provider;
+      delete record.encrypted_config;
+
+      // Set dynamic fields
+      record.connection_type = 'dynamic';
+      record.provider_id = providerId;
+      record.encrypted_dynamic_config = EncryptionService.encryptConfig(dynamicConfig);
+      
+      if (dynamicConfig.modelPreferences?.preferredModels) {
+        record.selected_models = JSON.stringify(dynamicConfig.modelPreferences.preferredModels);
+      }
+      
+      if (dynamicConfig.modelPreferences?.defaultModel) {
+        record.default_model = dynamicConfig.modelPreferences.defaultModel;
+      }
+
+      record.updated_at = new Date();
+
+      await this.saveConnections();
+
+      logger.info('Migrated connection to dynamic provider', {
+        connectionId,
+        providerId,
+        backupId
+      });
+    } catch (error) {
+      logger.error('Failed to migrate connection to dynamic:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a backup of a connection
+   */
+  public async createConnectionBackup(connectionId: string): Promise<string> {
+    try {
+      const record = this.connections.get(connectionId);
+      
+      if (!record) {
+        throw new NotFoundError(`Connection with ID '${connectionId}' not found`);
+      }
+
+      const backupId = `backup-${connectionId}-${Date.now()}`;
+      const backupRecord = { ...record, id: backupId };
+
+      // Store backup (in a real implementation, this might go to a separate backup storage)
+      this.connections.set(backupId, backupRecord);
+      await this.saveConnections();
+
+      logger.info('Created connection backup', {
+        connectionId,
+        backupId
+      });
+
+      return backupId;
+    } catch (error) {
+      logger.error('Failed to create connection backup:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore a connection from backup
+   */
+  public async restoreConnectionFromBackup(connectionId: string, backupId: string): Promise<void> {
+    try {
+      const backupRecord = this.connections.get(backupId);
+      
+      if (!backupRecord) {
+        throw new NotFoundError(`Backup with ID '${backupId}' not found`);
+      }
+
+      // Restore the connection
+      const restoredRecord = { ...backupRecord, id: connectionId, updated_at: new Date() };
+      this.connections.set(connectionId, restoredRecord);
+
+      // Remove the backup
+      this.connections.delete(backupId);
+
+      await this.saveConnections();
+
+      logger.info('Restored connection from backup', {
+        connectionId,
+        backupId
+      });
+    } catch (error) {
+      logger.error('Failed to restore connection from backup:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Convert extended connection record to extended connection object
+   */
+  private extendedRecordToConnection(record: ExtendedConnectionRecord): ExtendedLLMConnection {
+    const result: ExtendedLLMConnection = {
+      id: record.id,
+      name: record.name,
+      connectionType: record.connection_type,
+      status: record.status,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+      userId: record.user_id
+    };
+
+    // Add legacy fields if present
+    if (record.provider && record.encrypted_config) {
+      result.provider = record.provider;
+      result.config = EncryptionService.decryptConfig(record.encrypted_config);
+    }
+
+    // Add dynamic fields if present
+    if (record.provider_id && record.encrypted_dynamic_config) {
+      result.providerId = record.provider_id;
+      result.dynamicConfig = EncryptionService.decryptConfig(record.encrypted_dynamic_config);
+    }
+
+    // Add model selections
+    if (record.selected_models) {
+      try {
+        result.selectedModels = JSON.parse(record.selected_models);
+      } catch (error) {
+        logger.warn('Failed to parse selected models', { connectionId: record.id, error });
+        result.selectedModels = [];
+      }
+    }
+
+    if (record.default_model) {
+      result.defaultModel = record.default_model;
+    }
+
+    if (record.last_tested) {
+      result.lastTested = record.last_tested;
+    }
+
+    return result;
   }
 
   /**

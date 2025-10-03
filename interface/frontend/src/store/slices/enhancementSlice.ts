@@ -80,12 +80,19 @@ const enhancementSlice = createSlice({
     },
     updateJobProgress: (state, action: PayloadAction<EnhancementProgress>) => {
       const progress = action.payload;
+      
+      // Preserve existing promptId if the incoming progress doesn't have one
+      const existingJob = state.jobs[progress.jobId];
+      if (existingJob && !progress.promptId && existingJob.promptId) {
+        progress.promptId = existingJob.promptId;
+      }
+      
       state.jobs[progress.jobId] = progress;
       
       // If this is the active job, keep it active
       if (state.activeJobId === progress.jobId) {
         // Job completed or failed, clear active job
-        if (progress.status === 'complete' || progress.status === 'failed') {
+        if (progress.status === 'completed' || progress.status === 'failed') {
           state.activeJobId = null;
         }
       }

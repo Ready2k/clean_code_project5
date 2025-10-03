@@ -2,7 +2,7 @@ export interface EnhancementJob {
   id: string;
   promptId: string;
   userId: string;
-  status: 'pending' | 'analyzing' | 'enhancing' | 'generating_questions' | 'complete' | 'failed';
+  status: 'pending' | 'analyzing' | 'enhancing' | 'generating_questions' | 'completed' | 'failed';
   progress: number;
   message: string;
   result?: EnhancementResult;

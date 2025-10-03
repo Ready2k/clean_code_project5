@@ -4,10 +4,17 @@ This guide covers everything you need to know about setting up and managing conn
 
 ## Overview
 
-LLM connections allow you to integrate with various AI providers to enhance prompts and generate provider-specific outputs. The system currently supports:
+LLM connections allow you to integrate with various AI providers to enhance prompts and generate provider-specific outputs. The system supports dynamic provider management, allowing administrators to configure new providers without code changes. Currently available providers include:
 
-- **OpenAI** - GPT models including GPT-4, GPT-3.5-turbo
-- **AWS Bedrock** - Claude, Titan, and other foundation models
+- **OpenAI** - GPT models including GPT-4, GPT-3.5-turbo, and newer variants
+- **Anthropic** - Claude models (Opus, Sonnet, Haiku) with large context windows
+- **AWS Bedrock** - Claude, Titan, Jurassic, and other foundation models
+- **Azure OpenAI** - Microsoft's hosted OpenAI models
+- **Google AI Platform** - PaLM and other Google models
+- **Cohere** - Command and other Cohere models
+- **Custom Providers** - Any OpenAI-compatible API or custom LLM service
+
+> **Note**: Available providers depend on your system configuration. Contact your administrator to add new providers or if you need access to specific models.
 
 ## Understanding LLM Connections
 
@@ -25,6 +32,24 @@ LLM connections are secure configurations that store:
 - **Secure Transmission** - TLS 1.3 for all API communications
 - **Access Control** - Only you and admins can view your connections
 - **Audit Logging** - All connection activities are logged
+
+## Dynamic Provider System
+
+### How It Works
+
+The system now uses a dynamic provider management approach:
+
+1. **Administrators Configure Providers**: System admins set up and manage available providers
+2. **Users Create Connections**: You create connections using the configured providers
+3. **Automatic Updates**: New models and capabilities are automatically available
+4. **Centralized Management**: Consistent configuration across all users
+
+### Provider vs Connection
+
+- **Provider**: The LLM service configuration (managed by admins)
+- **Connection**: Your personal credentials and preferences for using a provider
+
+For detailed provider setup information, see the [Provider Setup Tutorials](provider-setup-tutorials.md).
 
 ## Setting Up OpenAI Connections
 

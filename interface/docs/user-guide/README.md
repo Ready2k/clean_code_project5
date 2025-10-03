@@ -7,13 +7,14 @@ Welcome to the Prompt Library Professional Interface! This comprehensive guide w
 1. [Getting Started](getting-started.md)
 2. [Dashboard Overview](dashboard.md)
 3. [Managing LLM Connections](connections.md)
-4. [Prompt Management](prompts.md)
-5. [AI Enhancement Workflow](enhancement.md)
-6. [Multi-Provider Rendering](rendering.md)
-7. [Rating and Evaluation](rating.md)
-8. [Export and Sharing](export.md)
-9. [User Settings and Preferences](settings.md)
-10. [Troubleshooting](troubleshooting.md)
+4. [Provider Setup Tutorials](provider-setup-tutorials.md)
+5. [Prompt Management](prompts.md)
+6. [AI Enhancement Workflow](enhancement.md)
+7. [Multi-Provider Rendering](rendering.md)
+8. [Rating and Evaluation](rating.md)
+9. [Export and Sharing](export.md)
+10. [User Settings and Preferences](settings.md)
+11. [Troubleshooting](troubleshooting.md)
 
 ## Quick Start
 
@@ -21,17 +22,21 @@ If you're new to the system, we recommend following this sequence:
 
 1. **[Getting Started](getting-started.md)** - Learn how to log in and navigate the interface
 2. **[Managing LLM Connections](connections.md)** - Set up your AI provider connections
-3. **[Prompt Management](prompts.md)** - Create and organize your first prompts
-4. **[AI Enhancement Workflow](enhancement.md)** - Improve your prompts with AI assistance
-5. **[Multi-Provider Rendering](rendering.md)** - Test your prompts across different providers
+3. **[Provider Setup Tutorials](provider-setup-tutorials.md)** - Detailed setup guides for popular providers
+4. **[Prompt Management](prompts.md)** - Create and organize your first prompts
+5. **[AI Enhancement Workflow](enhancement.md)** - Improve your prompts with AI assistance
+6. **[Multi-Provider Rendering](rendering.md)** - Test your prompts across different providers
 
 ## Key Features Overview
 
-### 🔗 LLM Connection Management
-- Support for OpenAI and AWS Bedrock
+### 🔗 Dynamic LLM Provider Management
+- Support for OpenAI, Anthropic, AWS Bedrock, Azure OpenAI, Google AI, Cohere, and custom providers
+- Dynamic provider configuration without code changes
 - Secure credential storage with encryption
 - Real-time connection testing and validation
-- Model discovery and configuration
+- Automatic model discovery and configuration
+- Provider templates for quick setup
+- Health monitoring and performance analytics
 
 ### 📝 Prompt Library Management
 - Intuitive prompt creation and editing

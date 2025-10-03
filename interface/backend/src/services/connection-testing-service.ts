@@ -471,6 +471,172 @@ export class ConnectionTestingService {
   }
 
   /**
+   * Test a dynamic provider connection
+   */
+  public static async testDynamicProviderConnection(
+    provider: any, // Provider from dynamic provider service
+    config: any    // Dynamic connection config
+  ): Promise<ConnectionTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      logger.info('Testing dynamic provider connection', {
+        providerId: provider.id,
+        providerName: provider.name,
+        authMethod: provider.authMethod
+      });
+
+      // Use the provider's test endpoint if available
+      const testEndpoint = provider.authConfig?.testEndpoint || provider.apiEndpoint;
+      
+      // Prepare authentication headers based on provider auth method
+      const headers = await this.prepareDynamicAuthHeaders(provider, config);
+      
+      // Make test request
+      const response = await this.makeRequest(testEndpoint, {
+        method: 'GET',
+        headers,
+        timeout: this.TEST_TIMEOUT
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = (errorData as any)?.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        
+        logger.warn('Dynamic provider connection test failed', {
+          providerId: provider.id,
+          status: response.status,
+          error: errorMessage
+        });
+
+        return {
+          success: false,
+          error: this.mapDynamicProviderError(response.status, errorMessage, provider.authMethod),
+          testedAt: new Date()
+        };
+      }
+
+      const latency = Date.now() - startTime;
+
+      logger.info('Dynamic provider connection test successful', {
+        providerId: provider.id,
+        latency
+      });
+
+      return {
+        success: true,
+        latency,
+        testedAt: new Date()
+      };
+
+    } catch (error: any) {
+      const latency = Date.now() - startTime;
+      const errorMessage = this.extractErrorMessage(error);
+      
+      logger.error('Dynamic provider connection test failed', {
+        providerId: provider.id,
+        error: errorMessage,
+        latency
+      });
+
+      return {
+        success: false,
+        latency,
+        error: errorMessage,
+        testedAt: new Date()
+      };
+    }
+  }
+
+  /**
+   * Prepare authentication headers for dynamic provider
+   */
+  private static async prepareDynamicAuthHeaders(provider: any, config: any): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'PromptLibrary/1.0.0'
+    };
+
+    const credentials = config.credentials || {};
+    const settings = config.settings || {};
+
+    switch (provider.authMethod) {
+      case 'api_key':
+        if (credentials.apiKey) {
+          headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+        }
+        if (credentials.organizationId) {
+          headers['OpenAI-Organization'] = credentials.organizationId;
+        }
+        break;
+
+      case 'oauth2':
+        if (credentials.accessToken) {
+          headers['Authorization'] = `Bearer ${credentials.accessToken}`;
+        }
+        break;
+
+      case 'aws_iam':
+        // For AWS IAM, we would need to create AWS signature
+        // This is a simplified version - in production, use AWS SDK
+        if (credentials.accessKeyId && credentials.secretAccessKey) {
+          // AWS signature would be created here
+          headers['Authorization'] = `AWS4-HMAC-SHA256 Credential=${credentials.accessKeyId}/...`;
+        }
+        break;
+
+      case 'custom':
+        // Apply custom headers from provider configuration
+        if (provider.authConfig?.headers) {
+          Object.entries(provider.authConfig.headers).forEach(([key, value]) => {
+            // Replace placeholders with actual credential values
+            let headerValue = value as string;
+            Object.entries(credentials).forEach(([credKey, credValue]) => {
+              headerValue = headerValue.replace(`{{${credKey}}}`, credValue as string);
+            });
+            headers[key] = headerValue;
+          });
+        }
+        break;
+    }
+
+    // Add custom headers from settings
+    if (settings.customHeaders) {
+      Object.assign(headers, settings.customHeaders);
+    }
+
+    return headers;
+  }
+
+  /**
+   * Map dynamic provider errors to user-friendly messages
+   */
+  private static mapDynamicProviderError(status: number, message: string, authMethod: string): string {
+    switch (status) {
+      case 401:
+        if (authMethod === 'api_key') {
+          return 'Invalid API key. Please check your API key configuration.';
+        } else if (authMethod === 'oauth2') {
+          return 'Invalid or expired access token. Please refresh your authentication.';
+        } else if (authMethod === 'aws_iam') {
+          return 'Invalid AWS credentials. Please check your access key and secret key.';
+        } else {
+          return 'Authentication failed. Please check your credentials.';
+        }
+      case 403:
+        return 'Access forbidden. Please check your permissions and account status.';
+      case 429:
+        return 'Rate limit exceeded. Please try again later.';
+      case 500:
+      case 502:
+      case 503:
+        return 'Provider service is temporarily unavailable. Please try again later.';
+      default:
+        return message || 'Unknown error occurred while testing provider connection.';
+    }
+  }
+
+  /**
    * Validate connection configuration before testing
    */
   public static validateConfig(provider: 'openai' | 'bedrock' | 'microsoft-copilot', config: any): void {

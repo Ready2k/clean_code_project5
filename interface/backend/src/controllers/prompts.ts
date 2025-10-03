@@ -365,6 +365,22 @@ export const submitQuestionnaireResponse = async (req: ExtendedAuthenticatedRequ
   }
 };
 
+// Track active render requests to prevent duplicates
+const activeRenders = new Map<string, { promise: Promise<any>; timestamp: number }>();
+
+// Clean up old render requests (older than 5 minutes)
+const cleanupOldRenders = () => {
+  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+  for (const [key, { timestamp }] of activeRenders.entries()) {
+    if (timestamp < fiveMinutesAgo) {
+      activeRenders.delete(key);
+    }
+  }
+};
+
+// Run cleanup every minute
+setInterval(cleanupOldRenders, 60 * 1000);
+
 /**
  * Render a prompt for a specific provider
  */
@@ -374,6 +390,25 @@ export const renderPrompt = async (req: ExtendedAuthenticatedRequest, res: Respo
     const { error, value } = renderPromptSchema.validate(req.body);
     if (error) {
       throw new ValidationError(error.details[0]?.message || 'Validation error');
+    }
+
+    // Create a unique key for this render request
+    const renderKey = `${id}-${provider}-${req.user!.userId}-${value.connectionId || 'default'}`;
+    
+    // Check if this exact render is already in progress
+    if (activeRenders.has(renderKey)) {
+      logger.info('Duplicate render request detected, waiting for existing request', {
+        promptId: id,
+        provider,
+        userId: req.user!.userId,
+        connectionId: value.connectionId
+      });
+      
+      // Wait for the existing request to complete and return its result
+      const { promise } = activeRenders.get(renderKey)!;
+      const existingResult = await promise;
+      res.json(existingResult);
+      return;
     }
 
     const renderRequest: RenderRequest = {
@@ -391,9 +426,41 @@ export const renderPrompt = async (req: ExtendedAuthenticatedRequest, res: Respo
       connectionId: value.connectionId
     };
 
-    const providerService = getProviderRegistryService();
-    const result = await providerService.renderPrompt(renderRequest);
+    // Create the render promise and store it
+    const renderPromise = (async () => {
+      try {
+        logger.info('Starting render request', {
+          promptId: id,
+          provider,
+          userId: req.user!.userId,
+          connectionId: value.connectionId
+        });
 
+        const providerService = getProviderRegistryService();
+        const result = await providerService.renderPrompt(renderRequest);
+        
+        logger.info('Render request completed successfully', {
+          promptId: id,
+          provider,
+          userId: req.user!.userId,
+          connectionId: value.connectionId
+        });
+
+        return result;
+      } finally {
+        // Always clean up the active render entry
+        activeRenders.delete(renderKey);
+      }
+    })();
+
+    // Store the promise in the active renders map with timestamp
+    activeRenders.set(renderKey, { 
+      promise: renderPromise, 
+      timestamp: Date.now() 
+    });
+
+    // Wait for the result and return it
+    const result = await renderPromise;
     res.json(result);
   } catch (error) {
     logger.error('Failed to render prompt:', error);

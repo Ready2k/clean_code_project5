@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { getSystemMonitoringService } from '../services/system-monitoring-service.js';
+import { getProviderRegistryService } from '../services/provider-registry-service.js';
+import { getRegistryMonitoringService } from '../services/registry-monitoring-service.js';
 import { logger } from '../utils/logger.js';
 import { ValidationError } from '../types/errors.js';
 
@@ -359,5 +361,209 @@ export const getSystemEvents = async (req: Request, res: Response): Promise<void
         }
       });
     }
+  }
+};
+/**
+
+ * Get provider registry status and diagnostics
+ */
+export const getRegistryStatus = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const registryService = getProviderRegistryService();
+    const status = await registryService.getRegistryStatus();
+    
+    res.json({
+      success: true,
+      data: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get registry status:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'REGISTRY_STATUS_ERROR',
+        message: 'Failed to retrieve registry status'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Get provider health status
+ */
+export const getProviderHealth = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const registryService = getProviderRegistryService();
+    const healthStatuses = registryService.getProviderHealth();
+    
+    res.json({
+      success: true,
+      data: {
+        providers: healthStatuses,
+        summary: {
+          total: healthStatuses.length,
+          healthy: healthStatuses.filter(h => h.status === 'healthy').length,
+          degraded: healthStatuses.filter(h => h.status === 'degraded').length,
+          down: healthStatuses.filter(h => h.status === 'down').length
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get provider health:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'PROVIDER_HEALTH_ERROR',
+        message: 'Failed to retrieve provider health status'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Refresh provider registry
+ */
+export const refreshRegistry = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const registryService = getProviderRegistryService();
+    await registryService.refreshRegistry();
+    
+    logger.info('Provider registry refreshed manually');
+    
+    res.json({
+      success: true,
+      message: 'Provider registry refreshed successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to refresh registry:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'REGISTRY_REFRESH_ERROR',
+        message: 'Failed to refresh provider registry'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Get registry monitoring status
+ */
+export const getRegistryMonitoringStatus = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const monitoringService = getRegistryMonitoringService();
+    const status = monitoringService.getStatus();
+    
+    res.json({
+      success: true,
+      data: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get registry monitoring status:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'REGISTRY_MONITORING_ERROR',
+        message: 'Failed to retrieve registry monitoring status'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Update registry monitoring configuration
+ */
+export const updateRegistryMonitoringConfig = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const config = req.body;
+    
+    // Validate configuration
+    if (!config || typeof config !== 'object') {
+      throw new ValidationError('Invalid configuration data');
+    }
+    
+    const monitoringService = getRegistryMonitoringService();
+    monitoringService.updateConfig(config);
+    
+    logger.info('Registry monitoring configuration updated', { 
+      config,
+      userId: (req as any).user?.userId 
+    });
+    
+    res.json({
+      success: true,
+      message: 'Registry monitoring configuration updated successfully',
+      data: monitoringService.getStatus(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to update registry monitoring config:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'REGISTRY_MONITORING_CONFIG_ERROR',
+          message: 'Failed to update registry monitoring configuration'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+};
+
+/**
+ * Trigger manual health check for all providers
+ */
+export const triggerHealthCheck = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const monitoringService = getRegistryMonitoringService();
+    const healthStatuses = await monitoringService.checkProviderHealth();
+    
+    logger.info('Manual health check completed', { 
+      providerCount: healthStatuses.length 
+    });
+    
+    res.json({
+      success: true,
+      message: 'Health check completed successfully',
+      data: {
+        providers: healthStatuses,
+        summary: {
+          total: healthStatuses.length,
+          healthy: healthStatuses.filter(h => h.status === 'healthy').length,
+          degraded: healthStatuses.filter(h => h.status === 'degraded').length,
+          down: healthStatuses.filter(h => h.status === 'down').length
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to trigger health check:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'HEALTH_CHECK_ERROR',
+        message: 'Failed to perform health check'
+      },
+      timestamp: new Date().toISOString()
+    });
   }
 };

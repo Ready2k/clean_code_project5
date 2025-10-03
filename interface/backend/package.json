@@ -17,12 +17,24 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "migrate": "tsx src/scripts/migrate.ts migrate",
+    "migrate:rollback": "tsx src/scripts/migrate.ts rollback",
+    "migrate:status": "tsx src/scripts/migrate.ts status",
+    "migrate:pending": "tsx src/scripts/migrate.ts pending",
+    "migrate:executed": "tsx src/scripts/migrate.ts executed",
+    "db:test": "tsx src/scripts/test-db.ts",
+    "migrate:providers": "tsx src/scripts/migrate-system-providers.ts migrate",
+    "migrate:providers:dry-run": "tsx src/scripts/migrate-system-providers.ts dry-run",
+    "migrate:providers:status": "tsx src/scripts/migrate-system-providers.ts status",
+    "migrate:providers:validate": "tsx src/scripts/migrate-system-providers.ts validate",
+    "validate:data": "tsx src/scripts/validate-data-integrity.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.36.0",
     "archiver": "^6.0.1",
     "bcrypt": "^5.1.1",
+    "commander": "^6.2.1",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.3.1",
@@ -46,6 +58,7 @@
   "devDependencies": {
     "@types/archiver": "^6.0.2",
     "@types/bcrypt": "^5.0.2",
+    "@types/commander": "^2.12.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/js-yaml": "^4.0.9",

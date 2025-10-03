@@ -10,6 +10,7 @@ import adminReducer from './slices/adminSlice';
 import enhancementReducer from './slices/enhancementSlice';
 import renderingReducer from './slices/renderingSlice';
 import exportReducer from './slices/exportSlice';
+import providersReducer from './slices/providersSlice';
 import { navigationMiddleware } from './middleware/navigation';
 
 export const store = configureStore({
@@ -23,6 +24,7 @@ export const store = configureStore({
     enhancement: enhancementReducer,
     rendering: renderingReducer,
     export: exportReducer,
+    providers: providersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

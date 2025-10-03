@@ -94,3 +94,13 @@ export const optionalAuth = (req: Request, _res: Response, next: NextFunction): 
 
   next();
 };
+
+export const validateAdminAccess = (req: Request): void => {
+  if (!req.user) {
+    throw new AuthenticationError('Authentication required');
+  }
+
+  if (req.user.role !== 'admin') {
+    throw new PermissionError('Admin access required');
+  }
+};

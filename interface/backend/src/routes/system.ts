@@ -24,4 +24,14 @@ router.get('/maintenance/logs', requirePermission(Permission.SYSTEM_CONFIG), asy
 router.get('/metrics', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemMetrics));
 router.get('/events', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemEvents));
 
+// Provider registry management
+router.get('/registry/status', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getRegistryStatus));
+router.get('/registry/health', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getProviderHealth));
+router.post('/registry/refresh', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.refreshRegistry));
+router.post('/registry/health-check', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.triggerHealthCheck));
+
+// Registry monitoring
+router.get('/registry/monitoring', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getRegistryMonitoringStatus));
+router.put('/registry/monitoring/config', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.updateRegistryMonitoringConfig));
+
 export { router as systemRoutes };
