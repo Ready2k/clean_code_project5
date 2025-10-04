@@ -5,6 +5,30 @@ import { LoginCredentials, RegisterData, RefreshTokenRequest } from '../types/au
 import { ValidationError } from '../types/errors.js';
 import { logger } from '../utils/logger.js';
 
+const maskEmailForLogs = (email?: string): string | undefined => {
+  if (!email) {
+    return undefined;
+  }
+
+  const [localPart, domain] = email.split('@');
+  if (!domain) {
+    if (!localPart) {
+      return undefined;
+    }
+    return localPart.length <= 1 ? '*' : `${localPart[0]}***`;
+  }
+
+  if (localPart.length <= 1) {
+    return `*@${domain}`;
+  }
+
+  if (localPart.length === 2) {
+    return `${localPart[0]}*@${domain}`;
+  }
+
+  return `${localPart[0]}***${localPart.slice(-1)}@${domain}`;
+};
+
 // Validation schemas
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -46,17 +70,22 @@ const changePasswordSchema = Joi.object({
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   // Debug logging
-  logger.info('Login attempt', { 
-    body: req.body,
+  const maskedEmail = maskEmailForLogs(typeof req.body?.email === 'string' ? req.body.email : undefined);
+  const hasPassword = typeof req.body?.password === 'string' && req.body.password.length > 0;
+
+  logger.info('Login attempt', {
+    email: maskedEmail,
+    hasPassword,
     headers: req.headers['content-type']
   });
 
   const { error, value } = loginSchema.validate(req.body);
   if (error) {
-    logger.error('Login validation error', { 
+    logger.error('Login validation error', {
       error: error.details[0]?.message || 'Validation error',
       field: error.details[0]?.path?.[0] || 'unknown',
-      body: req.body
+      email: maskedEmail,
+      hasPassword
     });
     throw new ValidationError(error.details[0]?.message || 'Validation error', error.details[0]?.path?.[0] as string || 'unknown');
   }
@@ -66,10 +95,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   
   const authResponse = await userService.login(credentials);
 
-  logger.info('User login successful', { 
-    userId: authResponse.user.id, 
-    email: authResponse.user.email,
-    ip: req.ip 
+  logger.info('User login successful', {
+    userId: authResponse.user.id,
+    email: maskEmailForLogs(authResponse.user.email),
+    ip: req.ip
   });
 
   res.json({
@@ -90,10 +119,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   
   const authResponse = await userService.register(registerData);
 
-  logger.info('User registration successful', { 
-    userId: authResponse.user.id, 
-    email: authResponse.user.email,
-    ip: req.ip 
+  logger.info('User registration successful', {
+    userId: authResponse.user.id,
+    email: maskEmailForLogs(authResponse.user.email),
+    ip: req.ip
   });
 
   res.status(201).json({
