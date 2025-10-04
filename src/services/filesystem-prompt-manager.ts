@@ -1,7 +1,7 @@
 // FileSystemPromptManager - Concrete implementation that orchestrates all services
 
 import { PromptManager } from './prompt-manager';
-import { PromptRecord, HumanPrompt, PromptRecordClass } from '../models/prompt';
+import { PromptRecord, HumanPrompt, PromptRecordClass, StructuredPrompt } from '../models/prompt';
 import { EnhancementResult } from '../models/enhancement';
 import { PromptFilters, RenderOptions, ProviderPayload } from '../types/common';
 import { IntegratedStorage } from '../storage/integrated-storage';
@@ -324,19 +324,10 @@ export class FileSystemPromptManager implements PromptManager {
     // Check for cached render
     const cachedRender = await this.storage.getCachedRender(id, provider, prompt.version);
     if (cachedRender && this.isRenderOptionsCompatible(cachedRender, options)) {
-      // Ensure cached render includes variables_used (backfill if older cache entries lack it)
-      try {
-        if ((cachedRender as any).variables_used === undefined) {
-          // Use the original structured prompt template to infer variables, not the substituted prompt
-          const originalTemplate = prompt.prompt_structured?.user_template || '';
-          const templateVariables = this.variableManager.extractVariableNames(originalTemplate);
-          const providedVars = options && options.variables ? Object.keys(options.variables) : null;
-          (cachedRender as any).variables_used = providedVars ? templateVariables.filter(v => providedVars.includes(v)) : templateVariables;
-        }
-      } catch (e) {
-        // Non-fatal: continue returning cached render even if augmentation fails
+      if ((cachedRender as any).variables_used === undefined) {
+        const variablesUsed = this.computeVariablesUsed(prompt.prompt_structured, options.variables);
+        (cachedRender as any).variables_used = variablesUsed;
       }
-
       return cachedRender;
     }
 
@@ -364,27 +355,9 @@ export class FileSystemPromptManager implements PromptManager {
       throw new Error(`Invalid render output: ${payloadValidation.errors.join(', ')}`);
     }
 
-    // Attach list of variables used in this render (if available)
-    try {
-      const usedVars = this.variableManager.extractVariableNames(structuredPrompt.user_template || '');
-      // Attach to payload metadata for downstream consumers
-      if (!payload.metadata) payload.metadata = {} as any;
-      (payload as any).variables_used = usedVars;
-    } catch (e) {
-      // Non-fatal: continue without variables_used
-    }
-
-    // Attach variables_used metadata to payload so callers/tests can inspect which variables were used
-    try {
-      const templateVariables = this.variableManager.extractVariableNames(structuredPrompt.user_template);
-      // Only include variables that have been provided in options.variables
-      const providedVars = options.variables ? Object.keys(options.variables) : null;
-      (payload as any).variables_used = providedVars ? templateVariables.filter(v => providedVars.includes(v)) : templateVariables;
-    } catch (err) {
-      // If extraction fails for any reason, don't block rendering; just skip attaching variables_used
-      // eslint-disable-next-line no-console
-      console.warn('Failed to attach variables_used metadata:', err);
-    }
+    const variablesUsed = this.computeVariablesUsed(prompt.prompt_structured, options.variables);
+    if (!payload.metadata) payload.metadata = {} as any;
+    (payload as any).variables_used = variablesUsed;
 
     // Cache the render result
     await this.storage.cacheRender(id, provider, prompt.version, payload);
@@ -466,7 +439,7 @@ export class FileSystemPromptManager implements PromptManager {
    * Validate that all required variables have values for rendering
    */
   private validateVariablesForRendering(
-    prompt: PromptRecord, 
+    prompt: PromptRecord,
     options: RenderOptions
   ): ValidationResult {
     const errors: string[] = [];
@@ -565,6 +538,36 @@ export class FileSystemPromptManager implements PromptManager {
     }
 
     return true;
+  }
+
+  private computeVariablesUsed(
+    structuredPrompt: StructuredPrompt | undefined,
+    providedVariables?: Record<string, any>
+  ): string[] {
+    if (!structuredPrompt || !structuredPrompt.user_template) {
+      return [];
+    }
+
+    try {
+      const templateVariables = this.variableManager.extractVariableNames(
+        structuredPrompt.user_template
+      );
+
+      if (!providedVariables) {
+        return templateVariables;
+      }
+
+      const providedKeys = Object.keys(providedVariables);
+      if (providedKeys.length === 0) {
+        return [];
+      }
+
+      return templateVariables.filter(variable => providedKeys.includes(variable));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to compute variables_used metadata:', error);
+      return [];
+    }
   }
 
   /**
