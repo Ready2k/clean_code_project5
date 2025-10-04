@@ -184,9 +184,28 @@ export class ImportService {
     // Convert to internal format
     const promptRecord = this.convertToInternalFormat(parsedContent, sourceProvider, options);
 
-  // Debug: log whether converted record includes structured prompt and variables
-  // eslint-disable-next-line no-console
-  console.log('ImportService: converted promptRecord has prompt_structured=', !!promptRecord.prompt_structured, 'variables=', (promptRecord.variables || []).length);
+    // If metadata provides variable usage information but the converted prompt lacks
+    // variables (common when exports substitute placeholders), backfill them so downstream
+    // consumers retain the variable definitions.
+    const metadataVariables = Array.isArray(parsedContent?._metadata?.variablesUsed)
+      ? (parsedContent._metadata.variablesUsed as string[]).filter(
+          (name): name is string => typeof name === 'string' && name.trim().length > 0
+        )
+      : [];
+
+    if (
+      metadataVariables.length > 0 &&
+      promptRecord.prompt_structured &&
+      promptRecord.prompt_structured.variables.length === 0
+    ) {
+      promptRecord.prompt_structured.variables = metadataVariables;
+      promptRecord.variables = metadataVariables.map(varName => ({
+        key: varName,
+        label: this.humanizeVariableName(varName),
+        type: 'string' as VariableType,
+        required: true
+      }));
+    }
 
     // If conversion didn't produce a structured prompt, synthesize a minimal structured
     // prompt from the human prompt so downstream callers (and tests) always receive
@@ -761,7 +780,38 @@ export class ImportService {
         newPrompt.slug = `${newPrompt.slug}-imported-${Date.now()}`;
         newPrompt.metadata.title = `${newPrompt.metadata.title} (Imported)`;
         if (this.promptManager) {
-          return await this.promptManager.createPrompt(newPrompt.prompt_human, newPrompt.metadata);
+          const created = await this.promptManager.createPrompt(
+            newPrompt.prompt_human,
+            newPrompt.metadata
+          );
+
+          if (newPrompt.prompt_structured || (newPrompt.variables && newPrompt.variables.length > 0)) {
+            try {
+              return await this.promptManager.updatePrompt(created.id, {
+                prompt_structured: newPrompt.prompt_structured,
+                variables: newPrompt.variables
+              });
+            } catch (err) {
+              console.warn(
+                'ImportService: failed to attach structured prompt during import:',
+                err instanceof Error ? err.message : err
+              );
+              if (err && (err as any).stack) {
+                console.warn((err as any).stack);
+              }
+
+              try {
+                (created as any).prompt_structured = newPrompt.prompt_structured;
+                (created as any).variables = newPrompt.variables || [];
+              } catch (attachError) {
+                // ignore fallback failure
+              }
+
+              return created;
+            }
+          }
+
+          return created;
         }
         return newPrompt;
 

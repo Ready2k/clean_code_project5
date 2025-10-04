@@ -237,6 +237,10 @@ export class FileSystemPromptManager {
         // Check for cached render
         const cachedRender = await this.storage.getCachedRender(id, provider, prompt.version);
         if (cachedRender && this.isRenderOptionsCompatible(cachedRender, options)) {
+            if (cachedRender.variables_used === undefined) {
+                const variablesUsed = this.computeVariablesUsed(prompt.prompt_structured, options.variables);
+                cachedRender.variables_used = variablesUsed;
+            }
             return cachedRender;
         }
         // Validate that all required variables have values
@@ -256,6 +260,10 @@ export class FileSystemPromptManager {
         if (!payloadValidation.isValid) {
             throw new Error(`Invalid render output: ${payloadValidation.errors.join(', ')}`);
         }
+        const variablesUsed = this.computeVariablesUsed(prompt.prompt_structured, options.variables);
+        if (!payload.metadata)
+            payload.metadata = {};
+        payload.variables_used = variablesUsed;
         // Cache the render result
         await this.storage.cacheRender(id, provider, prompt.version, payload);
         // Update prompt renders metadata
@@ -305,6 +313,26 @@ export class FileSystemPromptManager {
             content: JSON.stringify(exportContent, null, 2),
             metadata: exportMetadata
         };
+    }
+    computeVariablesUsed(structuredPrompt, providedVariables) {
+        if (!structuredPrompt || !structuredPrompt.user_template) {
+            return [];
+        }
+        try {
+            const templateVariables = this.variableManager.extractVariableNames(structuredPrompt.user_template);
+            if (!providedVariables) {
+                return templateVariables;
+            }
+            const providedKeys = Object.keys(providedVariables);
+            if (providedKeys.length === 0) {
+                return [];
+            }
+            return templateVariables.filter(variable => providedKeys.includes(variable));
+        }
+        catch (error) {
+            console.warn('Failed to compute variables_used metadata:', error);
+            return [];
+        }
     }
     /**
      * Validate that all required variables have values for rendering

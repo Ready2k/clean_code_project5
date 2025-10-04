@@ -77,6 +77,19 @@ export class ImportService {
         }
         // Convert to internal format
         const promptRecord = this.convertToInternalFormat(parsedContent, sourceProvider, options);
+
+        const metadataVariables = Array.isArray(parsedContent?._metadata?.variablesUsed)
+            ? parsedContent._metadata.variablesUsed.filter((name) => typeof name === 'string' && name.trim().length > 0)
+            : [];
+        if (metadataVariables.length > 0 && promptRecord.prompt_structured && promptRecord.prompt_structured.variables.length === 0) {
+            promptRecord.prompt_structured.variables = metadataVariables;
+            promptRecord.variables = metadataVariables.map(varName => ({
+                key: varName,
+                label: this.humanizeVariableName(varName),
+                type: 'string',
+                required: true
+            }));
+        }
         
         // Check if imported content has variant characteristics
         const variantInfo = this.detectVariantCharacteristics(promptRecord);
@@ -92,15 +105,59 @@ export class ImportService {
         
         // Clean variant metadata to ensure this becomes a base prompt
         this.cleanVariantMetadata(promptRecord);
-        
+
+        // If the converted content lacks a structured prompt but has a human prompt,
+        // synthesize a minimal structured prompt so downstream callers have one.
+        if (!promptRecord.prompt_structured && promptRecord.prompt_human) {
+            try {
+                promptRecord.prompt_structured = {
+                    schema_version: 1,
+                    system: [promptRecord.prompt_human.goal || 'You are a helpful assistant'],
+                    capabilities: [],
+                    user_template: (promptRecord.prompt_human.steps || []).join('\n\n') || promptRecord.prompt_human.goal || '',
+                    rules: [],
+                    variables: []
+                };
+                promptRecord.variables = promptRecord.variables || [];
+            }
+            catch {
+                // ignore fallback failure
+            }
+        }
+
         // Handle conflicts
         if (this.promptManager) {
             const existingPrompt = await this.findExistingPrompt(promptRecord);
             if (existingPrompt) {
                 return this.handleConflict(promptRecord, existingPrompt, options);
             }
-            // Save the imported prompt as a base prompt
-            return await this.promptManager.createPrompt(promptRecord.prompt_human, promptRecord.metadata);
+
+            const created = await this.promptManager.createPrompt(promptRecord.prompt_human, promptRecord.metadata);
+
+            if (promptRecord.prompt_structured || (promptRecord.variables && promptRecord.variables.length > 0)) {
+                try {
+                    return await this.promptManager.updatePrompt(created.id, {
+                        prompt_structured: promptRecord.prompt_structured,
+                        variables: promptRecord.variables
+                    });
+                }
+                catch (err) {
+                    console.warn('ImportService: failed to attach structured prompt during import:', err instanceof Error ? err.message : err);
+                    if (err && err.stack) {
+                        console.warn(err.stack);
+                    }
+                    try {
+                        created.prompt_structured = promptRecord.prompt_structured;
+                        created.variables = promptRecord.variables || [];
+                    }
+                    catch {
+                        // ignore
+                    }
+                    return created;
+                }
+            }
+
+            return created;
         }
         return promptRecord;
     }
@@ -650,7 +707,30 @@ export class ImportService {
                 newPrompt.slug = `${newPrompt.slug}-imported-${Date.now()}`;
                 newPrompt.metadata.title = `${newPrompt.metadata.title} (Imported)`;
                 if (this.promptManager) {
-                    return await this.promptManager.createPrompt(newPrompt.prompt_human, newPrompt.metadata);
+                    const created = await this.promptManager.createPrompt(newPrompt.prompt_human, newPrompt.metadata);
+                    if (newPrompt.prompt_structured || (newPrompt.variables && newPrompt.variables.length > 0)) {
+                        try {
+                            return await this.promptManager.updatePrompt(created.id, {
+                                prompt_structured: newPrompt.prompt_structured,
+                                variables: newPrompt.variables
+                            });
+                        }
+                        catch (err) {
+                            console.warn('ImportService: failed to attach structured prompt during import:', err instanceof Error ? err.message : err);
+                            if (err && err.stack) {
+                                console.warn(err.stack);
+                            }
+                            try {
+                                created.prompt_structured = newPrompt.prompt_structured;
+                                created.variables = newPrompt.variables || [];
+                            }
+                            catch {
+                                // ignore
+                            }
+                            return created;
+                        }
+                    }
+                    return created;
                 }
                 return newPrompt;
             case 'prompt':
