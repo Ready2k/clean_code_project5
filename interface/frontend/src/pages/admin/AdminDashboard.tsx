@@ -85,7 +85,8 @@ import {
   toggleUserStatus 
 } from '../../store/slices/adminSlice';
 import { User } from '../../types/auth';
-import { systemAPI, SystemConfig as APISystemConfig } from '../../services/api/systemAPI';
+import { systemAPI, SystemConfig as APISystemConfig, SystemEvent, SystemLog, SystemStats, SystemStatus } from '../../services/api/systemAPI';
+import { SystemLogsViewer } from '../../components/admin/SystemLogsViewer';
 
 interface UserFormData {
   username: string;
@@ -95,98 +96,11 @@ interface UserFormData {
   status: 'active' | 'inactive';
 }
 
-interface SystemStatus {
-  status: 'healthy' | 'degraded' | 'down';
-  services: {
-    api: ServiceStatus;
-    database: ServiceStatus;
-    storage: ServiceStatus;
-    llm: ServiceStatus;
-    redis: ServiceStatus;
-  };
-  uptime: number;
-  version: string;
-  timestamp: string;
-}
+// SystemStatus and ServiceStatus interfaces now imported from systemAPI
 
-interface ServiceStatus {
-  status: 'up' | 'down' | 'degraded';
-  responseTime?: number;
-  error?: string;
-  lastChecked: string;
-  details?: any;
-}
+// SystemStats interface now imported from systemAPI
 
-interface SystemStats {
-  system: {
-    uptime: number;
-    memory: {
-      total: number;
-      used: number;
-      free: number;
-      usage: number;
-    };
-    cpu: {
-      usage: number;
-      loadAverage: number[];
-    };
-    disk: {
-      total: number;
-      used: number;
-      free: number;
-      usage: number;
-    };
-  };
-  application: {
-    version: string;
-    environment: string;
-    nodeVersion: string;
-    processId: number;
-    startTime: string;
-  };
-  services: {
-    prompts: {
-      total: number;
-      totalRatings: number;
-    };
-    connections: {
-      total: number;
-      active: number;
-      inactive: number;
-      error: number;
-      byProvider: Record<string, number>;
-    };
-    redis: {
-      connected: boolean;
-      memoryUsage?: number;
-      keyCount?: number;
-    };
-  };
-  performance: {
-    requestsPerMinute: number;
-    averageResponseTime: number;
-    errorRate: number;
-  };
-}
-
-interface SystemEvent {
-  id: string;
-  timestamp: string;
-  type: 'info' | 'warning' | 'error' | 'critical';
-  category: 'system' | 'service' | 'security' | 'performance';
-  message: string;
-  details?: any;
-  source: string;
-}
-
-interface SystemLog {
-  timestamp: string;
-  level: string;
-  message: string;
-  category: string;
-  source: string;
-  details?: any;
-}
+// SystemEvent and SystemLog interfaces now imported from systemAPI
 
 export const AdminDashboard: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -210,11 +124,7 @@ export const AdminDashboard: React.FC = () => {
   const [isLoadingSystem, setIsLoadingSystem] = useState(false);
   const [systemError, setSystemError] = useState<string | null>(null);
   
-  // Logs filtering
-  const [logLevel, setLogLevel] = useState<string>('');
-  const [logCategory, setLogCategory] = useState<string>('');
-  const [logsPage, setLogsPage] = useState(1);
-  const [logsPerPage] = useState(50);
+  // Removed log filtering state - now handled by SystemLogsViewer component
   
   // Backup and maintenance
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
@@ -952,121 +862,17 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Logs & Events Tab */}
       {activeTab === 3 && (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6">System Logs & Events</Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Level</InputLabel>
-                <Select
-                  value={logLevel}
-                  label="Level"
-                  onChange={(e) => setLogLevel(e.target.value)}
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="error">Error</MenuItem>
-                  <MenuItem value="warning">Warning</MenuItem>
-                  <MenuItem value="info">Info</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={logCategory}
-                  label="Category"
-                  onChange={(e) => setLogCategory(e.target.value)}
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="system">System</MenuItem>
-                  <MenuItem value="security">Security</MenuItem>
-                  <MenuItem value="performance">Performance</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-          </Box>
-
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">Recent Events</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {systemEvents.length > 0 ? (
-                <List>
-                  {systemEvents.map((event) => (
-                    <ListItem key={event.id} divider>
-                      <ListItemIcon>
-                        {getEventIcon(event.type)}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={event.message}
-                        secondary={
-                          <Box>
-                            <Typography variant="caption" display="block">
-                              {event.category} • {event.source} • {new Date(event.timestamp).toLocaleString()}
-                            </Typography>
-                            {event.details && (
-                              <Typography variant="caption" color="text.secondary">
-                                {JSON.stringify(event.details)}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Typography color="text.secondary">No events found</Typography>
-              )}
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">System Logs</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {systemLogs.length > 0 ? (
-                <>
-                  <List>
-                    {systemLogs
-                      .filter(log => !logLevel || log.level === logLevel)
-                      .filter(log => !logCategory || log.category === logCategory)
-                      .slice((logsPage - 1) * logsPerPage, logsPage * logsPerPage)
-                      .map((log, index) => (
-                        <ListItem key={index} divider>
-                          <ListItemText
-                            primary={log.message}
-                            secondary={
-                              <Box>
-                                <Typography variant="caption" display="block">
-                                  {log.level.toUpperCase()} • {log.category} • {log.source} • {new Date(log.timestamp).toLocaleString()}
-                                </Typography>
-                                {log.details && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    {JSON.stringify(log.details)}
-                                  </Typography>
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                  </List>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <Pagination
-                      count={Math.ceil(systemLogs.length / logsPerPage)}
-                      page={logsPage}
-                      onChange={(_, page) => setLogsPage(page)}
-                    />
-                  </Box>
-                </>
-              ) : (
-                <Typography color="text.secondary">No logs found</Typography>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        </Box>
+        <SystemLogsViewer
+          events={systemEvents}
+          logs={systemLogs}
+          isLoadingEvents={isLoadingSystem}
+          isLoadingLogs={isLoadingSystem}
+          onRefresh={loadSystemData}
+          onExportLogs={() => {
+            // TODO: Implement log export functionality
+            console.log('Export logs functionality to be implemented');
+          }}
+        />
       )}
 
       {/* Maintenance Tab */}
@@ -1129,8 +935,52 @@ export const AdminDashboard: React.FC = () => {
                   </Button>
                   
                   {cleanupResult && (
-                    <Alert severity={cleanupResult.error ? 'error' : 'success'}>
-                      {cleanupResult.error || `Cleanup completed: ${cleanupResult.summary}`}
+                    <Alert severity={cleanupResult.error ? 'error' : 'success'} sx={{ mt: 2 }}>
+                      {cleanupResult.error ? (
+                        cleanupResult.error
+                      ) : (
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                            System Cleanup Completed Successfully
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={6} md={3}>
+                              <Typography variant="body2">
+                                <strong>Logs:</strong> {cleanupResult.results?.logsCleared || 0} processed
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                              <Typography variant="body2">
+                                <strong>Temp Files:</strong> {cleanupResult.results?.tempFilesRemoved || 0} removed
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                              <Typography variant="body2">
+                                <strong>Old Metrics:</strong> {cleanupResult.results?.oldMetricsRemoved || 0} cleared
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                              <Typography variant="body2">
+                                <strong>Old Events:</strong> {cleanupResult.results?.oldEventsRemoved || 0} cleared
+                              </Typography>
+                            </Grid>
+                            {cleanupResult.results?.logFilesRotated > 0 && (
+                              <Grid item xs={6} md={3}>
+                                <Typography variant="body2">
+                                  <strong>Log Files Rotated:</strong> {cleanupResult.results.logFilesRotated}
+                                </Typography>
+                              </Grid>
+                            )}
+                            {cleanupResult.results?.oldLogFilesRemoved > 0 && (
+                              <Grid item xs={6} md={3}>
+                                <Typography variant="body2">
+                                  <strong>Old Log Files Removed:</strong> {cleanupResult.results.oldLogFilesRemoved}
+                                </Typography>
+                              </Grid>
+                            )}
+                          </Grid>
+                        </Box>
+                      )}
                     </Alert>
                   )}
                 </CardContent>

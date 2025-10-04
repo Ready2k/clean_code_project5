@@ -3,7 +3,8 @@ import path from 'path';
 
 const logLevel = process.env['LOG_LEVEL'] || 'info';
 const nodeEnv = process.env['NODE_ENV'] || 'development';
-const logsDir = process.env['LOGS_DIR'] || path.join(process.cwd(), 'logs');
+// Always use the centralized logs directory at project root
+const logsDir = process.env['LOGS_DIR'] || path.resolve(process.cwd(), '../../logs');
 
 // Custom format for structured logging
 const structuredFormat = winston.format.combine(
@@ -54,53 +55,57 @@ export const logger = winston.createLogger({
   ]
 });
 
-// Add file transports in production
-if (nodeEnv === 'production') {
-  // Error logs
-  logger.add(new winston.transports.File({
-    filename: path.join(logsDir, 'error.log'),
-    level: 'error',
-    handleExceptions: true,
-    handleRejections: true,
-    maxsize: 10485760, // 10MB
-    maxFiles: 5,
-    tailable: true
-  }));
-
-  // Combined logs
-  logger.add(new winston.transports.File({
-    filename: path.join(logsDir, 'combined.log'),
-    maxsize: 10485760, // 10MB
-    maxFiles: 10,
-    tailable: true
-  }));
-
-  // Audit logs for security events
-  logger.add(new winston.transports.File({
-    filename: path.join(logsDir, 'audit.log'),
-    level: 'info',
-    maxsize: 10485760, // 10MB
-    maxFiles: 10,
-    tailable: true,
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.json(),
-      winston.format.printf(({ timestamp, level, message, ...meta }: any) => {
-        if (meta['audit']) {
-          return JSON.stringify({
-            '@timestamp': timestamp,
-            level,
-            message,
-            audit: true,
-            ...meta
-          });
-        }
-        return '';
-      }),
-      winston.format((info: any) => info !== null ? info : false)()
-    )
-  }));
+// Add file transports for all environments (development and production)
+// Ensure logs directory exists
+import fs from 'fs';
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
 }
+
+// Error logs
+logger.add(new winston.transports.File({
+  filename: path.join(logsDir, 'backend-error.log'),
+  level: 'error',
+  handleExceptions: true,
+  handleRejections: true,
+  maxsize: 10485760, // 10MB
+  maxFiles: 5,
+  tailable: true
+}));
+
+// Combined logs
+logger.add(new winston.transports.File({
+  filename: path.join(logsDir, 'backend-combined.log'),
+  maxsize: 10485760, // 10MB
+  maxFiles: 10,
+  tailable: true
+}));
+
+// Audit logs for security events
+logger.add(new winston.transports.File({
+  filename: path.join(logsDir, 'backend-audit.log'),
+  level: 'info',
+  maxsize: 10485760, // 10MB
+  maxFiles: 10,
+  tailable: true,
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json(),
+    winston.format.printf(({ timestamp, level, message, ...meta }: any) => {
+      if (meta['audit']) {
+        return JSON.stringify({
+          '@timestamp': timestamp,
+          level,
+          message,
+          audit: true,
+          ...meta
+        });
+      }
+      return '';
+    }),
+    winston.format((info: any) => info !== null ? info : false)()
+  )
+}));
 
 // Performance logging
 export const performanceLogger = winston.createLogger({
@@ -112,7 +117,7 @@ export const performanceLogger = winston.createLogger({
   },
   transports: [
     new winston.transports.File({ 
-      filename: path.join(logsDir, 'performance.log'),
+      filename: path.join(logsDir, 'backend-performance.log'),
       maxsize: 10485760,
       maxFiles: 5,
       tailable: true
@@ -130,7 +135,7 @@ export const securityLogger = winston.createLogger({
   },
   transports: [
     new winston.transports.File({ 
-      filename: path.join(logsDir, 'security.log'),
+      filename: path.join(logsDir, 'backend-security.log'),
       maxsize: 10485760,
       maxFiles: 10,
       tailable: true

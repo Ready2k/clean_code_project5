@@ -444,13 +444,17 @@ export class SystemMonitoringService extends EventEmitter {
     tempFilesRemoved: number;
     oldMetricsRemoved: number;
     oldEventsRemoved: number;
+    logFilesRotated: number;
+    oldLogFilesRemoved: number;
   }> {
     try {
       const results = {
         logsCleared: 0,
         tempFilesRemoved: 0,
         oldMetricsRemoved: 0,
-        oldEventsRemoved: 0
+        oldEventsRemoved: 0,
+        logFilesRotated: 0,
+        oldLogFilesRemoved: 0
       };
 
       // Clear old metrics (keep last 1000)
@@ -477,6 +481,16 @@ export class SystemMonitoringService extends EventEmitter {
         }
       }
 
+      // Cleanup centralized log files
+      try {
+        const logCleanupResults = await this.cleanupLogFiles();
+        results.logFilesRotated = logCleanupResults.rotated;
+        results.oldLogFilesRemoved = logCleanupResults.removed;
+        results.logsCleared = logCleanupResults.rotated + logCleanupResults.removed;
+      } catch (logError) {
+        logger.warn('Log cleanup failed, continuing with other cleanup tasks:', logError);
+      }
+
       this.addSystemEvent('info', 'system', 'System cleanup completed', results);
       logger.info('System cleanup completed', results);
 
@@ -489,7 +503,110 @@ export class SystemMonitoringService extends EventEmitter {
   }
 
   /**
-   * Get system logs
+   * Cleanup centralized log files
+   */
+  private async cleanupLogFiles(): Promise<{ rotated: number; removed: number }> {
+    const logsDir = process.env['LOGS_DIR'] || path.resolve(process.cwd(), '../../logs');
+    const maxLogSizeMB = parseInt(process.env['MAX_LOG_SIZE_MB'] || '50', 10);
+    const maxLogAgeDays = parseInt(process.env['MAX_LOG_AGE_DAYS'] || '30', 10);
+
+    let rotated = 0;
+    let removed = 0;
+
+    try {
+      // Check if logs directory exists
+      if (!await this.pathExists(logsDir)) {
+        return { rotated, removed };
+      }
+
+      const files = await fs.readdir(logsDir);
+      const logFiles = files.filter(file => file.endsWith('.log'));
+
+      for (const logFile of logFiles) {
+        const filePath = path.join(logsDir, logFile);
+        const stats = await fs.stat(filePath);
+
+        // Check file size for rotation
+        const fileSizeMB = stats.size / (1024 * 1024);
+        if (fileSizeMB > maxLogSizeMB) {
+          await this.rotateLogFile(filePath);
+          rotated++;
+        }
+
+        // Check file age for removal
+        const fileAgeDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
+        if (fileAgeDays > maxLogAgeDays) {
+          await fs.unlink(filePath);
+          removed++;
+          logger.info(`Removed old log file: ${logFile} (${fileAgeDays.toFixed(1)} days old)`);
+        }
+      }
+
+      // Clean up old archived logs
+      const archiveDir = path.join(logsDir, 'archive');
+      if (await this.pathExists(archiveDir)) {
+        const archiveFiles = await fs.readdir(archiveDir);
+        for (const archiveFile of archiveFiles) {
+          if (archiveFile.endsWith('.gz')) {
+            const archivePath = path.join(archiveDir, archiveFile);
+            const stats = await fs.stat(archivePath);
+            const fileAgeDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
+
+            if (fileAgeDays > maxLogAgeDays) {
+              await fs.unlink(archivePath);
+              removed++;
+              logger.info(`Removed old archived log: ${archiveFile} (${fileAgeDays.toFixed(1)} days old)`);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      logger.error('Error during log cleanup:', error);
+      throw error;
+    }
+
+    return { rotated, removed };
+  }
+
+  /**
+   * Rotate a log file by compressing and archiving it
+   */
+  private async rotateLogFile(filePath: string): Promise<void> {
+    const logsDir = path.dirname(filePath);
+    const archiveDir = path.join(logsDir, 'archive');
+    const fileName = path.basename(filePath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const archiveName = `${fileName}.${timestamp}.gz`;
+    const archivePath = path.join(archiveDir, archiveName);
+
+    try {
+      // Ensure archive directory exists
+      if (!await this.pathExists(archiveDir)) {
+        await fs.mkdir(archiveDir, { recursive: true });
+      }
+
+      // Read and compress the log file
+      const content = await fs.readFile(filePath);
+      const { gzip } = await import('zlib');
+      const { promisify } = await import('util');
+      const gzipAsync = promisify(gzip);
+
+      const compressed = await gzipAsync(content);
+      await fs.writeFile(archivePath, compressed);
+
+      // Truncate the original file (keeps file handles open)
+      await fs.writeFile(filePath, '');
+
+      logger.info(`Rotated log file: ${fileName} -> ${archiveName}`);
+    } catch (error) {
+      logger.error(`Failed to rotate log file ${filePath}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get system logs from centralized log files
    */
   async getSystemLogs(
     level?: string,
@@ -497,23 +614,29 @@ export class SystemMonitoringService extends EventEmitter {
     offset = 0
   ): Promise<{ logs: any[]; total: number }> {
     try {
-      // This is a simplified implementation
-      // In a real system, you'd read from log files or a logging service
-      const logs = this.events
-        .filter(event => !level || event.type === level)
-        .slice(offset, offset + limit)
-        .map(event => ({
-          timestamp: event.timestamp,
-          level: event.type,
-          message: event.message,
-          category: event.category,
-          source: event.source,
-          details: event.details
-        }));
+      const { getLogReaderService } = await import('./log-reader-service.js');
+      const logReaderService = getLogReaderService();
+
+      const readOptions: any = { limit, offset };
+      if (level) readOptions.level = level;
+
+      const result = await logReaderService.readAllLogs(readOptions);
 
       return {
-        logs,
-        total: this.events.length
+        logs: result.logs.map(log => ({
+          timestamp: log.timestamp,
+          level: log.level,
+          message: log.message,
+          category: log.category || 'system',
+          source: log.source || log.service,
+          details: {
+            service: log.service,
+            requestId: log.requestId,
+            userId: log.userId,
+            environment: log.environment
+          }
+        })),
+        total: result.total
       };
     } catch (error) {
       logger.error('Failed to get system logs:', error);
@@ -734,7 +857,7 @@ export class SystemMonitoringService extends EventEmitter {
       };
     } catch (error) {
       logger.warn('Failed to collect real system metrics, using fallback data:', error);
-      
+
       // Fallback to basic OS metrics
       const totalMem = os.totalmem();
       const freeMem = os.freemem();
@@ -862,13 +985,13 @@ export class SystemMonitoringService extends EventEmitter {
           logger.info('Container metrics available', {
             containerId: systemMetrics.container.id,
             containerName: systemMetrics.container.name,
-            memoryLimit: systemMetrics.container.memoryLimit ? 
+            memoryLimit: systemMetrics.container.memoryLimit ?
               `${Math.round(systemMetrics.container.memoryLimit / 1024 / 1024)}MB` : 'unlimited'
           });
         }
       } catch (error) {
         logger.error('Failed to collect metrics:', error);
-        
+
         // Fallback to basic metrics
         try {
           const metrics: SystemMetrics = {
@@ -1066,34 +1189,7 @@ export class SystemMonitoringService extends EventEmitter {
     });
   }
 
-  /**
-   * Get disk usage for a directory
-   */
-  private async getDiskUsage(_dirPath: string): Promise<{
-    total: number;
-    used: number;
-    free: number;
-    usage: number;
-  }> {
-    try {
-      // const _stats = await fs.stat(dirPath);
-      // This is a simplified implementation
-      // In a real system, you'd use a library like 'statvfs' or platform-specific commands
-      return {
-        total: 1000000000, // 1GB placeholder
-        used: 500000000,   // 500MB placeholder
-        free: 500000000,   // 500MB placeholder
-        usage: 50          // 50% placeholder
-      };
-    } catch (error) {
-      return {
-        total: 0,
-        used: 0,
-        free: 0,
-        usage: 0
-      };
-    }
-  }
+
 
   /**
    * Check if path exists

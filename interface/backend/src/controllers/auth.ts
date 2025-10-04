@@ -11,7 +11,7 @@ const maskEmailForLogs = (email?: string): string | undefined => {
   }
 
   const [localPart, domain] = email.split('@');
-  if (!domain) {
+  if (!domain || !localPart) {
     if (!localPart) {
       return undefined;
     }

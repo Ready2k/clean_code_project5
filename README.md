@@ -32,9 +32,74 @@ A comprehensive web-based interface for managing AI prompts across multiple prov
 - **🚀 Real-time Collaboration** - WebSocket-powered collaborative editing
 - **🐳 Production Ready** - Docker containerization with monitoring stack
 
-## 🛠️ Full Development Setup
+## 🛠️ Application Management
 
-For full development with backend services:
+### 🚀 Quick Start (Recommended)
+
+Use our robust management scripts for the best experience:
+
+```bash
+# Start all services (Docker + Backend + Frontend)
+npm start
+# or
+./scripts/start.sh
+
+# Check service status
+npm run status
+# or
+./scripts/status.sh
+
+# Stop all services
+npm stop
+# or
+./scripts/stop.sh
+
+# Restart all services
+npm restart
+# or
+./scripts/restart.sh
+```
+
+### 🔍 Health Monitoring
+
+```bash
+# Quick health check
+./scripts/health-check.sh
+
+# Detailed status with resource usage
+./scripts/status.sh
+
+# Quiet status for scripts
+./scripts/status.sh --quiet
+```
+
+### 📊 What the Scripts Do
+
+**Start Script (`start.sh`)**:
+1. ✅ Checks Docker is running and prerequisites
+2. 🐳 Starts PostgreSQL and Redis containers
+3. ⏳ Waits for database services to be ready
+4. 🔧 Starts backend API with health verification
+5. 🎨 Starts frontend with accessibility checks
+6. 🎉 Provides complete service URLs and login info
+
+**Stop Script (`stop.sh`)**:
+1. 🛑 Gracefully stops frontend (SIGTERM → SIGKILL)
+2. 🔧 Gracefully stops backend API
+3. 🐳 Stops Docker services
+4. 🧹 Cleans up PID files and temporary data
+5. ✅ Verifies all services are stopped
+
+**Status Script (`status.sh`)**:
+- 📊 Real-time service status with health checks
+- 🔗 Service URLs and endpoints
+- 📝 Log file information and sizes
+- 💻 Resource usage (CPU, Memory)
+- 🛠️ Management command suggestions
+
+## 🛠️ Manual Development Setup
+
+For manual setup or troubleshooting:
 
 ### Prerequisites
 - **Node.js** 18+ with npm
@@ -69,6 +134,90 @@ npm run dev
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/api/docs
+
+## 📝 Logging & Monitoring
+
+### Log Files
+All services log to the `logs/` directory:
+
+```bash
+# Real-time backend logs
+tail -f logs/backend.log
+
+# Real-time frontend logs  
+tail -f logs/frontend.log
+
+# Startup/shutdown events
+tail -f logs/startup.log
+
+# All logs combined
+tail -f logs/*.log
+```
+
+### Service Monitoring
+```bash
+# Comprehensive status check
+./scripts/status.sh
+
+# Quick health verification
+./scripts/health-check.sh
+
+# JSON output for monitoring tools
+./scripts/health-check.sh --json
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Services won't start:**
+```bash
+# Check current status
+./scripts/status.sh
+
+# Check Docker is running
+docker info
+
+# Check for port conflicts
+lsof -i :3000 -i :8000 -i :5432 -i :6379
+
+# Clean restart
+./scripts/stop.sh
+./scripts/start.sh
+```
+
+**Partial service failure:**
+```bash
+# Force restart all services
+./scripts/restart.sh --force
+
+# Check logs for errors
+tail -f logs/backend.log
+tail -f logs/frontend.log
+```
+
+**Manual recovery:**
+```bash
+# Kill all processes
+pkill -f "node backend/dist/index.js"
+pkill -f "vite.*--port 3000"
+
+# Stop Docker services
+docker-compose down
+
+# Clean up and restart
+rm -f .backend.pid .frontend.pid
+./scripts/start.sh
+```
+
+### Default Login
+- **Username**: `admin`
+- **Password**: `admin123456`
+
+### Support
+- Check `logs/` directory for detailed error information
+- Review `scripts/README.md` for script documentation
+- Use `./scripts/status.sh` for comprehensive system status
 
 ## 📖 Documentation
 
@@ -124,6 +273,49 @@ prompt-library/
 └── .kiro/             # Development steering and specs
     ├── steering/      # Project standards and guidelines
     └── specs/         # Feature specifications
+```
+
+## 📋 Logging & Monitoring
+
+All application logs are centralized in the `./logs/` directory for easy monitoring and management.
+
+### Log Files
+- `backend-combined.log` - All backend application logs
+- `backend-error.log` - Backend error logs only
+- `backend-audit.log` - Security and audit events
+- `backend-performance.log` - Performance metrics
+- `frontend.log` - Frontend application logs
+- `startup.log` - Application startup logs
+
+### Log Management
+```bash
+# Show log status and file sizes
+./scripts/manage-logs.sh status
+
+# Tail specific logs
+./scripts/manage-logs.sh tail backend
+./scripts/manage-logs.sh tail frontend
+
+# Rotate large log files
+./scripts/manage-logs.sh rotate
+
+# Clean up old logs
+./scripts/manage-logs.sh cleanup
+
+# Run full maintenance
+./scripts/manage-logs.sh maintain
+```
+
+### Real-time Monitoring
+```bash
+# Watch all backend activity
+tail -f logs/backend-combined.log
+
+# Watch errors only
+tail -f logs/backend-error.log
+
+# Watch multiple logs
+tail -f logs/backend-combined.log logs/frontend.log
 ```
 
 ## 🔧 Development Commands

@@ -929,7 +929,7 @@ export class ConnectionManagementService extends EventEmitter implements Extende
     const results: ConnectionMigrationResult[] = [];
     let successful = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
     const errors: string[] = [];
     const warnings: string[] = [];
     let backupsCreated = 0;

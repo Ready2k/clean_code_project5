@@ -116,6 +116,82 @@ export const systemAPI = {
     return response.data;
   },
 
+  async getLogFiles(): Promise<{ 
+    success: boolean; 
+    data: Array<{
+      name: string;
+      path: string;
+      size: number;
+      lastModified: string;
+      type: 'backend' | 'frontend' | 'system';
+    }>;
+    timestamp: string;
+  }> {
+    const response = await apiClient.get('/system/logs/files');
+    return response.data;
+  },
+
+  async getLogFileContent(filename: string, params?: {
+    level?: string;
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<{
+    success: boolean;
+    data: { logs: SystemLog[]; total: number };
+    timestamp: string;
+  }> {
+    const response = await apiClient.get(`/system/logs/files/${filename}`, { params });
+    return response.data;
+  },
+
+  async searchLogs(params: {
+    query: string;
+    level?: string;
+    limit?: number;
+    fileTypes?: string;
+  }): Promise<{
+    success: boolean;
+    data: { logs: SystemLog[]; total: number };
+    query: string;
+    timestamp: string;
+  }> {
+    const response = await apiClient.get('/system/logs/search', { params });
+    return response.data;
+  },
+
+  async getLogStats(): Promise<{
+    success: boolean;
+    data: {
+      totalFiles: number;
+      totalSize: number;
+      oldestLog?: string;
+      newestLog?: string;
+      logCounts: {
+        error: number;
+        warn: number;
+        info: number;
+        debug: number;
+      };
+    };
+    timestamp: string;
+  }> {
+    const response = await apiClient.get('/system/logs/stats');
+    return response.data;
+  },
+
+  async getRecentErrors(params?: {
+    limit?: number;
+  }): Promise<{
+    success: boolean;
+    data: SystemLog[];
+    count: number;
+    timestamp: string;
+  }> {
+    const response = await apiClient.get('/system/logs/errors', { params });
+    return response.data;
+  },
+
   async getSystemEvents(params?: {
     type?: string;
     category?: string;
@@ -152,6 +228,8 @@ export const systemAPI = {
       tempFilesRemoved: number;
       oldMetricsRemoved: number;
       oldEventsRemoved: number;
+      logFilesRotated: number;
+      oldLogFilesRemoved: number;
     };
   }> {
     const response = await apiClient.post('/system/maintenance/cleanup');

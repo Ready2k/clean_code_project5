@@ -498,7 +498,7 @@ export class ImportService {
     
     // Determine provider from model info
     let tunedForProvider = '';
-    let preferredModel = modelInfo;
+    const preferredModel = modelInfo;
     
     if (modelInfo) {
       const lowerModel = modelInfo.toLowerCase();
@@ -521,7 +521,7 @@ export class ImportService {
     const promptType = ImportService.detectPromptType({ goal, audience, steps, output_expectations: { format, fields: [] } });
     const promptTypeTag = `prompt-type:${promptType}`;
     
-    let allTags = [...baseTags, promptTypeTag];
+    const allTags = [...baseTags, promptTypeTag];
     if (providerModelTag) {
       allTags.push(providerModelTag);
     }

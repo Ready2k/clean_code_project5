@@ -6,7 +6,7 @@
  */
 
 import { Request, Response } from 'express';
-import Joi from 'joi';
+
 import { getDynamicProviderService } from '../services/dynamic-provider-service.js';
 import { getProviderValidationService } from '../services/provider-validation-service.js';
 import { ValidationError, NotFoundError } from '../types/errors.js';
@@ -84,13 +84,13 @@ export const getProviders = async (req: Request, res: Response): Promise<void> =
   const queryParams = { ...req.query };
   
   // Convert comma-separated status to array
-  if (queryParams.status && typeof queryParams.status === 'string') {
-    queryParams.status = queryParams.status.split(',');
+  if (queryParams['status'] && typeof queryParams['status'] === 'string') {
+    queryParams['status'] = queryParams['status'].split(',');
   }
   
   // Convert comma-separated authMethod to array
-  if (queryParams.authMethod && typeof queryParams.authMethod === 'string') {
-    queryParams.authMethod = queryParams.authMethod.split(',');
+  if (queryParams['authMethod'] && typeof queryParams['authMethod'] === 'string') {
+    queryParams['authMethod'] = queryParams['authMethod'].split(',');
   }
 
   const { error, value } = providerQuerySchema.validate(queryParams);

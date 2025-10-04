@@ -5,6 +5,19 @@ import { resolve } from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  esbuild: {
+    // Disable TypeScript type checking for development
+    target: 'es2020',
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    tsconfigRaw: {
+      compilerOptions: {
+        skipLibCheck: true,
+        noEmit: true,
+        allowJs: true,
+        checkJs: false
+      }
+    }
+  },
   define: {
     global: 'globalThis',
     'process.env': {},

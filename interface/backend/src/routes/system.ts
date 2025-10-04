@@ -20,6 +20,13 @@ router.post('/maintenance/backup', requirePermission(Permission.SYSTEM_CONFIG), 
 router.post('/maintenance/cleanup', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.cleanupSystem));
 router.get('/maintenance/logs', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.getSystemLogs));
 
+// Enhanced log management
+router.get('/logs/files', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.getLogFiles));
+router.get('/logs/files/:filename', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.getLogFileContent));
+router.get('/logs/search', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.searchLogs));
+router.get('/logs/stats', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.getLogStats));
+router.get('/logs/errors', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(systemController.getRecentErrors));
+
 // System monitoring
 router.get('/metrics', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemMetrics));
 router.get('/events', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemEvents));

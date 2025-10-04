@@ -12,7 +12,14 @@ import { logger } from '../utils/logger.js';
 async function cleanupDuplicateProviders() {
   try {
     // Initialize database service
-    await initializeDatabaseService();
+    const config = {
+      host: process.env['DB_HOST'] || 'localhost',
+      port: parseInt(process.env['DB_PORT'] || '5432'),
+      database: process.env['DB_NAME'] || 'prompt_library',
+      user: process.env['DB_USER'] || 'postgres',
+      password: process.env['DB_PASSWORD'] || 'password'
+    };
+    await initializeDatabaseService(config);
     
     const dynamicProviderService = getDynamicProviderService();
     
@@ -40,11 +47,11 @@ async function cleanupDuplicateProviders() {
         logger.info(`Found ${providerList.length} providers with name "${name}"`);
         
         // Keep the "-basic" version, remove others
-        const basicProvider = providerList.find(p => p.identifier.includes('-basic'));
-        const nonBasicProviders = providerList.filter(p => !p.identifier.includes('-basic'));
+        const basicProvider = providerList.find((p: any) => p.identifier.includes('-basic'));
+        const nonBasicProviders = providerList.filter((p: any) => !p.identifier.includes('-basic'));
         
         if (basicProvider && nonBasicProviders.length > 0) {
-          logger.info(`Keeping "${basicProvider.identifier}", removing: ${nonBasicProviders.map(p => p.identifier).join(', ')}`);
+          logger.info(`Keeping "${basicProvider.identifier}", removing: ${nonBasicProviders.map((p: any) => p.identifier).join(', ')}`);
           duplicatesToRemove.push(...nonBasicProviders);
         }
       }

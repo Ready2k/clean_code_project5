@@ -50,7 +50,7 @@ async function checkModels(): Promise<void> {
             const parsed = JSON.parse(row.capabilities);
             logger.info(`   Parsed successfully: ${Object.keys(parsed).join(', ')}`);
           } catch (error) {
-            logger.error(`   Failed to parse JSON: ${error.message}`);
+            logger.error(`   Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}`);
           }
         } else {
           logger.info(`   Capabilities object: ${JSON.stringify(row.capabilities).substring(0, 100)}...`);

@@ -220,7 +220,7 @@ export const cleanupSystem = async (_req: Request, res: Response): Promise<void>
 };
 
 /**
- * Get system logs
+ * Get system logs from centralized log files
  */
 export const getSystemLogs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -261,6 +261,234 @@ export const getSystemLogs = async (req: Request, res: Response): Promise<void> 
           code: 'SYSTEM_LOGS_ERROR',
           message: 'Failed to retrieve system logs'
         }
+      });
+    }
+  }
+};
+
+/**
+ * Get available log files
+ */
+export const getLogFiles = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { getLogReaderService } = await import('../services/log-reader-service.js');
+    const logReaderService = getLogReaderService();
+    
+    const logFiles = await logReaderService.getLogFiles();
+    
+    res.json({
+      success: true,
+      data: logFiles,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get log files:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'LOG_FILES_ERROR',
+        message: 'Failed to retrieve log files'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Get logs from a specific file
+ */
+export const getLogFileContent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { filename } = req.params;
+    const { level, limit = '100', offset = '0', search } = req.query;
+    
+    if (!filename) {
+      throw new ValidationError('Filename parameter is required');
+    }
+    
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+    
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
+      throw new ValidationError('Limit must be between 1 and 1000');
+    }
+    
+    if (isNaN(offsetNum) || offsetNum < 0) {
+      throw new ValidationError('Offset must be non-negative');
+    }
+    
+    const { getLogReaderService } = await import('../services/log-reader-service.js');
+    const logReaderService = getLogReaderService();
+    
+    const readOptions: any = { limit: limitNum, offset: offsetNum };
+    if (level) readOptions.level = level as string;
+    if (search) readOptions.search = search as string;
+    
+    const result = await logReaderService.readLogFile(filename, readOptions);
+    
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get log file content:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'LOG_FILE_CONTENT_ERROR',
+          message: 'Failed to retrieve log file content'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+};
+
+/**
+ * Search logs across all files
+ */
+export const searchLogs = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { query: searchQuery, level, limit = '100', fileTypes } = req.query;
+    
+    if (!searchQuery || typeof searchQuery !== 'string') {
+      throw new ValidationError('Search query is required');
+    }
+    
+    const limitNum = parseInt(limit as string, 10);
+    
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
+      throw new ValidationError('Limit must be between 1 and 1000');
+    }
+    
+    const { getLogReaderService } = await import('../services/log-reader-service.js');
+    const logReaderService = getLogReaderService();
+    
+    const fileTypesArray = fileTypes 
+      ? (fileTypes as string).split(',') as ('backend' | 'frontend' | 'system')[]
+      : undefined;
+    
+    const searchOptions: any = { limit: limitNum };
+    if (level) searchOptions.level = level as string;
+    if (fileTypesArray) searchOptions.fileTypes = fileTypesArray;
+    
+    const result = await logReaderService.searchLogs(searchQuery, searchOptions);
+    
+    res.json({
+      success: true,
+      data: result,
+      query: searchQuery,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to search logs:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'LOG_SEARCH_ERROR',
+          message: 'Failed to search logs'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+};
+
+/**
+ * Get log statistics
+ */
+export const getLogStats = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { getLogReaderService } = await import('../services/log-reader-service.js');
+    const logReaderService = getLogReaderService();
+    
+    const stats = await logReaderService.getLogStats();
+    
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get log stats:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'LOG_STATS_ERROR',
+        message: 'Failed to retrieve log statistics'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Get recent error logs
+ */
+export const getRecentErrors = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { limit = '50' } = req.query;
+    
+    const limitNum = parseInt(limit as string, 10);
+    
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 500) {
+      throw new ValidationError('Limit must be between 1 and 500');
+    }
+    
+    const { getLogReaderService } = await import('../services/log-reader-service.js');
+    const logReaderService = getLogReaderService();
+    
+    const errors = await logReaderService.getRecentErrors(limitNum);
+    
+    res.json({
+      success: true,
+      data: errors,
+      count: errors.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get recent errors:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'RECENT_ERRORS_ERROR',
+          message: 'Failed to retrieve recent errors'
+        },
+        timestamp: new Date().toISOString()
       });
     }
   }

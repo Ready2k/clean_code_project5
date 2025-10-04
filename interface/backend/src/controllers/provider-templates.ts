@@ -16,9 +16,10 @@ import { getDynamicProviderService } from '../services/dynamic-provider-service.
 import { ValidationError, NotFoundError } from '../types/errors.js';
 import { logger } from '../utils/logger.js';
 import {
-  ProviderTemplate,
   CreateProviderRequest,
-  Provider
+  CreateModelRequest,
+  ProviderCapabilities,
+  ModelCapabilities
 } from '../types/dynamic-providers.js';
 
 // ============================================================================
@@ -134,6 +135,10 @@ export const getTemplates = async (req: Request, res: Response): Promise<void> =
 export const getTemplate = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
 
+  if (!id) {
+    throw new ValidationError('Template ID is required');
+  }
+
   try {
     const template = getProviderTemplate(id);
     
@@ -186,14 +191,14 @@ export const applyTemplate = async (req: Request, res: Response): Promise<void> 
         // Merge any custom auth config
         ...(customizations.authConfig && { fields: { ...template.providerConfig.authConfig.fields, ...customizations.authConfig } })
       },
-      capabilities: template.providerConfig.capabilities || {
+      capabilities: (template.providerConfig.capabilities || {
         supportsSystemMessages: true,
         maxContextLength: 4096,
         supportedRoles: ['system', 'user', 'assistant'],
         supportsStreaming: false,
         supportsTools: false,
         supportedAuthMethods: [template.providerConfig.authMethod]
-      }
+      }) as ProviderCapabilities
     };
 
     // Create the provider using the dynamic provider service
@@ -207,40 +212,56 @@ export const applyTemplate = async (req: Request, res: Response): Promise<void> 
       );
 
       for (const modelConfig of selectedModelConfigs) {
-        await providerService.createModel(provider.id, {
+        const createRequest: CreateModelRequest = {
           identifier: modelConfig.identifier,
           name: modelConfig.name,
-          description: modelConfig.description,
           contextLength: modelConfig.contextLength,
-          capabilities: modelConfig.capabilities || {
+          capabilities: (modelConfig.capabilities || {
             supportsSystemMessages: true,
             maxContextLength: modelConfig.contextLength,
             supportedRoles: ['system', 'user', 'assistant'],
             supportsStreaming: false,
             supportsTools: false,
             supportsFunctionCalling: false
-          },
-          isDefault: modelConfig.isDefault
-        });
+          }) as ModelCapabilities
+        };
+        
+        if (modelConfig.description) {
+          createRequest.description = modelConfig.description;
+        }
+        
+        if (modelConfig.isDefault !== undefined) {
+          createRequest.isDefault = modelConfig.isDefault;
+        }
+        
+        await providerService.createModel(provider.id, createRequest);
       }
     } else {
       // Create all default models
       for (const modelConfig of template.defaultModels) {
-        await providerService.createModel(provider.id, {
+        const createRequest: CreateModelRequest = {
           identifier: modelConfig.identifier,
           name: modelConfig.name,
-          description: modelConfig.description,
           contextLength: modelConfig.contextLength,
-          capabilities: modelConfig.capabilities || {
+          capabilities: (modelConfig.capabilities || {
             supportsSystemMessages: true,
             maxContextLength: modelConfig.contextLength,
             supportedRoles: ['system', 'user', 'assistant'],
             supportsStreaming: false,
             supportsTools: false,
             supportsFunctionCalling: false
-          },
-          isDefault: modelConfig.isDefault
-        });
+          }) as ModelCapabilities
+        };
+        
+        if (modelConfig.description) {
+          createRequest.description = modelConfig.description;
+        }
+        
+        if (modelConfig.isDefault !== undefined) {
+          createRequest.isDefault = modelConfig.isDefault;
+        }
+        
+        await providerService.createModel(provider.id, createRequest);
       }
     }
 
@@ -294,8 +315,8 @@ export const previewTemplate = async (req: Request, res: Response): Promise<void
         : template.defaultModels,
       validation: {
         valid: true,
-        errors: [],
-        warnings: []
+        errors: [] as Array<{ field: string; code: string; message: string; suggestion: string }>,
+        warnings: [] as Array<{ field: string; code: string; message: string; suggestion: string }>
       }
     };
 
@@ -334,13 +355,13 @@ export const previewTemplate = async (req: Request, res: Response): Promise<void
  * Get template categories/providers
  * GET /api/admin/provider-templates/categories
  */
-export const getTemplateCategories = async (req: Request, res: Response): Promise<void> => {
+export const getTemplateCategories = async (_req: Request, res: Response): Promise<void> => {
   try {
     const templates = getAllProviderTemplates();
     
     // Group templates by provider name
     const categories = templates.reduce((acc, template) => {
-      const category = template.name.split(' ')[0]; // Use first word as category
+      const category = template.name.split(' ')[0] || 'Other'; // Use first word as category
       if (!acc[category]) {
         acc[category] = {
           name: category,

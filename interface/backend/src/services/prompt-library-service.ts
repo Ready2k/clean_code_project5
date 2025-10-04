@@ -195,6 +195,7 @@ export class PromptLibraryService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
+      logger.info('Prompt Library Service already initialized, skipping');
       return;
     }
 
@@ -202,15 +203,20 @@ export class PromptLibraryService {
       logger.info('Initializing Prompt Library Service...');
 
       // Create storage directory if it doesn't exist
+      logger.info('Creating storage directory...');
       await fs.mkdir(this.storageDir, { recursive: true });
+      logger.info('Storage directory created/verified');
 
       // Load existing prompts from files
+      logger.info('Loading prompts from files...');
       await this.loadPromptsFromFiles();
+      logger.info('Finished loading prompts from files');
 
       // If no prompts were loaded, create some sample data
       if (this.prompts.size === 0) {
         logger.info('No existing prompts found, creating sample data');
         await this.loadMockData();
+        logger.info('Sample data created');
       }
 
       this.isInitialized = true;
@@ -241,16 +247,22 @@ export class PromptLibraryService {
    */
   private async loadPromptsFromFiles(): Promise<void> {
     try {
+      logger.info('Reading storage directory...');
       const files = await fs.readdir(this.storageDir);
       const yamlFiles = files.filter(file => file.endsWith('.yaml'));
 
       logger.info('Loading prompts from files', { fileCount: yamlFiles.length });
 
+      let loadedCount = 0;
       for (const file of yamlFiles) {
         try {
+          logger.debug('Processing file', { file });
           const filePath = path.join(this.storageDir, file);
           const content = await fs.readFile(filePath, 'utf-8');
+          logger.debug('File content read', { file, contentLength: content.length });
+          
           const prompt = YAML.parse(content) as PromptRecord;
+          logger.debug('YAML parsed', { file, promptId: prompt?.id });
 
           // Validate that the prompt has required fields
           if (prompt.id && prompt.metadata && prompt.humanPrompt) {
@@ -267,7 +279,8 @@ export class PromptLibraryService {
             if (!this.ratings.has(prompt.id)) {
               this.ratings.set(prompt.id, []);
             }
-            logger.debug('Loaded prompt from file', { promptId: prompt.id });
+            loadedCount++;
+            logger.debug('Loaded prompt from file', { promptId: prompt.id, loadedCount });
           } else {
             logger.warn('Invalid prompt structure in file, missing required fields', {
               file,
@@ -282,7 +295,8 @@ export class PromptLibraryService {
       }
 
       logger.info('Finished loading prompts from files', {
-        totalLoaded: this.prompts.size
+        totalLoaded: this.prompts.size,
+        processedFiles: yamlFiles.length
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

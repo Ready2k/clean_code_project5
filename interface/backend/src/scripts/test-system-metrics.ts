@@ -6,7 +6,7 @@
  */
 
 import { getSystemMetricsCollector } from '../utils/system-metrics.js';
-import { logger } from '../utils/logger.js';
+
 
 async function testSystemMetrics() {
   console.log('🔍 Testing System Metrics Collection...\n');

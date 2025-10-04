@@ -164,7 +164,7 @@ export class EnhancementWorkflowService extends EventEmitter {
     }
 
     // Process the questionnaire response
-    this.updateJobStatus(response.jobId, 'in-progress', 50, 'Processing questionnaire response');
+    this.updateJobStatus(response.jobId, 'enhancing', 50, 'Processing questionnaire response');
     
     // Simulate processing
     setTimeout(() => {

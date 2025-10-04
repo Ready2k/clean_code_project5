@@ -22,6 +22,7 @@ import healthMonitoringRoutes from './routes/health-monitoring.js';
 import usageAnalyticsRoutes from './routes/usage-analytics.js';
 import migrationUtilitiesRoutes from './routes/migration-utilities.js';
 import { migrationRoutes } from './routes/migration.js';
+import logsRoutes from './routes/logs.js';
 import { authenticateToken } from './middleware/auth.js';
 import { recordMetrics, trackAPIUsage, trackSecurityEvents } from './middleware/metrics.js';
 import { initializePromptLibraryService, getPromptLibraryService } from './services/prompt-library-service.js';
@@ -149,6 +150,7 @@ app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/ratings', authenticateToken, ratingRoutes);
 app.use('/api/export', authenticateToken, exportRoutes);
 app.use('/api/import', authenticateToken, importRoutes);
+app.use('/api/v1/logs', logsRoutes);
 
 // Dynamic provider management routes (admin only)
 app.use('/api/admin/providers', authenticateToken, providerRoutes);
@@ -207,13 +209,17 @@ async function initializeServices() {
     await initializeUserService(redisService);
 
     // Initialize WebSocket service (after Redis is initialized)
+    logger.info('Initializing WebSocket service...');
     const webSocketService = getWebSocketService();
     webSocketService.initialize(io);
+    logger.info('WebSocket service initialized');
 
     // Initialize prompt library service
+    logger.info('Initializing prompt library service...');
     await initializePromptLibraryService(webSocketService, {
       storageDir: process.env['PROMPT_STORAGE_DIR'] || './data/prompts'
     });
+    logger.info('Prompt library service initialized');
 
     // Initialize connection management service
     await initializeConnectionManagementService({
@@ -263,47 +269,51 @@ async function initializeServices() {
     app.set('io', io);
     app.set('webSocketService', webSocketService);
 
-    // Initialize registry monitoring service (after all other services)
-    await initializeRegistryMonitoring({
-      refreshInterval: parseInt(process.env['REGISTRY_REFRESH_INTERVAL'] || '300000'), // 5 minutes
-      healthCheckInterval: parseInt(process.env['REGISTRY_HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
-      enableAutoRefresh: process.env['REGISTRY_AUTO_REFRESH'] !== 'false',
-      enableHealthMonitoring: process.env['REGISTRY_HEALTH_MONITORING'] !== 'false'
-    });
+    // Initialize database-dependent services only if database is available
+    if (process.env['DATABASE_URL']) {
+      // Initialize registry monitoring service (after all other services)
+      await initializeRegistryMonitoring({
+        refreshInterval: parseInt(process.env['REGISTRY_REFRESH_INTERVAL'] || '300000'), // 5 minutes
+        healthCheckInterval: parseInt(process.env['REGISTRY_HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
+        enableAutoRefresh: process.env['REGISTRY_AUTO_REFRESH'] !== 'false',
+        enableHealthMonitoring: process.env['REGISTRY_HEALTH_MONITORING'] !== 'false'
+      });
 
-    // Initialize provider health monitoring service
-    await initializeHealthMonitoring({
-      healthCheckInterval: parseInt(process.env['HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
-      performanceMetricsInterval: parseInt(process.env['METRICS_INTERVAL'] || '60000'), // 1 minute
-      alertThresholds: {
-        responseTimeMs: parseInt(process.env['ALERT_RESPONSE_TIME_MS'] || '5000'),
-        errorRatePercent: parseInt(process.env['ALERT_ERROR_RATE_PERCENT'] || '10'),
-        uptimePercent: parseInt(process.env['ALERT_UPTIME_PERCENT'] || '95')
-      },
-      retentionDays: parseInt(process.env['HEALTH_DATA_RETENTION_DAYS'] || '30'),
-      enableAlerting: process.env['ENABLE_HEALTH_ALERTING'] !== 'false',
-      enableMetricsCollection: process.env['ENABLE_METRICS_COLLECTION'] !== 'false'
-    });
+      // Initialize provider health monitoring service
+      await initializeHealthMonitoring({
+        healthCheckInterval: parseInt(process.env['HEALTH_CHECK_INTERVAL'] || '300000'), // 5 minutes
+        performanceMetricsInterval: parseInt(process.env['METRICS_INTERVAL'] || '60000'), // 1 minute
+        alertThresholds: {
+          responseTimeMs: parseInt(process.env['ALERT_RESPONSE_TIME_MS'] || '5000'),
+          errorRatePercent: parseInt(process.env['ALERT_ERROR_RATE_PERCENT'] || '10'),
+          uptimePercent: parseInt(process.env['ALERT_UPTIME_PERCENT'] || '95')
+        },
+        retentionDays: parseInt(process.env['HEALTH_DATA_RETENTION_DAYS'] || '30'),
+        enableAlerting: process.env['ENABLE_HEALTH_ALERTING'] !== 'false',
+        enableMetricsCollection: process.env['ENABLE_METRICS_COLLECTION'] !== 'false'
+      });
+      // Initialize provider usage analytics service
+      await initializeUsageAnalytics({
+        aggregationInterval: parseInt(process.env['ANALYTICS_AGGREGATION_INTERVAL'] || '300000'), // 5 minutes
+        retentionDays: parseInt(process.env['ANALYTICS_RETENTION_DAYS'] || '90'), // 90 days
+        enableRecommendations: process.env['ENABLE_USAGE_RECOMMENDATIONS'] !== 'false',
+        enableRealTimeTracking: process.env['ENABLE_REALTIME_TRACKING'] !== 'false'
+      });
 
-    // Initialize provider usage analytics service
-    await initializeUsageAnalytics({
-      aggregationInterval: parseInt(process.env['ANALYTICS_AGGREGATION_INTERVAL'] || '300000'), // 5 minutes
-      retentionDays: parseInt(process.env['ANALYTICS_RETENTION_DAYS'] || '90'), // 90 days
-      enableRecommendations: process.env['ENABLE_USAGE_RECOMMENDATIONS'] !== 'false',
-      enableRealTimeTracking: process.env['ENABLE_REALTIME_TRACKING'] !== 'false'
-    });
-
-    // Initialize provider migration utilities service
-    const migrationUtilitiesService = getProviderMigrationUtilitiesService({
-      batchSize: parseInt(process.env['MIGRATION_BATCH_SIZE'] || '10'),
-      validateBeforeMigration: process.env['MIGRATION_VALIDATE_BEFORE'] !== 'false',
-      createBackup: process.env['MIGRATION_CREATE_BACKUP'] !== 'false',
-      enableRollback: process.env['MIGRATION_ENABLE_ROLLBACK'] !== 'false',
-      dryRun: process.env['MIGRATION_DRY_RUN'] === 'true'
-    });
-    
-    // Initialize migration database tables
-    await migrationUtilitiesService.initializeTables();
+      // Initialize provider migration utilities service
+      const migrationUtilitiesService = getProviderMigrationUtilitiesService({
+        batchSize: parseInt(process.env['MIGRATION_BATCH_SIZE'] || '10'),
+        validateBeforeMigration: process.env['MIGRATION_VALIDATE_BEFORE'] !== 'false',
+        createBackup: process.env['MIGRATION_CREATE_BACKUP'] !== 'false',
+        enableRollback: process.env['MIGRATION_ENABLE_ROLLBACK'] !== 'false',
+        dryRun: process.env['MIGRATION_DRY_RUN'] === 'true'
+      });
+      
+      // Initialize migration database tables
+      await migrationUtilitiesService.initializeTables();
+    } else {
+      logger.info('Database not available, skipping database-dependent services (registry monitoring, health monitoring, usage analytics, migration utilities)');
+    }
 
     logger.info('Services initialized successfully');
   } catch (error) {

@@ -159,8 +159,9 @@ export class UserService {
 
   private async initializeDefaultUser(): Promise<void> {
     try {
-      // Check if admin user exists
-      const existingAdmin = await this.getUserByUsername('admin');
+      // Check if admin user exists (use direct map lookup to avoid circular dependency)
+      const adminUserId = this.usersByUsername.get('admin');
+      const existingAdmin = adminUserId ? this.users.get(adminUserId) : null;
       
       if (!existingAdmin) {
         logger.info('No admin user found, creating default admin user');
@@ -628,7 +629,7 @@ export class UserService {
   private sanitizeEmailForLog(email: string): string {
     const [localPart, domain] = email.split('@');
 
-    if (!domain) {
+    if (!domain || !localPart) {
       if (!localPart) {
         return 'unknown';
       }

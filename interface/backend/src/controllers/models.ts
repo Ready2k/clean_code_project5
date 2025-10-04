@@ -28,47 +28,7 @@ import {
 // Validation Schemas
 // ============================================================================
 
-const modelCapabilitiesSchema = Joi.object({
-  supportsSystemMessages: Joi.boolean().required(),
-  maxContextLength: Joi.number().integer().min(1).required(),
-  supportedRoles: Joi.array().items(Joi.string()).min(1).required(),
-  supportsStreaming: Joi.boolean().required(),
-  supportsTools: Joi.boolean().required(),
-  supportsFunctionCalling: Joi.boolean().required(),
-  supportsVision: Joi.boolean().optional(),
-  supportsAudio: Joi.boolean().optional(),
-  supportsImageGeneration: Joi.boolean().optional(),
-  supportsCodeExecution: Joi.boolean().optional()
-});
 
-const pricingInfoSchema = Joi.object({
-  inputTokenPrice: Joi.number().min(0).optional(),
-  outputTokenPrice: Joi.number().min(0).optional(),
-  imagePrice: Joi.number().min(0).optional(),
-  audioPrice: Joi.number().min(0).optional(),
-  currency: Joi.string().length(3).optional(),
-  billingUnit: Joi.string().optional()
-});
-
-const createModelSchema = Joi.object({
-  identifier: Joi.string().pattern(/^[a-zA-Z0-9-_.]+$/).min(1).max(100).required(),
-  name: Joi.string().min(1).max(255).required(),
-  description: Joi.string().max(1000).optional(),
-  contextLength: Joi.number().integer().min(1).required(),
-  capabilities: modelCapabilitiesSchema.required(),
-  pricingInfo: pricingInfoSchema.optional(),
-  isDefault: Joi.boolean().optional()
-});
-
-const updateModelSchema = Joi.object({
-  name: Joi.string().min(1).max(255).optional(),
-  description: Joi.string().max(1000).allow('').optional(),
-  contextLength: Joi.number().integer().min(1).optional(),
-  capabilities: modelCapabilitiesSchema.optional(),
-  pricingInfo: pricingInfoSchema.optional(),
-  status: Joi.string().valid('active', 'inactive', 'deprecated').optional(),
-  isDefault: Joi.boolean().optional()
-});
 
 // Validation schemas are imported from dynamic-provider-validation.ts
 
@@ -188,13 +148,13 @@ export const getAllModels = async (req: Request, res: Response): Promise<void> =
   const queryParams = { ...req.query };
   
   // Convert comma-separated status to array
-  if (queryParams.status && typeof queryParams.status === 'string') {
-    queryParams.status = queryParams.status.split(',');
+  if (queryParams['status'] && typeof queryParams['status'] === 'string') {
+    queryParams['status'] = queryParams['status'].split(',');
   }
   
   // Convert comma-separated capabilities to array
-  if (queryParams.capabilities && typeof queryParams.capabilities === 'string') {
-    queryParams.capabilities = queryParams.capabilities.split(',');
+  if (queryParams['capabilities'] && typeof queryParams['capabilities'] === 'string') {
+    queryParams['capabilities'] = queryParams['capabilities'].split(',');
   }
 
   const { error, value } = modelQuerySchema.validate(queryParams);
