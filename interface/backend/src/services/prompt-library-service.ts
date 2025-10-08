@@ -175,7 +175,7 @@ export interface RatingData {
 
 /**
  * Service layer that provides prompt library functionality for the API
- * This is a mock implementation that will be replaced with actual integration
+ * This is the actual implementation used by the web interface
  */
 export class PromptLibraryService {
   private isInitialized = false;

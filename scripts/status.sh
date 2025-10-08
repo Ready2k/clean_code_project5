@@ -356,7 +356,7 @@ case "${1:-}" in
         exit 0
         ;;
     --json)
-        echo "JSON output not yet implemented"
+        echo "JSON output not implemented - remove this option if not needed"
         exit 1
         ;;
     --quiet)

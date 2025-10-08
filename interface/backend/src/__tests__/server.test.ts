@@ -83,7 +83,7 @@ describe('Backend API Foundation', () => {
     it('should have auth routes', async () => {
       await request(app)
         .post('/api/auth/login')
-        .expect(501); // Not implemented yet
+        .expect(400); // Should return validation error for missing credentials
     });
 
     it('should have prompt routes (protected)', async () => {

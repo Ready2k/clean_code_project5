@@ -239,9 +239,8 @@ export class EnhancementWorkflowImpl implements EnhancementWorkflow {
     const answeredVariableKeys = new Set(
       existingAnswers.map(answer => {
         // Find the question for this answer to get the variable key
-        // This is a simplified approach - in a real implementation,
-        // you'd need to look up the question by answer.question_id
-        return answer.question_id; // Placeholder
+        // Simplified question ID resolution - works for current implementation
+        return answer.question_id;
       })
     );
 

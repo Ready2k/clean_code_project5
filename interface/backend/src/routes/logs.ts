@@ -148,19 +148,7 @@ router.post(
   }
 );
 
-// Endpoint to retrieve recent logs (admin only)
-router.get('/recent', authenticateToken, (_req, res) => {
-  try {
-    // This would require implementing log retrieval from files
-    // For now, return a placeholder response
-    return res.status(200).json({
-      message: 'Log retrieval not implemented yet',
-      suggestion: 'Use file system tools to access log files in ./logs/ directory'
-    });
-  } catch (error) {
-    logger.error('Failed to retrieve recent logs:', error);
-    return res.status(500).json({ error: 'Failed to retrieve logs' });
-  }
-});
+// Removed unused log retrieval endpoint - add back if needed:
+// GET /recent - was placeholder implementation with no frontend usage
 
 export default router;

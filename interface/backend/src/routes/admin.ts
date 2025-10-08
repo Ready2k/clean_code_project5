@@ -19,8 +19,7 @@ router.put('/users/:id/status', requirePermission(Permission.ADMIN_USERS), async
 router.post('/users/:id/reset-password', requirePermission(Permission.ADMIN_USERS), asyncHandler(adminController.resetUserPassword));
 
 // System administration
-router.get('/audit-logs', requirePermission(Permission.ADMIN_USERS), asyncHandler(adminController.getAuditLogs));
-router.get('/system/usage', requirePermission(Permission.ADMIN_USERS), asyncHandler(adminController.getSystemUsage));
-router.get('/system/errors', requirePermission(Permission.ADMIN_USERS), asyncHandler(adminController.getSystemErrors));
+// Removed unused monitoring endpoints - add back if needed:
+// - /audit-logs, /system/usage, /system/errors
 
 export { router as adminRoutes };

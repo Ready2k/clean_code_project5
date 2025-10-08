@@ -1,0 +1,16 @@
+id: a2472c8d-a254-4151-b9b8-b966b3285349
+username: user1
+email: user1@example.com
+role: user
+status: active
+passwordHash: $2b$12$DP2nAPvsvZc6389VjPE9zeXS7BJAXR62qcp4T5yyvI2e10mvVNXvy
+createdAt: &a1 2025-10-08T18:18:34.914Z
+updatedAt: *a1
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true

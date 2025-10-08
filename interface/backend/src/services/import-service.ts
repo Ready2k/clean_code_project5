@@ -1,4 +1,5 @@
 import { CreatePromptRequest } from './prompt-library-service.js';
+import { logger } from '../utils/logger.js';
 
 export interface ImportOptions {
   sourceProvider?: string;
@@ -14,12 +15,14 @@ export interface ImportOptions {
   forceAsVariant?: boolean;
   interactive?: boolean;
   onVariantDetected?: (variantInfo: VariantDetectionInfo) => Promise<boolean> | boolean;
+  createBaseIfMissing?: boolean;
 }
 
 export interface VariantDetectionInfo {
   isVariant: boolean;
   indicators: string[];
   confidence: number;
+  basePromptHints: string[];
 }
 
 export interface ImportValidationResult {
@@ -31,7 +34,7 @@ export interface ImportValidationResult {
 }
 
 export class ImportService {
-  constructor(private promptLibraryService?: any) {}
+  constructor(private promptLibraryService?: any) { }
 
   /**
    * Import prompt from content string
@@ -71,8 +74,7 @@ export class ImportService {
       const shouldImportAsBase = await this.handleVariantDetection(variantInfo, options);
       if (!shouldImportAsBase && options.allowVariantImport) {
         // User chose to import as variant - preserve variant metadata
-        // This would require additional logic to link to base prompt
-        throw new Error('Variant import not yet implemented. Use forceAsBasePrompt: true to import as base prompt.');
+        return await this.importAsVariant(promptData, variantInfo, options);
       }
     }
 
@@ -126,7 +128,7 @@ export class ImportService {
 
     // Detect provider format
     const detection = this.detectProviderFormat(content);
-    
+
     if (!detection.provider && !options.sourceProvider) {
       errors.push('Could not detect provider format');
       suggestions.push('Specify sourceProvider in import options');
@@ -170,7 +172,7 @@ export class ImportService {
 
     // OpenAI format detection
     if (content.messages && Array.isArray(content.messages)) {
-      const hasValidMessages = content.messages.every((msg: any) => 
+      const hasValidMessages = content.messages.every((msg: any) =>
         msg.role && ['system', 'user', 'assistant'].includes(msg.role) && msg.content
       );
       if (hasValidMessages) {
@@ -180,7 +182,7 @@ export class ImportService {
 
     // Meta/Llama format detection
     if (content.messages && Array.isArray(content.messages)) {
-      const hasLlamaStructure = content.messages.some((msg: any) => 
+      const hasLlamaStructure = content.messages.some((msg: any) =>
         msg.role === 'system' || (msg.role === 'user' && typeof msg.content === 'string')
       );
       if (hasLlamaStructure) {
@@ -281,7 +283,7 @@ export class ImportService {
     } else if (userMessages[0]?.content) {
       title = this.extractTitleFromContent(userMessages[0].content) || title;
     }
-    
+
     // Create human prompt from metadata if available
     const humanPrompt = {
       goal: content._metadata?.originalPrompt?.goal || this.extractGoalFromMessages(messages),
@@ -355,7 +357,7 @@ export class ImportService {
   private convertFromInternal(content: any, options: ImportOptions): CreatePromptRequest {
     // If it's already in internal format, extract the needed parts
     const title = content.metadata?.title || 'Imported Prompt';
-    
+
     return {
       humanPrompt: content.humanPrompt || content.prompt_human || {
         goal: 'Imported goal',
@@ -385,14 +387,14 @@ export class ImportService {
     let format = 'Text';
     let mainContent = content;
     let modelInfo = '';
-    
+
     // Parse YAML frontmatter if present
     if (content.startsWith('---')) {
       const frontmatterEnd = content.indexOf('---', 3);
       if (frontmatterEnd !== -1) {
         const frontmatter = content.substring(3, frontmatterEnd).trim();
         mainContent = content.substring(frontmatterEnd + 3).trim();
-        
+
         // Parse YAML frontmatter
         const yamlLines = frontmatter.split('\n');
         for (const line of yamlLines) {
@@ -407,25 +409,25 @@ export class ImportService {
         }
       }
     }
-    
+
     const lines = mainContent.split('\n');
-    
+
     // Parse markdown content
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]?.trim() || '';
-      
+
       // Extract title from first H1 header if not found in frontmatter
       if (line.startsWith('# ') && title.includes('Imported')) {
         title = line.substring(2).trim();
         continue;
       }
-      
+
       // Look for common sections
       if (line.startsWith('## ') || line.startsWith('### ')) {
         currentSection = line.substring(line.indexOf(' ') + 1).toLowerCase();
         continue;
       }
-      
+
       // Extract content based on section
       if (line && !line.startsWith('#')) {
         switch (currentSection) {
@@ -466,7 +468,7 @@ export class ImportService {
         }
       }
     }
-    
+
     // If no goal found in sections, use description or first paragraph
     if (!goal) {
       if (description) {
@@ -479,7 +481,7 @@ export class ImportService {
         }
       }
     }
-    
+
     // If no steps found, extract from remaining content
     if (steps.length === 0) {
       const paragraphs = mainContent.split('\n\n').filter(p => p.trim());
@@ -489,17 +491,17 @@ export class ImportService {
         steps.push('Follow the instructions in the content');
       }
     }
-    
+
     // Fallback values
     if (!goal) goal = 'Process the markdown content';
-    
+
     // Use description as summary if available, otherwise generate one
     const summary = description || `Imported from markdown: ${title}`;
-    
+
     // Determine provider from model info
     let tunedForProvider = '';
     const preferredModel = modelInfo;
-    
+
     if (modelInfo) {
       const lowerModel = modelInfo.toLowerCase();
       if (lowerModel.includes('sonnet') || lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
@@ -510,22 +512,22 @@ export class ImportService {
         tunedForProvider = 'meta';
       }
     }
-    
+
     // Build tags including provider-model tag
     const baseTags = options.defaultTags || ['imported', 'markdown'];
-    const providerModelTag = tunedForProvider && preferredModel 
-      ? `${tunedForProvider}-${preferredModel}` 
+    const providerModelTag = tunedForProvider && preferredModel
+      ? `${tunedForProvider}-${preferredModel}`
       : null;
-    
+
     // Auto-detect prompt type and add tag
     const promptType = ImportService.detectPromptType({ goal, audience, steps, output_expectations: { format, fields: [] } });
     const promptTypeTag = `prompt-type:${promptType}`;
-    
+
     const allTags = [...baseTags, promptTypeTag];
     if (providerModelTag) {
       allTags.push(providerModelTag);
     }
-    
+
     return {
       humanPrompt: {
         goal,
@@ -554,7 +556,7 @@ export class ImportService {
   private static detectPromptType(humanPrompt: any): 'task' | 'agent' {
     const goalLower = humanPrompt.goal.toLowerCase();
     const stepsText = humanPrompt.steps.join(' ').toLowerCase();
-    
+
     // Agent-defining keywords (identity/capability focused)
     const agentKeywords = [
       'expert', 'specialist', 'engineer', 'architect', 'masters', 'specializing',
@@ -562,14 +564,14 @@ export class ImportService {
       'example interactions', 'purpose', '## capabilities', '## behavioral',
       'you are', 'i am', 'my expertise', 'my specialization'
     ];
-    
+
     // Task-defining keywords (action/deliverable focused) - for future use
     // const taskKeywords = ['create', 'build', 'generate', 'analyze', 'write', 'develop', 'design'];
-    
-    const hasAgentKeywords = agentKeywords.some(keyword => 
+
+    const hasAgentKeywords = agentKeywords.some(keyword =>
       goalLower.includes(keyword) || stepsText.includes(keyword)
     );
-    
+
     // If agent keywords present, it's an agent
     // Otherwise, it's a task
     return hasAgentKeywords ? 'agent' : 'task';
@@ -580,7 +582,7 @@ export class ImportService {
    */
   private extractTitleFromContent(content: string): string | null {
     if (!content) return null;
-    
+
     // Look for title-like patterns
     const titlePatterns = [
       /^#\s+(.+)$/m,  // Markdown header
@@ -638,7 +640,7 @@ export class ImportService {
     // Try to extract numbered steps
     const content = userMessages.map(m => m.content).join('\n');
     const stepMatches = content.match(/^\d+\.\s+(.+)$/gm);
-    
+
     if (stepMatches && stepMatches.length > 1) {
       return stepMatches.map(step => step.replace(/^\d+\.\s+/, ''));
     }
@@ -660,11 +662,11 @@ export class ImportService {
     const variantIndicators: string[] = [];
     const metadata = promptData.metadata;
     const tags = metadata.tags || [];
-    
+
     // Check for variant tags
     const variantTags = ['enhanced'];
     const providerModelPattern = /^(openai|anthropic|meta|aws|google)-/i;
-    
+
     for (const tag of tags) {
       if (variantTags.includes(tag.toLowerCase())) {
         variantIndicators.push(`Tag: ${tag}`);
@@ -673,7 +675,7 @@ export class ImportService {
         variantIndicators.push(`Provider-model tag: ${tag}`);
       }
     }
-    
+
     // Check for variant metadata fields
     if ((metadata as any).variant_of) {
       variantIndicators.push(`Linked to base prompt: ${(metadata as any).variant_of}`);
@@ -684,7 +686,7 @@ export class ImportService {
     if ((metadata as any).preferred_model) {
       variantIndicators.push(`Preferred model: ${(metadata as any).preferred_model}`);
     }
-    
+
     // Check for variant title patterns
     const title = metadata.title || '';
     const variantTitlePatterns = [
@@ -694,18 +696,19 @@ export class ImportService {
       /optimized for/i,
       /tuned for/i
     ];
-    
+
     for (const pattern of variantTitlePatterns) {
       if (pattern.test(title)) {
         variantIndicators.push(`Title pattern: ${title}`);
         break;
       }
     }
-    
+
     return {
       isVariant: variantIndicators.length > 0,
       indicators: variantIndicators,
-      confidence: Math.min(variantIndicators.length / 3, 1) // 0-1 scale
+      confidence: Math.min(variantIndicators.length / 3, 1), // 0-1 scale
+      basePromptHints: [] // Extract hints from title/content if needed
     };
   }
 
@@ -720,18 +723,18 @@ export class ImportService {
     if (options.forceAsVariant === true) {
       return false; // Import as variant
     }
-    
+
     // If interactive mode is disabled, default to base prompt
     if (options.interactive === false) {
       return true;
     }
-    
+
     // In a real implementation, this would show a user prompt
     // For now, we'll use a callback if provided, otherwise default to base prompt
     if (options.onVariantDetected && typeof options.onVariantDetected === 'function') {
       return await options.onVariantDetected(variantInfo);
     }
-    
+
     // Default: import as base prompt (safer option)
     return true;
   }
@@ -741,23 +744,23 @@ export class ImportService {
    */
   private cleanVariantMetadata(promptData: CreatePromptRequest): void {
     const metadata = promptData.metadata as any;
-    
+
     // Remove variant-specific metadata fields
     delete metadata.variant_of;
     delete metadata.tuned_for_provider;
     delete metadata.preferred_model;
-    
+
     // Clean variant tags
     if (metadata.tags) {
       const variantTags = ['enhanced'];
       const providerModelPattern = /^(openai|anthropic|meta|aws|google)-/i;
-      
+
       metadata.tags = metadata.tags.filter((tag: string) => {
-        return !variantTags.includes(tag.toLowerCase()) && 
-               !providerModelPattern.test(tag);
+        return !variantTags.includes(tag.toLowerCase()) &&
+          !providerModelPattern.test(tag);
       });
     }
-    
+
     // Clean variant title patterns
     if (metadata.title) {
       metadata.title = metadata.title
@@ -767,7 +770,7 @@ export class ImportService {
         .replace(/\s*-\s*optimized\s+for\s+.*/i, '') // Remove optimization descriptions
         .trim();
     }
-    
+
     // Clean summary
     if (metadata.summary) {
       metadata.summary = metadata.summary
@@ -775,7 +778,7 @@ export class ImportService {
         .replace(/\s*-\s*optimized\s+for\s+.*/i, '')
         .trim();
     }
-    
+
     // Ensure imported tag is present
     if (!metadata.tags) {
       metadata.tags = [];
@@ -783,7 +786,7 @@ export class ImportService {
     if (!metadata.tags.includes('imported')) {
       metadata.tags.push('imported');
     }
-    
+
     // Add base-prompt tag to clearly indicate this is a base prompt
     if (!metadata.tags.includes('base-prompt')) {
       metadata.tags.push('base-prompt');
@@ -799,7 +802,7 @@ export class ImportService {
     try {
       // Try to find by title (simplified approach)
       const allPrompts = await this.promptLibraryService.getPrompts({});
-      const existingByTitle = allPrompts.prompts.find((p: any) => 
+      const existingByTitle = allPrompts.prompts.find((p: any) =>
         p.metadata.title.toLowerCase() === promptData.metadata.title.toLowerCase()
       );
       return existingByTitle || null;
@@ -851,5 +854,153 @@ export class ImportService {
       default:
         throw new Error(`Unknown conflict resolution strategy: ${options.conflictResolution}`);
     }
+  }
+
+  /**
+   * Import as variant - find base prompt and create variant
+   */
+  private async importAsVariant(
+    promptData: CreatePromptRequest,
+    variantInfo: VariantDetectionInfo,
+    options: ImportOptions
+  ): Promise<any> {
+    if (!this.promptLibraryService) {
+      throw new Error('Prompt library service not available for variant import');
+    }
+
+    // Try to find the base prompt
+    let basePrompt = null;
+
+    // Strategy 1: Look for base prompt by similar title (without variant indicators)
+    const baseTitle = this.extractBaseTitle(promptData.metadata.title);
+    const allPrompts = await this.promptLibraryService.getPrompts({});
+
+    basePrompt = allPrompts.prompts.find((p: any) => {
+      const candidateTitle = p.metadata.title.toLowerCase();
+      const searchTitle = baseTitle.toLowerCase();
+      return candidateTitle === searchTitle ||
+        candidateTitle.includes(searchTitle) ||
+        searchTitle.includes(candidateTitle);
+    });
+
+    // Strategy 2: If no base found, look for prompts with similar content
+    if (!basePrompt && variantInfo.basePromptHints.length > 0) {
+      basePrompt = allPrompts.prompts.find((p: any) => {
+        return variantInfo.basePromptHints.some(hint =>
+          p.metadata.title.toLowerCase().includes(hint.toLowerCase()) ||
+          p.metadata.summary?.toLowerCase().includes(hint.toLowerCase())
+        );
+      });
+    }
+
+    // If still no base prompt found, create one or import as base
+    if (!basePrompt) {
+      if (options.createBaseIfMissing) {
+        // Create a base prompt first
+        const basePromptData = this.createBasePromptFromVariant(promptData);
+        basePrompt = await this.promptLibraryService.createPrompt(basePromptData);
+        logger.info('Created base prompt for variant import', {
+          basePromptId: basePrompt.id,
+          baseTitle: basePromptData.metadata.title
+        });
+      } else {
+        throw new Error(`Cannot import as variant: base prompt not found. Use createBaseIfMissing: true or forceAsBasePrompt: true`);
+      }
+    }
+
+    // Now create the variant
+    const variantPromptData = this.prepareVariantPromptData(promptData, basePrompt, variantInfo);
+    const variant = await this.promptLibraryService.createPrompt(variantPromptData);
+
+    logger.info('Successfully imported as variant', {
+      variantId: variant.id,
+      basePromptId: basePrompt.id,
+      variantTitle: variant.metadata.title
+    });
+
+    return variant;
+  }
+
+  /**
+   * Extract base title from variant title
+   */
+  private extractBaseTitle(title: string): string {
+    return title
+      .replace(/\s*\(enhanced\)/i, '')
+      .replace(/\s*\([^)]*-[^)]*\)/i, '') // Remove (provider-model) patterns
+      .replace(/\s*-\s*enhanced\s+using\s+.*/i, '') // Remove enhancement descriptions
+      .replace(/\s*-\s*optimized\s+for\s+.*/i, '') // Remove optimization descriptions
+      .replace(/\s*-\s*variant\s*/i, '') // Remove variant indicators
+      .replace(/\s*v\d+(\.\d+)?\s*/i, '') // Remove version numbers
+      .trim();
+  }
+
+  /**
+   * Create base prompt data from variant
+   */
+  private createBasePromptFromVariant(variantData: CreatePromptRequest): CreatePromptRequest {
+    const baseTitle = this.extractBaseTitle(variantData.metadata.title);
+
+    return {
+      humanPrompt: {
+        ...variantData.humanPrompt,
+        // Simplify the goal and steps for base prompt
+        goal: variantData.humanPrompt.goal.replace(/enhanced|optimized|improved/gi, '').trim(),
+        steps: variantData.humanPrompt.steps.map(step =>
+          step.replace(/^enhanced:\s*/i, '').replace(/^improved:\s*/i, '').trim()
+        )
+      },
+      metadata: {
+        ...variantData.metadata,
+        title: baseTitle,
+        summary: variantData.metadata.summary?.replace(/\s*-\s*(enhanced|optimized).*$/i, '').trim(),
+        tags: ['base-prompt', 'imported']
+      },
+      owner: variantData.owner || 'imported-user'
+    };
+  }
+
+  /**
+   * Prepare variant prompt data
+   */
+  private prepareVariantPromptData(
+    originalData: CreatePromptRequest,
+    basePrompt: any,
+    _variantInfo: VariantDetectionInfo
+  ): CreatePromptRequest {
+    // Determine variant type and tags
+    const variantTags = [...(originalData.metadata.tags || [])];
+
+    // Add variant indicator tags
+    if (!variantTags.includes('variant')) {
+      variantTags.push('variant');
+    }
+    if (!variantTags.includes('imported')) {
+      variantTags.push('imported');
+    }
+
+    // Add provider/model specific tags if detected
+    if (originalData.metadata.tuned_for_provider) {
+      const providerTag = `${originalData.metadata.tuned_for_provider}-optimized`;
+      if (!variantTags.includes(providerTag)) {
+        variantTags.push(providerTag);
+      }
+    }
+
+    return {
+      ...originalData,
+      metadata: {
+        ...originalData.metadata,
+        tags: variantTags,
+        // Ensure variant title is distinct
+        title: originalData.metadata.title.includes('variant') ?
+          originalData.metadata.title :
+          `${originalData.metadata.title} (Variant)`,
+        // Add reference to base in summary
+        summary: originalData.metadata.summary ?
+          `${originalData.metadata.summary} [Variant of: ${basePrompt.metadata.title}]` :
+          `Variant of: ${basePrompt.metadata.title}`
+      }
+    };
   }
 }

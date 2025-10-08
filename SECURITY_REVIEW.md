@@ -20,15 +20,15 @@ This report summarizes the most critical security risks identified in the curren
    *Evidence*: `importFromUrl` passes user-provided URLs directly to `fetch` after minimal validation.【F:interface/backend/src/controllers/import.ts†L112-L158】  
    *Recommendation*: Restrict imports to trusted domains or signed sources, enforce protocol allow-lists, and add network-layer protections (e.g., SSRF proxy, URL validation with DNS/IP checks).
 
-4. **Log File Path Traversal (High) – Resolved**
-   *Description*: The log viewing API previously joined user-controlled filenames directly with the logs directory, enabling directory traversal and arbitrary file reads for users with `system:config` access.
-   *Status*: ✅ Fixed. `LogReaderService` now builds an allow-list of `.log` files and calls `validateLogPath` to canonicalize requests, ensuring every filename stays within the configured logs directory. Unauthorized access attempts are rejected and logged for auditing.【F:interface/backend/src/services/log-reader-service.ts†L1-L120】【F:interface/backend/src/utils/path-security.ts†L1-L53】
-   *Recommendation*: Maintain the centralized validation utility and keep the allow-list refreshed to preserve the protection against traversal attacks.
+4. **Log File Path Traversal (High)**  
+   *Description*: The log viewing API accepts a `filename` path segment and joins it directly with the logs directory. Attackers with the `system:config` permission can request `../../../../etc/passwd` (or similar) and read arbitrary files accessible to the process.  
+   *Evidence*: `getLogFileContent` forwards unsanitized filenames to `logReaderService.readLogFile`, which uses `path.join` without enforcing directory boundaries.【F:interface/backend/src/controllers/system.ts†L300-L333】【F:interface/backend/src/services/log-reader-service.ts†L83-L125】  
+   *Recommendation*: Normalize and validate filenames, reject path traversal sequences, and maintain an allow-list of known log files before reading from disk.
 
-5. **Unauthenticated Log Ingestion Enables Log Forgery / DoS (Medium) – Resolved**
-   *Description*: The `/api/v1/logs/frontend` endpoints formerly accepted unauthenticated payloads, letting attackers inject or flood server logs.
-   *Status*: ✅ Fixed. Frontend log ingestion routes now require JWT authentication, apply dedicated rate-limiters, and validate each payload with schema-based middleware before logging, preventing anonymous spoofing or volumetric abuse.【F:interface/backend/src/routes/logs.ts†L1-L116】【F:interface/backend/src/middleware/log-ingestion.ts†L1-L74】
-   *Recommendation*: Monitor rate-limit metrics and adjust thresholds as needed while retaining authentication and validation.
+5. **Unauthenticated Log Ingestion Enables Log Forgery / DoS (Medium)**  
+   *Description*: The `/api/v1/logs/frontend` and `/api/v1/logs/frontend/batch` endpoints allow anyone to submit arbitrary log messages that are written to server log files. An attacker can flood storage, obscure true audit events, or inject misleading log entries.  
+   *Evidence*: Log ingestion routes are exposed without authentication and forward request bodies straight into the logger.【F:interface/backend/src/routes/logs.ts†L7-L115】  
+   *Recommendation*: Require authentication and rate limiting for log ingestion, validate message content, and cap total log volume accepted from clients.
 
 ## Remediation Priorities
 

@@ -1,0 +1,16 @@
+id: 741dffe1-e544-45f9-8bb3-141fd3aeb1a2
+username: user2
+email: user2@example.com
+role: admin
+status: active
+passwordHash: $2b$12$lLWi9/c9vc00uerO2VWEO.jE4/FOXVEu84kjP9deeXUEqKcjUTBGG
+createdAt: &a1 2025-10-08T18:18:35.107Z
+updatedAt: *a1
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true

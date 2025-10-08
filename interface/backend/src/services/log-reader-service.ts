@@ -235,6 +235,18 @@ class LogReaderService {
   }
 
   /**
+   * List available log files safely
+   */
+  async listLogFiles(): Promise<string[]> {
+    try {
+      return await getAllowedLogFiles(this.logsDir);
+    } catch (error) {
+      logger.error('Failed to list log files:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get log statistics
    */
   async getLogStats(): Promise<LogStats> {

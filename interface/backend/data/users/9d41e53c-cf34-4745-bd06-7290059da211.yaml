@@ -1,0 +1,16 @@
+id: 9d41e53c-cf34-4745-bd06-7290059da211
+username: user3
+email: user3@example.com
+role: viewer
+status: active
+passwordHash: $2b$12$XrT5gEsSDN8jkzTExJCpVOuVTd2o160LD0AHi6iaxJTwEOzM4fzc.
+createdAt: &a1 2025-10-08T18:18:35.293Z
+updatedAt: *a1
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true

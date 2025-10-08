@@ -274,7 +274,7 @@ export const getLogFiles = async (_req: Request, res: Response): Promise<void> =
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
     
-    const logFiles = await logReaderService.getLogFiles();
+    const logFiles = await logReaderService.listLogFiles();
     
     res.json({
       success: true,
@@ -304,6 +304,11 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
     
     if (!filename) {
       throw new ValidationError('Filename parameter is required');
+    }
+
+    // Additional security: validate filename format before processing
+    if (typeof filename !== 'string' || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      throw new ValidationError('Invalid filename format');
     }
     
     const limitNum = parseInt(limit as string, 10);
@@ -355,6 +360,7 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
     }
   }
 };
+
 
 /**
  * Search logs across all files
