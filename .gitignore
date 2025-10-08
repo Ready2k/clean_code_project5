@@ -44,7 +44,10 @@ tmp/
 temp/
 
 # Prompt library data (for development)
-prompts/
-renders/
-specs/
+/prompts/
+/renders/
+/specs/
 .prompt-library/
+data/prompts/
+interface/data/prompts/
+interface/backend/data/prompts/
