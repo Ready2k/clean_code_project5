@@ -4,7 +4,7 @@ email: admin@example.com
 role: admin
 passwordHash: $2b$12$DuaREt0ey16.PrJGNe8xBeHGEA8V/XVqLJt6T0XRpw6MjmJ4z9VDa
 createdAt: 2025-09-24T09:12:50.288Z
-updatedAt: 2025-10-04T17:45:52.680Z
+updatedAt: 2025-10-08T19:00:56.596Z
 preferences:
   theme: light
   language: en
@@ -13,5 +13,5 @@ preferences:
     browser: true
     enhancement: true
     system: true
-lastLogin: 2025-10-04T17:45:52.680Z
+lastLogin: 2025-10-08T19:00:56.596Z
 status: active
