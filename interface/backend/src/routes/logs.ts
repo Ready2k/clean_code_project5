@@ -1,116 +1,152 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { validateLogEntry, validateBatchLogEntries } from '../middleware/log-validation.js';
-import { rateLimitSingleLog, rateLimitBatchLogs } from '../middleware/log-rate-limit.js';
+import {
+  rateLimitBatchLogs,
+  rateLimitSingleLog,
+  validateBatchLogEntries,
+  validateLogEntry
+} from '../middleware/log-ingestion.js';
 
 const router = Router();
 
-// Endpoint to receive single frontend log entry (now secured)
-router.post('/frontend', authenticateToken, rateLimitSingleLog, validateLogEntry, (req, res) => {
-  try {
-    const logEntry = req.body;
-    
-    // Validate log entry structure
-    if (!logEntry.timestamp || !logEntry.level || !logEntry.message) {
-      return res.status(400).json({ 
-        error: 'Invalid log entry format',
-        required: ['timestamp', 'level', 'message']
-      });
-    }
+type LogLevel = 'error' | 'warn' | 'warning' | 'info' | 'debug' | 'trace' | 'fatal';
 
-    // Log to backend with frontend prefix
-    const level = logEntry.level.toLowerCase();
-    const message = `[FRONTEND] ${logEntry.message}`;
-    const meta = {
-      ...logEntry,
-      source: 'frontend',
-      originalLevel: logEntry.level
-    };
+interface FrontendLogEntry {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  [key: string]: unknown;
+}
 
-    // Route to appropriate log level
-    switch (level) {
-      case 'error':
-        logger.error(message, meta);
-        break;
-      case 'warn':
-        logger.warn(message, meta);
-        break;
-      case 'debug':
-        logger.debug(message, meta);
-        break;
-      default:
-        logger.info(message, meta);
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (error) {
-    logger.error('Failed to process frontend log entry:', error);
-    return res.status(500).json({ error: 'Failed to process log entry' });
+const normalizeLogLevel = (level: LogLevel): 'error' | 'warn' | 'info' | 'debug' => {
+  switch (level) {
+    case 'warning':
+      return 'warn';
+    case 'trace':
+      return 'debug';
+    case 'fatal':
+      return 'error';
+    default:
+      return level;
   }
-});
+};
 
-// Endpoint to receive batch of frontend log entries (now secured)
-router.post('/frontend/batch', authenticateToken, rateLimitBatchLogs, validateBatchLogEntries, (req, res) => {
-  try {
-    const { logs } = req.body; // Updated to match validation middleware expectation
-    
-    if (!Array.isArray(logs)) {
-      return res.status(400).json({ 
-        error: 'Expected logs array in request body' 
-      });
-    }
+// Endpoint to receive single frontend log entry
+router.post(
+  '/frontend',
+  authenticateToken,
+  rateLimitSingleLog,
+  validateLogEntry,
+  (req, res) => {
+    try {
+      const logEntry = req.body as FrontendLogEntry;
 
-    let processed = 0;
-    let errors = 0;
-
-    logs.forEach((logEntry, index) => {
-      try {
-        // Validation is already done by middleware, so we can trust the structure
-
-        // Log to backend with frontend prefix
-        const level = logEntry.level.toLowerCase();
-        const message = `[FRONTEND] ${logEntry.message}`;
-        const meta = {
-          ...logEntry,
-          source: 'frontend',
-          originalLevel: logEntry.level,
-          batchIndex: index
-        };
-
-        // Route to appropriate log level
-        switch (level) {
-          case 'error':
-            logger.error(message, meta);
-            break;
-          case 'warn':
-            logger.warn(message, meta);
-            break;
-          case 'debug':
-            logger.debug(message, meta);
-            break;
-          default:
-            logger.info(message, meta);
-        }
-
-        processed++;
-      } catch (error) {
-        errors++;
-        logger.error(`Failed to process frontend log entry at index ${index}:`, error);
+      // Validate log entry structure
+      if (!logEntry.timestamp || !logEntry.level || !logEntry.message) {
+        return res.status(400).json({
+          error: 'Invalid log entry format',
+          required: ['timestamp', 'level', 'message']
+        });
       }
-    });
 
-    return res.status(200).json({ 
-      success: true, 
-      processed, 
-      errors,
-      total: logs.length 
-    });
-  } catch (error) {
-    logger.error('Failed to process frontend log batch:', error);
-    return res.status(500).json({ error: 'Failed to process log batch' });
+      // Log to backend with frontend prefix
+      const normalizedLevel = normalizeLogLevel(logEntry.level.toLowerCase() as LogLevel);
+      const message = `[FRONTEND] ${logEntry.message}`;
+      const meta = {
+        ...logEntry,
+        source: 'frontend',
+        originalLevel: logEntry.level
+      };
+
+      // Route to appropriate log level
+      switch (normalizedLevel) {
+        case 'error':
+          logger.error(message, meta);
+          break;
+        case 'warn':
+          logger.warn(message, meta);
+          break;
+        case 'debug':
+          logger.debug(message, meta);
+          break;
+        default:
+          logger.info(message, meta);
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      logger.error('Failed to process frontend log entry:', error);
+      return res.status(500).json({ error: 'Failed to process log entry' });
+    }
   }
-});
+);
+
+// Endpoint to receive batch of frontend log entries
+router.post(
+  '/frontend/batch',
+  authenticateToken,
+  rateLimitBatchLogs,
+  validateBatchLogEntries,
+  (req, res) => {
+    try {
+      const logEntries = req.body as FrontendLogEntry[];
+
+      let processed = 0;
+      let errors = 0;
+
+      logEntries.forEach((logEntry, index) => {
+        try {
+          // Validate log entry structure (defensive, should already be validated)
+          if (!logEntry.timestamp || !logEntry.level || !logEntry.message) {
+            errors++;
+            return;
+          }
+
+          // Log to backend with frontend prefix
+          const normalizedLevel = normalizeLogLevel(logEntry.level.toLowerCase() as LogLevel);
+          const message = `[FRONTEND] ${logEntry.message}`;
+          const meta = {
+            ...logEntry,
+            source: 'frontend',
+            originalLevel: logEntry.level,
+            batchIndex: index
+          };
+
+          // Route to appropriate log level
+          switch (normalizedLevel) {
+            case 'error':
+              logger.error(message, meta);
+              break;
+            case 'warn':
+              logger.warn(message, meta);
+              break;
+            case 'debug':
+              logger.debug(message, meta);
+              break;
+            default:
+              logger.info(message, meta);
+          }
+
+          processed++;
+        } catch (error) {
+          errors++;
+          logger.error(`Failed to process frontend log entry at index ${index}:`, error);
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        processed,
+        errors,
+        total: logEntries.length
+      });
+    } catch (error) {
+      logger.error('Failed to process frontend log batch:', error);
+      return res.status(500).json({ error: 'Failed to process log batch' });
+    }
+  }
+);
 
 // Removed unused log retrieval endpoint - add back if needed:
 // GET /recent - was placeholder implementation with no frontend usage

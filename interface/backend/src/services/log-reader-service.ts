@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { logger } from '../utils/logger.js';
-import { validateLogPath, getAllowedLogFiles } from '../utils/path-security.js';
+import { logger, securityLogger } from '../utils/logger.js';
+import { PathValidationError, validateLogPath } from '../utils/path-security.js';
 
 export interface LogEntry {
   timestamp: string;
@@ -39,6 +39,9 @@ export interface LogStats {
 
 class LogReaderService {
   private logsDir: string;
+  private allowedLogFiles: Set<string> | null = null;
+  private allowListUpdatedAt = 0;
+  private readonly allowListTtlMs = 60_000;
 
   constructor() {
     this.logsDir = process.env['LOGS_DIR'] || path.resolve(process.cwd(), '../../logs');
@@ -49,14 +52,15 @@ class LogReaderService {
    */
   async getLogFiles(): Promise<LogFile[]> {
     try {
-      const files = await fs.readdir(this.logsDir);
+      const allowedFiles = await this.getAllowedLogFiles();
+      const allowList = this.allowedLogFiles ?? new Set(allowedFiles);
       const logFiles: LogFile[] = [];
 
-      for (const file of files) {
-        if (file.endsWith('.log')) {
-          const filePath = path.join(this.logsDir, file);
+      for (const file of allowedFiles) {
+        try {
+          const filePath = validateLogPath(this.logsDir, file, allowList);
           const stats = await fs.stat(filePath);
-          
+
           let type: 'backend' | 'frontend' | 'system' = 'system';
           if (file.startsWith('backend-')) {
             type = 'backend';
@@ -70,6 +74,11 @@ class LogReaderService {
             size: stats.size,
             lastModified: stats.mtime,
             type
+          });
+        } catch (error) {
+          securityLogger.warn('Rejected unauthorized log file listing attempt', {
+            file,
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -96,9 +105,10 @@ class LogReaderService {
     } = {}
   ): Promise<{ logs: LogEntry[]; total: number }> {
     try {
-      // Validate and secure the file path to prevent path traversal
-      const filePath = validateLogPath(this.logsDir, filename);
-      
+      const allowedFiles = await this.getAllowedLogFiles();
+      const allowList = this.allowedLogFiles ?? new Set(allowedFiles);
+      const filePath = validateLogPath(this.logsDir, filename, allowList);
+
       // Check if file exists
       try {
         await fs.access(filePath);
@@ -161,6 +171,14 @@ class LogReaderService {
 
       return { logs: paginatedLogs, total };
     } catch (error) {
+      if (error instanceof PathValidationError) {
+        securityLogger.warn('Blocked unauthorized log file access attempt', {
+          filename,
+          error: error.message
+        });
+        return { logs: [], total: 0 };
+      }
+
       logger.error(`Failed to read log file ${filename}:`, error);
       return { logs: [], total: 0 };
     }
@@ -302,6 +320,26 @@ class LogReaderService {
       limit
     });
     return logs;
+  }
+
+  private async getAllowedLogFiles(): Promise<string[]> {
+    const now = Date.now();
+    if (this.allowedLogFiles && now - this.allowListUpdatedAt < this.allowListTtlMs) {
+      return Array.from(this.allowedLogFiles);
+    }
+
+    try {
+      const files = await fs.readdir(this.logsDir);
+      const allowed = files.filter(file => file.endsWith('.log') && !file.includes(path.sep));
+      this.allowedLogFiles = new Set(allowed);
+      this.allowListUpdatedAt = now;
+      return allowed;
+    } catch (error) {
+      logger.error('Failed to build allowed log file list:', error);
+      this.allowedLogFiles = new Set();
+      this.allowListUpdatedAt = now;
+      return [];
+    }
   }
 
   /**
