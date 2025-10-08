@@ -31,7 +31,7 @@ export function createLogRateLimit(options: RateLimitOptions) {
 
       const key = keyGenerator(req);
       const now = Date.now();
-      const windowStart = now - windowMs;
+      // const windowStart = now - windowMs; // Unused for now
 
       // Create Redis keys
       const requestCountKey = `rate_limit:logs:requests:${key}`;
@@ -52,7 +52,7 @@ export function createLogRateLimit(options: RateLimitOptions) {
       // Check request rate limit
       if (requestCount >= maxRequests) {
         logger.warn(`Rate limit exceeded for log requests from ${key}: ${requestCount}/${maxRequests}`);
-        return res.status(429).json({
+        res.status(429).json({
           success: false,
           error: {
             code: 'RATE_LIMIT_EXCEEDED',
@@ -61,12 +61,13 @@ export function createLogRateLimit(options: RateLimitOptions) {
           },
           timestamp: new Date().toISOString()
         });
+        return;
       }
 
       // Check log entries rate limit
       if (logCount + currentLogEntries > maxLogEntries) {
         logger.warn(`Log entries rate limit exceeded from ${key}: ${logCount + currentLogEntries}/${maxLogEntries}`);
-        return res.status(429).json({
+        res.status(429).json({
           success: false,
           error: {
             code: 'LOG_ENTRIES_LIMIT_EXCEEDED',
@@ -75,13 +76,14 @@ export function createLogRateLimit(options: RateLimitOptions) {
           },
           timestamp: new Date().toISOString()
         });
+        return;
       }
 
       // Increment counters
-      const pipeline = redisService.multi();
+      const pipeline = redisService.client.multi();
       pipeline.incr(requestCountKey);
       pipeline.expire(requestCountKey, Math.ceil(windowMs / 1000));
-      pipeline.incrby(logCountKey, currentLogEntries);
+      pipeline.incrBy(logCountKey, currentLogEntries);
       pipeline.expire(logCountKey, Math.ceil(windowMs / 1000));
       
       await pipeline.exec();

@@ -121,16 +121,18 @@ export const validateBatchLogEntries = (req: Request, res: Response, next: NextF
     for (let i = 0; i < logs.length; i++) {
       const logEntry = logs[i];
       
-      // Create a mock request object for individual validation
-      const mockReq = { body: logEntry } as Request;
-      const mockRes = {
-        status: () => mockRes,
-        json: (data: any) => {
-          throw new ValidationError(`Invalid log entry at index ${i}: ${data.error?.message || 'Unknown error'}`);
-        }
-      } as Response;
-
-      validateLogEntry(mockReq, mockRes, () => {});
+      // Validate log entry directly
+      if (!logEntry || typeof logEntry !== 'object') {
+        throw new ValidationError(`Invalid log entry at index ${i}: must be an object`);
+      }
+      
+      if (!logEntry.timestamp || !logEntry.level || !logEntry.message) {
+        throw new ValidationError(`Invalid log entry at index ${i}: missing required fields (timestamp, level, message)`);
+      }
+      
+      if (!['error', 'warn', 'info', 'debug'].includes(logEntry.level.toLowerCase())) {
+        throw new ValidationError(`Invalid log entry at index ${i}: invalid log level`);
+      }
     }
 
     next();
