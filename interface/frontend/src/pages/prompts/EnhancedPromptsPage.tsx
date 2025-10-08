@@ -149,18 +149,18 @@ export const EnhancedPromptsPage: React.FC = () => {
     // Helper function to find base prompt name from variant
     const getBasePromptName = (variantPrompt: PromptRecord): string => {
       let baseName = variantPrompt.metadata.title;
-      
+
       // Remove common variant indicators
       baseName = baseName.replace(/\s*\([^)]*\)\s*/g, ''); // Remove parentheses content
       baseName = baseName.replace(/\s*Enhanced\s*/gi, ''); // Remove "Enhanced"
       baseName = baseName.replace(/\s*-\s*Optimized for.*$/gi, ''); // Remove optimization text
-      
+
       return baseName.trim();
     };
 
     // First pass: identify base prompts
     const basePrompts = prompts.filter(prompt => !isVariantPrompt(prompt));
-    
+
     // Second pass: group variants with base prompts
     basePrompts.forEach(basePrompt => {
       if (processedIds.has(basePrompt.id)) return;
@@ -172,11 +172,11 @@ export const EnhancedPromptsPage: React.FC = () => {
         // Check if this variant belongs to this base prompt
         const variantBaseName = getBasePromptName(prompt);
         const basePromptName = basePrompt.metadata.title;
-        
+
         // Match by name similarity or explicit variant_of field
         const nameMatch = variantBaseName.toLowerCase() === basePromptName.toLowerCase();
         const explicitMatch = (prompt.metadata as any)?.variant_of === basePrompt.id;
-        
+
         return nameMatch || explicitMatch;
       });
 
@@ -195,7 +195,7 @@ export const EnhancedPromptsPage: React.FC = () => {
     });
 
     // Third pass: handle orphaned variants (variants without clear base prompts)
-    const orphanedVariants = prompts.filter(prompt => 
+    const orphanedVariants = prompts.filter(prompt =>
       isVariantPrompt(prompt) && !processedIds.has(prompt.id)
     );
 
@@ -359,18 +359,18 @@ export const EnhancedPromptsPage: React.FC = () => {
     try {
       // Close the quick render dialog
       setShowQuickRender(false);
-      
+
       // Show the advanced renderer with the selected prompt and variant
       setSelectedPrompt(prompt);
       setShowRenderer(true);
-      
+
       // Show info message
       setSnackbar({
         open: true,
         message: `Opening renderer for ${variant ? `${variant.metadata.title}` : prompt.metadata.title}...`,
         severity: 'info',
       });
-      
+
     } catch (error) {
       setSnackbar({
         open: true,

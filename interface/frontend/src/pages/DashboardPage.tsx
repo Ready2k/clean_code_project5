@@ -61,8 +61,8 @@ export const DashboardPage: React.FC = () => {
   const totalPrompts = systemStats?.services?.prompts?.total || pagination?.total || 0;
   const activeConnections = (connections || []).filter(conn => conn.status === 'active').length;
   const totalRatings = systemStats?.services?.prompts?.totalRatings || 0;
-  const averageRating = totalRatings > 0 && totalPrompts > 0 
-    ? totalRatings / totalPrompts 
+  const averageRating = totalRatings > 0 && totalPrompts > 0
+    ? totalRatings / totalPrompts
     : 0;
 
   const handleTestConnection = (connectionId: string) => {
@@ -93,10 +93,10 @@ export const DashboardPage: React.FC = () => {
             trend={
               0
                 ? {
-                    value: 0,
-                    label: 'vs last week',
-                    direction: 'up' as const,
-                  }
+                  value: 0,
+                  label: 'vs last week',
+                  direction: 'up' as const,
+                }
                 : undefined
             }
           />
@@ -134,8 +134,8 @@ export const DashboardPage: React.FC = () => {
               systemStatus?.status === 'healthy'
                 ? 'success'
                 : systemStatus?.status === 'degraded'
-                ? 'warning'
-                : 'error'
+                  ? 'warning'
+                  : 'error'
             }
             isLoading={systemLoading}
           />
@@ -165,8 +165,8 @@ export const DashboardPage: React.FC = () => {
                 (systemStats?.system?.disk?.usage || 0) > 80
                   ? 'error'
                   : (systemStats?.system?.disk?.usage || 0) > 60
-                  ? 'warning'
-                  : 'success'
+                    ? 'warning'
+                    : 'success'
               }
             />
           </Grid>
@@ -191,8 +191,8 @@ export const DashboardPage: React.FC = () => {
                 (systemStats?.performance?.errorRate || 0) > 5
                   ? 'error'
                   : (systemStats?.performance?.errorRate || 0) > 2
-                  ? 'warning'
-                  : 'success'
+                    ? 'warning'
+                    : 'success'
               }
             />
           </Grid>
