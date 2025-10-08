@@ -1,0 +1,17 @@
+id: 86b80fd3-0e8d-441d-a802-9d29b681e08e
+username: testuser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$hp1A93wq0MqZXD7mRgpk5Odslo42zAsKi4/emMkPDycAXBvEtkRSe
+createdAt: 2025-10-02T14:32:17.187Z
+updatedAt: 2025-10-02T14:32:17.510Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-10-02T14:32:17.510Z

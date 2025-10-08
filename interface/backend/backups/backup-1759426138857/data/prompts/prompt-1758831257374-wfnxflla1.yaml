@@ -1,0 +1,44 @@
+id: prompt-1758831257374-wfnxflla1
+version: 1
+metadata:
+  title: Test Case Generator (openai-gpt-4)
+  summary: Generate comprehensive test cases for software features - Optimized for
+    openai gpt-4
+  tags:
+    - testing
+    - qa
+    - test-cases
+    - quality-assurance
+    - openai-gpt-4
+  owner: f13342b0-b726-400a-9ed1-ebcf70f8cb44
+  created_at: 2025-09-25T20:14:17.374Z
+  updated_at: 2025-09-25T20:14:17.374Z
+  preferred_model: gpt-4
+  tuned_for_provider: openai
+humanPrompt:
+  goal: Create comprehensive test cases covering all scenarios
+  audience: QA engineers and developers
+  steps:
+    - Analyze the feature requirements
+    - Identify positive and negative test scenarios
+    - Create edge cases and boundary conditions
+    - Define expected results for each test
+    - Organize tests by priority and category
+  output_expectations:
+    format: Structured test case document
+    fields:
+      - test_id
+      - description
+      - preconditions
+      - steps
+      - expected_result
+      - priority
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: f13342b0-b726-400a-9ed1-ebcf70f8cb44
+    timestamp: 2025-09-25T20:14:17.374Z
+    changes:
+      action: create
+      details: Initial prompt creation

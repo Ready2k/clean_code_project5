@@ -1,0 +1,30 @@
+id: prompt-1759415532894-d9p89shdo
+version: 1
+metadata:
+  title: Second Test Prompt
+  summary: Another prompt for bulk export testing
+  tags:
+    - test
+    - bulk
+  owner: test-user-123
+  created_at: 2025-10-02T14:32:12.894Z
+  updated_at: 2025-10-02T14:32:12.894Z
+humanPrompt:
+  goal: Test bulk export functionality
+  audience: Developers
+  steps:
+    - Create multiple prompts
+    - Export them together
+  output_expectations:
+    format: Archive
+    fields:
+      - multiple files
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: test-user-123
+    timestamp: 2025-10-02T14:32:12.894Z
+    changes:
+      action: create
+      details: Initial prompt creation

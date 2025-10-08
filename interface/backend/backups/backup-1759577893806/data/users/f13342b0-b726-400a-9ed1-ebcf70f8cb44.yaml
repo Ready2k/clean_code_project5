@@ -1,0 +1,17 @@
+id: f13342b0-b726-400a-9ed1-ebcf70f8cb44
+username: admin
+email: admin@example.com
+role: admin
+passwordHash: $2b$12$DuaREt0ey16.PrJGNe8xBeHGEA8V/XVqLJt6T0XRpw6MjmJ4z9VDa
+createdAt: 2025-09-24T09:12:50.288Z
+updatedAt: 2025-10-03T10:57:10.482Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-10-03T10:57:10.482Z
+status: active

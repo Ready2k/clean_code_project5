@@ -1,0 +1,17 @@
+id: c4df8ea5-f2c4-44a2-ab5c-d3876eb75987
+username: admin
+email: admin@example.com
+role: admin
+status: active
+passwordHash: $2b$12$lAJcdLmzVSTW1YO/z4syFOraQHkp0n/wDAGt6P2PhMaIAA0P5l6aK
+createdAt: 2025-10-04T12:22:30.815Z
+updatedAt: 2025-10-04T12:23:32.062Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-10-04T12:23:32.062Z

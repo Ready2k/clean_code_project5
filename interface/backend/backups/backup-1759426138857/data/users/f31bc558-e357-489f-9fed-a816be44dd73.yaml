@@ -1,0 +1,16 @@
+id: f31bc558-e357-489f-9fed-a816be44dd73
+username: testuser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$18QvDf5CcDBHjgpQtX9K2OThpQAwkAILKziGnbQPn7u9sGFc/QRKS
+createdAt: &a1 2025-10-02T14:32:12.537Z
+updatedAt: *a1
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true

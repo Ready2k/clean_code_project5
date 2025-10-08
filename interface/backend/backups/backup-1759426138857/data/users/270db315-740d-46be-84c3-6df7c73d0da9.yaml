@@ -1,0 +1,17 @@
+id: 270db315-740d-46be-84c3-6df7c73d0da9
+username: testuser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$4akknBhLykGZcGo8gDYAiOev47WO5d0A3qRKSL0JfpBYiRqpiBGp.
+createdAt: 2025-10-02T14:32:13.305Z
+updatedAt: 2025-10-02T14:32:13.799Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-10-02T14:32:13.799Z

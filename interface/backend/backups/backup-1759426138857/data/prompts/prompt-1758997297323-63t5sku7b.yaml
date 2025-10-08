@@ -1,0 +1,52 @@
+id: prompt-1758997297323-63t5sku7b
+version: 1
+metadata:
+  title: API Design Consultant (openai-gpt-4-turbo)
+  summary: Help design RESTful APIs with best practices and standards - Optimized
+    for openai gpt-4-turbo
+  tags:
+    - api-design
+    - rest
+    - backend
+    - architecture
+    - openai-gpt-4-turbo
+  owner: f13342b0-b726-400a-9ed1-ebcf70f8cb44
+  created_at: 2025-09-27T18:21:37.323Z
+  updated_at: 2025-09-27T18:21:37.323Z
+  preferred_model: gpt-4-turbo
+  tuned_for_provider: openai
+humanPrompt:
+  goal: >-
+    Design a well-structured RESTful API following industry best practices
+
+
+    Enhanced context: You are a helpful assistant specialized in the task
+    described below.
+  audience: Backend developers and API architects
+  steps:
+    - Understand the business requirements
+    - Define resource models and relationships
+    - Design endpoint structure and HTTP methods
+    - Specify request/response formats
+    - Add authentication and error handling
+    - "Enhanced: Converted to structured format with system instructions"
+    - "Enhanced: Organized user template with clear steps"
+    - "Enhanced: No additional variables needed"
+    - "Enhanced: Added accuracy and completeness rules"
+  output_expectations:
+    format: OpenAPI specification with detailed documentation
+    fields:
+      - endpoints
+      - models
+      - authentication
+      - error_codes
+      - examples
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: f13342b0-b726-400a-9ed1-ebcf70f8cb44
+    timestamp: 2025-09-27T18:21:37.323Z
+    changes:
+      action: create
+      details: Initial prompt creation

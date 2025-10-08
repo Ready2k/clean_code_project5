@@ -1,0 +1,16 @@
+id: 93794c1b-961f-4e45-9158-95bffd13426b
+username: updateduser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$4BZ6SBT5.FLw6e3N237fjer/yC5qxAlte.LIa5px3Upxw.lF3Hq/.
+createdAt: 2025-10-02T14:32:13.140Z
+updatedAt: 2025-10-02T14:32:13.142Z
+preferences:
+  theme: dark
+  language: es
+  notifications:
+    email: false
+    browser: true
+    enhancement: true
+    system: false

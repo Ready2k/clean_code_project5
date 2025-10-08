@@ -1,0 +1,45 @@
+id: prompt-1758829825269-yq80rpaw0
+version: 1
+metadata:
+  title: API Design Consultant (Enhanced)
+  summary: Help design RESTful APIs with best practices and standards - Enhanced
+    using openai claude-3-sonnet
+  tags:
+    - api-design
+    - rest
+    - backend
+    - architecture
+    - openai-claude-3-sonnet
+    - enhanced
+  owner: system
+  created_at: 2025-09-25T19:50:25.269Z
+  updated_at: 2025-09-25T19:50:25.269Z
+  preferred_model: claude-3-sonnet
+  tuned_for_provider: openai
+humanPrompt:
+  goal: "Enhanced context: Design a well-structured RESTful API following industry
+    best practices"
+  audience: Backend developers and API architects
+  steps:
+    - "Enhanced: Understand the business requirements"
+    - "Enhanced: Define resource models and relationships"
+    - "Enhanced: Design endpoint structure and HTTP methods"
+    - "Enhanced: Specify request/response formats"
+    - "Enhanced: Add authentication and error handling"
+  output_expectations:
+    format: OpenAPI specification with detailed documentation
+    fields:
+      - endpoints
+      - models
+      - authentication
+      - error_codes
+      - examples
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: system
+    timestamp: 2025-09-25T19:50:25.269Z
+    changes:
+      action: create
+      details: Initial prompt creation

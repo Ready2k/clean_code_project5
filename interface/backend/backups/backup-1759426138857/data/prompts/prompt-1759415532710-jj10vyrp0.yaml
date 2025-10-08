@@ -1,0 +1,48 @@
+id: prompt-1759415532710-jj10vyrp0
+version: 1
+metadata:
+  title: Test Export Prompt
+  summary: A prompt for testing export functionality
+  tags:
+    - test
+    - export
+  owner: test-user-123
+  created_at: 2025-10-02T14:32:12.710Z
+  updated_at: 2025-10-02T14:32:12.712Z
+humanPrompt:
+  goal: Test the export API endpoints
+  audience: Developers
+  steps:
+    - Create test data
+    - Call export API
+    - Verify results
+  output_expectations:
+    format: JSON response
+    fields:
+      - status
+      - data
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: test-user-123
+    timestamp: 2025-10-02T14:32:12.710Z
+    changes:
+      action: create
+      details: Initial prompt creation
+  - version: 1
+    message: Prompt rendered for openai
+    author: system
+    timestamp: 2025-10-02T14:32:12.712Z
+    changes:
+      action: render
+      details:
+        provider: openai
+        version: original
+        variablesUsed: []
+createdAt: 2025-10-02T14:32:12.710Z
+updatedAt: 2025-10-02T14:32:12.710Z
+status: active
+ratings: []
+averageRating: 0
+totalRatings: 0

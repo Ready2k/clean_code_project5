@@ -1,0 +1,32 @@
+id: prompt-1759415532811-iyv3y5qz8
+version: 1
+metadata:
+  title: Test Export Prompt
+  summary: A prompt for testing export functionality
+  tags:
+    - test
+    - export
+  owner: test-user-123
+  created_at: 2025-10-02T14:32:12.811Z
+  updated_at: 2025-10-02T14:32:12.811Z
+humanPrompt:
+  goal: Test the export API endpoints
+  audience: Developers
+  steps:
+    - Create test data
+    - Call export API
+    - Verify results
+  output_expectations:
+    format: JSON response
+    fields:
+      - status
+      - data
+variables: []
+history:
+  - version: 1
+    message: Prompt created
+    author: test-user-123
+    timestamp: 2025-10-02T14:32:12.811Z
+    changes:
+      action: create
+      details: Initial prompt creation

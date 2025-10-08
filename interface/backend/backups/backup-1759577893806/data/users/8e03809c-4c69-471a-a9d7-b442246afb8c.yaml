@@ -1,0 +1,17 @@
+id: 8e03809c-4c69-471a-a9d7-b442246afb8c
+username: james
+email: jamescregeen@gmail.com
+role: user
+status: active
+passwordHash: $2b$12$MZTmKg557OJUgxQwvcqLKuIxuvHfRh76/7X1HGUpd62zstJBXClWe
+createdAt: 2025-09-24T21:21:50.229Z
+updatedAt: 2025-09-26T16:10:58.413Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-09-26T16:10:58.413Z

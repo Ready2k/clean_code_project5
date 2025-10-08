@@ -1,0 +1,67 @@
+id: sample-prompt-1
+version: 2
+metadata:
+  title: Code Review Assistant
+  summary: A prompt to help review code and provide constructive feedback
+  tags:
+    - code-review
+    - development
+    - feedback
+  owner: system
+  created_at: 2025-09-23T12:28:26.216Z
+  updated_at: 2025-09-25T18:37:42.511Z
+humanPrompt:
+  goal: >-
+    Review the provided code and give constructive feedback
+
+
+    Enhanced context: You are a helpful assistant specialized in the task
+    described below.
+  audience: Software developers
+  steps: &a1
+    - Analyze the code structure and logic
+    - Identify potential issues or improvements
+    - Provide specific, actionable feedback
+    - Suggest best practices where applicable
+    - "Enhanced: Converted to structured format with system instructions"
+    - "Enhanced: Organized user template with clear steps"
+    - "Enhanced: Identified 1 variables for customization"
+    - "Enhanced: Added accuracy and completeness rules"
+  output_expectations: &a2
+    format: Structured feedback with sections for different aspects
+    fields:
+      - strengths
+      - issues
+      - suggestions
+      - best_practices
+variables: &a3
+  - key: programming_language
+    label: Programming Language
+    type: string
+    required: true
+    sensitive: false
+history:
+  - version: 1
+    message: Prompt enhanced via AI
+    author: system
+    timestamp: 2025-09-25T18:37:42.511Z
+    changes:
+      humanPrompt:
+        goal: >-
+          Review the provided code and give constructive feedback
+
+
+          Enhanced context: You are a helpful assistant specialized in the task
+          described below.
+        audience: Software developers
+        steps: *a1
+        output_expectations: *a2
+      variables: *a3
+    enhancement_model: claude-3-sonnet
+    enhancement_provider: anthropic
+createdAt: 2025-09-23T12:28:26.216Z
+updatedAt: 2025-09-23T12:28:26.216Z
+status: active
+ratings: []
+averageRating: 0
+totalRatings: 0

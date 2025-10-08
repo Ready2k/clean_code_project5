@@ -1,0 +1,16 @@
+id: 48d9d485-17fa-42c5-8c76-d30f3aec9749
+username: testuser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$EcXMBse3F5Q70ToWEBCOHuzaql5kFIjfbBeAAumFDYZ.i8bSHzRu6
+createdAt: &a1 2025-10-02T14:32:15.547Z
+updatedAt: *a1
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true

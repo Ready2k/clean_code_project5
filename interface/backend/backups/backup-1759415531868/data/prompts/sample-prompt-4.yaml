@@ -1,0 +1,48 @@
+id: sample-prompt-4
+version: 1
+metadata:
+  title: Database Schema Designer
+  summary: Design efficient database schemas with proper normalization
+  tags:
+    - database
+    - schema-design
+    - sql
+    - data-modeling
+  owner: system
+  created_at: 2025-09-20T12:28:26.216Z
+  updated_at: 2025-09-20T12:28:26.216Z
+humanPrompt:
+  goal: Create an optimized database schema for the given requirements
+  audience: Database administrators and backend developers
+  steps:
+    - Analyze data requirements and relationships
+    - Apply normalization principles
+    - Define primary and foreign keys
+    - Add appropriate indexes for performance
+    - Include constraints and validation rules
+  output_expectations:
+    format: SQL DDL statements with documentation
+    fields:
+      - tables
+      - relationships
+      - indexes
+      - constraints
+      - sample_data
+variables:
+  - key: business_domain
+    label: Business Domain
+    type: string
+    required: true
+    sensitive: false
+  - key: database_type
+    label: Database Type
+    type: select
+    required: true
+    sensitive: false
+    options:
+      - PostgreSQL
+      - MySQL
+      - SQLite
+      - SQL Server
+      - Oracle
+history: []
