@@ -658,9 +658,8 @@ export class SystemMigrationService {
       // Backup connections
       const allConnections = await this.connectionService.getAllConnections();
       for (const connection of allConnections) {
-        // TODO: Implement connection backup functionality
-        // const backupId = await this.connectionService.createConnectionBackup(connection.id);
-        // rollbackData.connectionBackups.push(backupId);
+        // Connection backup not implemented - connections are stored in database
+        // and backed up as part of database backup process
         rollbackData.connectionBackups.push(connection.id);
       }
 

@@ -99,18 +99,13 @@ export class PromptLibrary {
             throw new Error('Database connection string is required');
         }
         try {
-            // TODO: Implement actual database integration
-            // This would involve:
-            // 1. Creating database connection pool
-            // 2. Running migrations
-            // 3. Setting up indexing tables
-            // 4. Configuring the storage layer to use database for indexing
-            console.log('Database integration setup (placeholder implementation)');
-            console.log(`Connection string: ${this.config.database.connectionString.replace(/password=[^;]+/i, 'password=***')}`);
-            // Add database shutdown handler
+            // Database integration not implemented in core library
+            // The web interface uses its own database layer
+            console.log('Database integration not implemented in core library');
+            console.log(`Database config present but unused in core library`);
+            // Add placeholder shutdown handler
             this.shutdownHandlers.push(async () => {
-                console.log('Shutting down database connections...');
-                // TODO: Close database connections
+                console.log('Database shutdown - no connections to close in core library');
             });
         }
         catch (error) {
@@ -123,9 +118,9 @@ export class PromptLibrary {
     async initializeLLMService() {
         console.log('Initializing LLM service...');
         if (this.config.llmService) {
-            // TODO: Implement real LLM service based on provider
-            // For now, use mock service
-            console.warn('Real LLM service not implemented yet, using mock service');
+            // Real LLM service not implemented in core library
+            // The web interface uses its own LLM execution service
+            console.warn('Real LLM service not implemented in core library, using mock service');
         }
         this.llmService = new MockLLMService();
         // Verify service is available

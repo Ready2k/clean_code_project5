@@ -223,24 +223,19 @@ export const updateUserRole = async (req: Request, res: Response): Promise<void>
 };
 
 export const updateUserStatus = async (req: Request, res: Response): Promise<void> => {
-  // This is a placeholder for future user status functionality (active/inactive/suspended)
-  // For now, we'll just return a success message
+  // Removed placeholder implementation - add back if user status management is needed
   const { id } = req.params;
   
   if (!id) {
     throw new ValidationError('User ID is required');
   }
 
-  logger.info('User status update requested (not implemented)', { 
-    adminId: req.user?.userId,
-    targetUserId: id,
-    ip: req.ip 
-  });
-
-  res.json({
-    success: true,
-    message: 'User status functionality will be implemented in future updates',
-    timestamp: new Date().toISOString()
+  // Return not implemented for now
+  res.status(501).json({
+    error: {
+      code: 'NOT_IMPLEMENTED', 
+      message: 'User status management not implemented'
+    }
   });
 };
 
@@ -272,32 +267,8 @@ export const resetUserPassword = async (req: Request, res: Response): Promise<vo
   });
 };
 
-export const getAuditLogs = async (_req: Request, res: Response): Promise<void> => {
-  // TODO: Implement in task 8 - Build system administration and monitoring APIs
-  res.status(501).json({
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'Audit logs not yet implemented'
-    }
-  });
-};
-
-export const getSystemUsage = async (_req: Request, res: Response): Promise<void> => {
-  // TODO: Implement in task 8 - Build system administration and monitoring APIs
-  res.status(501).json({
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'System usage analytics not yet implemented'
-    }
-  });
-};
-
-export const getSystemErrors = async (_req: Request, res: Response): Promise<void> => {
-  // TODO: Implement in task 8 - Build system administration and monitoring APIs
-  res.status(501).json({
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'System error tracking not yet implemented'
-    }
-  });
-};
+// Removed unused admin monitoring endpoints:
+// - getAuditLogs: No frontend or tests use this endpoint
+// - getSystemUsage: No frontend or tests use this endpoint  
+// - getSystemErrors: No frontend or tests use this endpoint
+// These were placeholder implementations that should be added back if needed

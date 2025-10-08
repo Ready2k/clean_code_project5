@@ -1,0 +1,17 @@
+id: a79e943a-b17a-471d-a147-a05bc90718ff
+username: testuser
+email: test@example.com
+role: user
+status: active
+passwordHash: $2b$12$L8VNqfHP4gVDfiE2Fu4gPuiCLUzgIxcwkY1eyNBOPxI9nEq1jl4V2
+createdAt: 2025-10-08T18:18:34.465Z
+updatedAt: 2025-10-08T18:18:34.680Z
+preferences:
+  theme: light
+  language: en
+  notifications:
+    email: true
+    browser: true
+    enhancement: true
+    system: true
+lastLogin: 2025-10-08T18:18:34.680Z
