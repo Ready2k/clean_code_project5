@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { logger } from '../utils/logger.js';
+import { validateLogPath, getAllowedLogFiles } from '../utils/path-security.js';
 
 export interface LogEntry {
   timestamp: string;
@@ -95,7 +96,8 @@ class LogReaderService {
     } = {}
   ): Promise<{ logs: LogEntry[]; total: number }> {
     try {
-      const filePath = path.join(this.logsDir, filename);
+      // Validate and secure the file path to prevent path traversal
+      const filePath = validateLogPath(this.logsDir, filename);
       
       // Check if file exists
       try {
@@ -211,6 +213,18 @@ class LogReaderService {
     } catch (error) {
       logger.error('Failed to read all logs:', error);
       return { logs: [], total: 0 };
+    }
+  }
+
+  /**
+   * List available log files safely
+   */
+  async listLogFiles(): Promise<string[]> {
+    try {
+      return await getAllowedLogFiles(this.logsDir);
+    } catch (error) {
+      logger.error('Failed to list log files:', error);
+      return [];
     }
   }
 

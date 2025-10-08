@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { validateLogEntry, validateBatchLogEntries } from '../middleware/log-validation.js';
+import { rateLimitSingleLog, rateLimitBatchLogs } from '../middleware/log-rate-limit.js';
 
 const router = Router();
 
-// Endpoint to receive single frontend log entry
-router.post('/frontend', (req, res) => {
+// Endpoint to receive single frontend log entry (now secured)
+router.post('/frontend', authenticateToken, rateLimitSingleLog, validateLogEntry, (req, res) => {
   try {
     const logEntry = req.body;
     
@@ -48,27 +50,23 @@ router.post('/frontend', (req, res) => {
   }
 });
 
-// Endpoint to receive batch of frontend log entries
-router.post('/frontend/batch', (req, res) => {
+// Endpoint to receive batch of frontend log entries (now secured)
+router.post('/frontend/batch', authenticateToken, rateLimitBatchLogs, validateBatchLogEntries, (req, res) => {
   try {
-    const logEntries = req.body;
+    const { logs } = req.body; // Updated to match validation middleware expectation
     
-    if (!Array.isArray(logEntries)) {
+    if (!Array.isArray(logs)) {
       return res.status(400).json({ 
-        error: 'Expected array of log entries' 
+        error: 'Expected logs array in request body' 
       });
     }
 
     let processed = 0;
     let errors = 0;
 
-    logEntries.forEach((logEntry, index) => {
+    logs.forEach((logEntry, index) => {
       try {
-        // Validate log entry structure
-        if (!logEntry.timestamp || !logEntry.level || !logEntry.message) {
-          errors++;
-          return;
-        }
+        // Validation is already done by middleware, so we can trust the structure
 
         // Log to backend with frontend prefix
         const level = logEntry.level.toLowerCase();
