@@ -31,5 +31,17 @@
     "last_tested": "2025-10-02T10:49:00.615Z",
     "created_at": "2025-10-02T05:31:29.593Z",
     "updated_at": "2025-10-02T12:42:28.056Z"
+  },
+  {
+    "id": "82ffb1a1-71bf-4740-8e8d-9e27615f3b7d",
+    "name": "OpenAI LLM",
+    "connection_type": "legacy",
+    "status": "active",
+    "created_at": "2025-10-09T12:58:43.241Z",
+    "updated_at": "2025-10-09T12:58:49.850Z",
+    "user_id": "f13342b0-b726-400a-9ed1-ebcf70f8cb44",
+    "provider": "openai",
+    "encrypted_config": "{\"iv\":\"5381f91e5e5cc8a174f878220e0f76e6\",\"encrypted\":\"b58bc9b06ebd067eae3d8f11fc1df809a3a42c8867c82a7d4e1504913bda271a1bbb185296c0d980ffa437e79fe265a8a9dbfa3f3fe544a7a4625101965cc4706dd9e8563af19cebf9cd8fa5f59b939e3d2474de0526e58d1116fcda88614990f9d8f0a0331ef49c8006e943df2330a8df8e64d2c80bac3cf9d5f83a2be931e46d1b134dc16b06a35a3c2ef7fbdeb21f72b7e9be63b3ae5402f136dcd3db0aa4345a087abd97a720d72b7108d5f451d342fdc7e17193ae3f64dba946127ca206b1ac0a1eefdd980d1d5ec29301f45ea45e03a9445b5e907717976087265d6a7ec3bca04a8ad8a46dfa0a4892b656b1728bb29b85cc3869501f29141b47d777e2dd741864a4018f7798c96ba14ba890bad5fd906e1f069f4b8a3b1e12612fdd70f41b5a6a95d8501dfb28b8106de8eeabcac59f2ee41a49d6cc2e20dbf800de1920e84af662274452d3684bd7ce31c21c\"}",
+    "last_tested": "2025-10-09T12:58:49.850Z"
   }
 ]

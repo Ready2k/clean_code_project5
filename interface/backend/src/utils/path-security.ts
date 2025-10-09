@@ -52,3 +52,20 @@ export const validateLogPath = (
 
   return normalizedPath;
 };
+
+export const getAllowedLogFiles = async (baseDir: string): Promise<string[]> => {
+  try {
+    const fs = await import('fs/promises');
+    const files = await fs.readdir(baseDir);
+    
+    // Only return .log files to prevent directory traversal
+    return files.filter(file => 
+      file.endsWith(DEFAULT_ALLOWED_EXTENSION) && 
+      !file.includes('..') && 
+      !file.includes('/') && 
+      !file.includes('\\')
+    );
+  } catch (error) {
+    throw new PathValidationError(`Failed to list log files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};

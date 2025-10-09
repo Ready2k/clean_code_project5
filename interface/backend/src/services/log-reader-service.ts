@@ -239,6 +239,7 @@ class LogReaderService {
    */
   async listLogFiles(): Promise<string[]> {
     try {
+      const { getAllowedLogFiles } = await import('../utils/path-security.js');
       return await getAllowedLogFiles(this.logsDir);
     } catch (error) {
       logger.error('Failed to list log files:', error);

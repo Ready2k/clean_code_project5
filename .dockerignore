@@ -1,0 +1,111 @@
+# Root .dockerignore for the entire project
+
+# Dependencies
+node_modules
+*/node_modules
+interface/*/node_modules
+
+# Build outputs
+dist
+build
+*/dist
+*/build
+
+# Environment files
+.env*
+interface/.env*
+interface/*/.env*
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Testing
+coverage
+.nyc_output
+**/coverage
+**/.nyc_output
+**/__tests__
+**/test
+**/tests
+
+# Logs
+logs
+*.log
+interface/logs
+**/logs
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+.tmp
+temp
+tmp
+interface/temp
+**/temp
+**/tmp
+
+# Data directories
+data
+interface/data
+**/data
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Documentation
+README.md
+*.md
+docs
+**/docs
+
+# Scripts
+scripts
+interface/scripts
+**/scripts
+
+# AWS and deployment
+aws
+**/aws
+
+# Monitoring
+interface/monitoring
+**/monitoring
+
+# Demo files
+demo-*.mjs
+demo-*.js
+simple-example.mjs
+test-*.js
+test-*.md
+
+# Configuration files that shouldn't be in containers
+.eslintrc*
+.prettierrc*
+tsconfig*.json
+vitest.config.*
+vite.config.*
+**/tsconfig*.json
+**/vitest.config.*
+**/vite.config.*

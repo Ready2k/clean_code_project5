@@ -12,7 +12,7 @@ export const getSystemStatus = async (_req: Request, res: Response): Promise<voi
   try {
     const monitoringService = getSystemMonitoringService();
     const status = await monitoringService.getSystemStatus();
-    
+
     res.json({
       success: true,
       data: status,
@@ -38,7 +38,7 @@ export const getSystemHealth = async (_req: Request, res: Response): Promise<voi
   try {
     const monitoringService = getSystemMonitoringService();
     const status = await monitoringService.getSystemStatus();
-    
+
     // Return detailed health information
     const healthInfo = {
       healthy: status.status === 'healthy',
@@ -55,11 +55,11 @@ export const getSystemHealth = async (_req: Request, res: Response): Promise<voi
         redis: status.services.redis.status === 'up'
       }
     };
-    
+
     // Set appropriate HTTP status based on health
-    const httpStatus = status.status === 'healthy' ? 200 : 
-                      status.status === 'degraded' ? 200 : 503;
-    
+    const httpStatus = status.status === 'healthy' ? 200 :
+      status.status === 'degraded' ? 200 : 503;
+
     res.status(httpStatus).json(healthInfo);
   } catch (error) {
     logger.error('Failed to get system health:', error);
@@ -80,7 +80,7 @@ export const getSystemStats = async (_req: Request, res: Response): Promise<void
   try {
     const monitoringService = getSystemMonitoringService();
     const stats = await monitoringService.getSystemStats();
-    
+
     res.json({
       success: true,
       data: stats,
@@ -106,7 +106,7 @@ export const getSystemConfig = async (_req: Request, res: Response): Promise<voi
   try {
     const monitoringService = getSystemMonitoringService();
     const config = monitoringService.getSystemConfig();
-    
+
     res.json(config);
   } catch (error) {
     logger.error('Failed to get system config:', error);
@@ -125,27 +125,27 @@ export const getSystemConfig = async (_req: Request, res: Response): Promise<voi
 export const updateSystemConfig = async (req: Request, res: Response): Promise<void> => {
   try {
     const updates = req.body;
-    
+
     // Validate the updates
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
       throw new ValidationError('Invalid configuration data');
     }
-    
+
     const monitoringService = getSystemMonitoringService();
     const updatedConfig = await monitoringService.updateSystemConfig(updates);
-    
-    logger.info('System configuration updated', { 
+
+    logger.info('System configuration updated', {
       updatedFields: Object.keys(updates),
-      userId: (req as any).user?.userId 
+      userId: (req as any).user?.userId
     });
-    
+
     res.json({
       message: 'System configuration updated successfully',
       config: updatedConfig
     });
   } catch (error) {
     logger.error('Failed to update system config:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: {
@@ -171,9 +171,9 @@ export const createBackup = async (_req: Request, res: Response): Promise<void> 
   try {
     const monitoringService = getSystemMonitoringService();
     const backup = await monitoringService.createBackup();
-    
+
     logger.info('System backup created', backup);
-    
+
     res.json({
       message: 'System backup created successfully',
       backup: {
@@ -201,9 +201,9 @@ export const cleanupSystem = async (_req: Request, res: Response): Promise<void>
   try {
     const monitoringService = getSystemMonitoringService();
     const results = await monitoringService.cleanupSystem();
-    
+
     logger.info('System cleanup completed', results);
-    
+
     res.json({
       message: 'System cleanup completed successfully',
       results
@@ -225,29 +225,29 @@ export const cleanupSystem = async (_req: Request, res: Response): Promise<void>
 export const getSystemLogs = async (req: Request, res: Response): Promise<void> => {
   try {
     const { level, limit = '100', offset = '0' } = req.query;
-    
+
     const limitNum = parseInt(limit as string, 10);
     const offsetNum = parseInt(offset as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       throw new ValidationError('Limit must be between 1 and 1000');
     }
-    
+
     if (isNaN(offsetNum) || offsetNum < 0) {
       throw new ValidationError('Offset must be non-negative');
     }
-    
+
     const monitoringService = getSystemMonitoringService();
     const logs = await monitoringService.getSystemLogs(
       level as string,
       limitNum,
       offsetNum
     );
-    
+
     res.json(logs);
   } catch (error) {
     logger.error('Failed to get system logs:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: {
@@ -273,9 +273,9 @@ export const getLogFiles = async (_req: Request, res: Response): Promise<void> =
   try {
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
-    
-    const logFiles = await logReaderService.listLogFiles();
-    
+
+    const logFiles = await logReaderService.getLogFiles();
+
     res.json({
       success: true,
       data: logFiles,
@@ -301,7 +301,7 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
   try {
     const { filename } = req.params;
     const { level, limit = '100', offset = '0', search } = req.query;
-    
+
     if (!filename) {
       throw new ValidationError('Filename parameter is required');
     }
@@ -310,27 +310,27 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
     if (typeof filename !== 'string' || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       throw new ValidationError('Invalid filename format');
     }
-    
+
     const limitNum = parseInt(limit as string, 10);
     const offsetNum = parseInt(offset as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       throw new ValidationError('Limit must be between 1 and 1000');
     }
-    
+
     if (isNaN(offsetNum) || offsetNum < 0) {
       throw new ValidationError('Offset must be non-negative');
     }
-    
+
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
-    
+
     const readOptions: any = { limit: limitNum, offset: offsetNum };
     if (level) readOptions.level = level as string;
     if (search) readOptions.search = search as string;
-    
+
     const result = await logReaderService.readLogFile(filename, readOptions);
-    
+
     res.json({
       success: true,
       data: result,
@@ -338,7 +338,7 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
     });
   } catch (error) {
     logger.error('Failed to get log file content:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         success: false,
@@ -368,30 +368,30 @@ export const getLogFileContent = async (req: Request, res: Response): Promise<vo
 export const searchLogs = async (req: Request, res: Response): Promise<void> => {
   try {
     const { query: searchQuery, level, limit = '100', fileTypes } = req.query;
-    
+
     if (!searchQuery || typeof searchQuery !== 'string') {
       throw new ValidationError('Search query is required');
     }
-    
+
     const limitNum = parseInt(limit as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       throw new ValidationError('Limit must be between 1 and 1000');
     }
-    
+
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
-    
-    const fileTypesArray = fileTypes 
+
+    const fileTypesArray = fileTypes
       ? (fileTypes as string).split(',') as ('backend' | 'frontend' | 'system')[]
       : undefined;
-    
+
     const searchOptions: any = { limit: limitNum };
     if (level) searchOptions.level = level as string;
     if (fileTypesArray) searchOptions.fileTypes = fileTypesArray;
-    
+
     const result = await logReaderService.searchLogs(searchQuery, searchOptions);
-    
+
     res.json({
       success: true,
       data: result,
@@ -400,7 +400,7 @@ export const searchLogs = async (req: Request, res: Response): Promise<void> => 
     });
   } catch (error) {
     logger.error('Failed to search logs:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         success: false,
@@ -430,9 +430,9 @@ export const getLogStats = async (_req: Request, res: Response): Promise<void> =
   try {
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
-    
+
     const stats = await logReaderService.getLogStats();
-    
+
     res.json({
       success: true,
       data: stats,
@@ -457,18 +457,18 @@ export const getLogStats = async (_req: Request, res: Response): Promise<void> =
 export const getRecentErrors = async (req: Request, res: Response): Promise<void> => {
   try {
     const { limit = '50' } = req.query;
-    
+
     const limitNum = parseInt(limit as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 500) {
       throw new ValidationError('Limit must be between 1 and 500');
     }
-    
+
     const { getLogReaderService } = await import('../services/log-reader-service.js');
     const logReaderService = getLogReaderService();
-    
+
     const errors = await logReaderService.getRecentErrors(limitNum);
-    
+
     res.json({
       success: true,
       data: errors,
@@ -477,7 +477,7 @@ export const getRecentErrors = async (req: Request, res: Response): Promise<void
     });
   } catch (error) {
     logger.error('Failed to get recent errors:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         success: false,
@@ -506,16 +506,16 @@ export const getRecentErrors = async (req: Request, res: Response): Promise<void
 export const getSystemMetrics = async (req: Request, res: Response): Promise<void> => {
   try {
     const { limit = '100' } = req.query;
-    
+
     const limitNum = parseInt(limit as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       throw new ValidationError('Limit must be between 1 and 1000');
     }
-    
+
     const monitoringService = getSystemMonitoringService();
     const metrics = monitoringService.getSystemMetrics(limitNum);
-    
+
     res.json({
       metrics,
       count: metrics.length,
@@ -523,7 +523,7 @@ export const getSystemMetrics = async (req: Request, res: Response): Promise<voi
     });
   } catch (error) {
     logger.error('Failed to get system metrics:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: {
@@ -548,30 +548,30 @@ export const getSystemMetrics = async (req: Request, res: Response): Promise<voi
 export const getSystemEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, category, limit = '100' } = req.query;
-    
+
     const limitNum = parseInt(limit as string, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       throw new ValidationError('Limit must be between 1 and 1000');
     }
-    
+
     // Validate type if provided
     if (type && !['info', 'warning', 'error', 'critical'].includes(type as string)) {
       throw new ValidationError('Invalid event type. Must be one of: info, warning, error, critical');
     }
-    
+
     // Validate category if provided
     if (category && !['system', 'service', 'security', 'performance'].includes(category as string)) {
       throw new ValidationError('Invalid event category. Must be one of: system, service, security, performance');
     }
-    
+
     const monitoringService = getSystemMonitoringService();
     const events = monitoringService.getSystemEvents(
       limitNum,
       type as any,
       category as any
     );
-    
+
     res.json({
       events,
       count: events.length,
@@ -579,7 +579,7 @@ export const getSystemEvents = async (req: Request, res: Response): Promise<void
     });
   } catch (error) {
     logger.error('Failed to get system events:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: {
@@ -605,7 +605,7 @@ export const getRegistryStatus = async (_req: Request, res: Response): Promise<v
   try {
     const registryService = getProviderRegistryService();
     const status = await registryService.getRegistryStatus();
-    
+
     res.json({
       success: true,
       data: status,
@@ -631,7 +631,7 @@ export const getProviderHealth = async (_req: Request, res: Response): Promise<v
   try {
     const registryService = getProviderRegistryService();
     const healthStatuses = registryService.getProviderHealth();
-    
+
     res.json({
       success: true,
       data: {
@@ -665,9 +665,9 @@ export const refreshRegistry = async (_req: Request, res: Response): Promise<voi
   try {
     const registryService = getProviderRegistryService();
     await registryService.refreshRegistry();
-    
+
     logger.info('Provider registry refreshed manually');
-    
+
     res.json({
       success: true,
       message: 'Provider registry refreshed successfully',
@@ -693,7 +693,7 @@ export const getRegistryMonitoringStatus = async (_req: Request, res: Response):
   try {
     const monitoringService = getRegistryMonitoringService();
     const status = monitoringService.getStatus();
-    
+
     res.json({
       success: true,
       data: status,
@@ -718,20 +718,20 @@ export const getRegistryMonitoringStatus = async (_req: Request, res: Response):
 export const updateRegistryMonitoringConfig = async (req: Request, res: Response): Promise<void> => {
   try {
     const config = req.body;
-    
+
     // Validate configuration
     if (!config || typeof config !== 'object') {
       throw new ValidationError('Invalid configuration data');
     }
-    
+
     const monitoringService = getRegistryMonitoringService();
     monitoringService.updateConfig(config);
-    
-    logger.info('Registry monitoring configuration updated', { 
+
+    logger.info('Registry monitoring configuration updated', {
       config,
-      userId: (req as any).user?.userId 
+      userId: (req as any).user?.userId
     });
-    
+
     res.json({
       success: true,
       message: 'Registry monitoring configuration updated successfully',
@@ -740,7 +740,7 @@ export const updateRegistryMonitoringConfig = async (req: Request, res: Response
     });
   } catch (error) {
     logger.error('Failed to update registry monitoring config:', error);
-    
+
     if (error instanceof ValidationError) {
       res.status(400).json({
         success: false,
@@ -770,11 +770,11 @@ export const triggerHealthCheck = async (_req: Request, res: Response): Promise<
   try {
     const monitoringService = getRegistryMonitoringService();
     const healthStatuses = await monitoringService.checkProviderHealth();
-    
-    logger.info('Manual health check completed', { 
-      providerCount: healthStatuses.length 
+
+    logger.info('Manual health check completed', {
+      providerCount: healthStatuses.length
     });
-    
+
     res.json({
       success: true,
       message: 'Health check completed successfully',

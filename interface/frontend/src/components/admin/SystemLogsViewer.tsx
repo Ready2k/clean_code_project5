@@ -347,8 +347,8 @@ export const SystemLogsViewer: React.FC<SystemLogsViewerProps> = ({
               </Typography>
             ) : (
               <List sx={{ '& .MuiListItem-root': { py: 2 } }}>
-                {events.slice(0, 10).map((event) => (
-                  <React.Fragment key={event.id}>
+                {events.slice(0, 10).map((event, index) => (
+                  <React.Fragment key={`event-${event.id || index}`}>
                     <ListItem sx={{ px: 2 }}>
                       <ListItemIcon sx={{ minWidth: 40 }}>
                         {getEventIcon(event.type)}
@@ -684,39 +684,37 @@ export const SystemLogsViewer: React.FC<SystemLogsViewerProps> = ({
             {recentErrors.length > 0 ? (
               <List sx={{ '& .MuiListItem-root': { py: 2, px: 2, borderRadius: 1, mb: 1, backgroundColor: 'error.light', color: 'error.contrastText' } }}>
                 {recentErrors.map((error, index) => (
-                  <React.Fragment key={index}>
-                    <ListItem sx={{ backgroundColor: 'error.light', borderRadius: 1, mb: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <ErrorIcon color="error" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5, color: 'text.primary' }}>
-                            {error.message}
+                  <ListItem key={`error-${index}-${error.timestamp}`} sx={{ backgroundColor: 'error.light', borderRadius: 1, mb: 2 }}>
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      <ErrorIcon color="error" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5, color: 'text.primary' }}>
+                          {error.message}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" display="block" sx={{ mb: 0.5, color: 'text.secondary' }}>
+                            {new Date(error.timestamp).toLocaleString()} • {error.source}
                           </Typography>
-                        }
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="caption" display="block" sx={{ mb: 0.5, color: 'text.secondary' }}>
-                              {new Date(error.timestamp).toLocaleString()} • {error.source}
+                          {error.details && (
+                            <Typography variant="caption" sx={{ 
+                              fontFamily: 'monospace',
+                              backgroundColor: 'grey.100',
+                              color: 'text.primary',
+                              p: 0.5,
+                              borderRadius: 0.5,
+                              display: 'inline-block'
+                            }}>
+                              {JSON.stringify(error.details)}
                             </Typography>
-                            {error.details && (
-                              <Typography variant="caption" sx={{ 
-                                fontFamily: 'monospace',
-                                backgroundColor: 'grey.100',
-                                color: 'text.primary',
-                                p: 0.5,
-                                borderRadius: 0.5,
-                                display: 'inline-block'
-                              }}>
-                                {JSON.stringify(error.details)}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  </React.Fragment>
+                          )}
+                        </Box>
+                      }
+                    />
+                  </ListItem>
                 ))}
               </List>
             ) : (

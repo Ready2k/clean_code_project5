@@ -321,7 +321,7 @@ export const validateProvider = async (req: Request, res: Response): Promise<voi
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    const validationResult = await validationService.validateProviderConfig(tempProvider);
+    const validationResult = await validationService.validateProvider(tempProvider);
 
     res.json({
       success: true,

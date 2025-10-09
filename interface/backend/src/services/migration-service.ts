@@ -1,7 +1,8 @@
-import { readdir, readFile } from 'fs/promises';
+import { readdir, readFile, access } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
+import { constants } from 'fs';
 import { getDatabaseService } from './database-service.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../types/errors.js';
@@ -28,10 +29,36 @@ export interface MigrationRecord {
  * Database migration service
  */
 export class MigrationService {
-  private migrationsPath: string;
+  private defaultMigrationsPath: string;
 
   constructor(migrationsPath?: string) {
-    this.migrationsPath = migrationsPath || join(__dirname, '../migrations');
+    this.defaultMigrationsPath = migrationsPath || join(__dirname, '../migrations');
+  }
+
+  /**
+   * Find the correct migrations path
+   */
+  private async findMigrationsPath(): Promise<string> {
+    const possiblePaths = [
+      this.defaultMigrationsPath,                 // Constructor provided path
+      join(__dirname, '../migrations'),           // Production (compiled)
+      join(process.cwd(), 'src/migrations'),      // Development (tsx)
+      join(process.cwd(), 'dist/migrations'),     // Alternative production
+      join(__dirname, '../../src/migrations'),    // Alternative development
+    ];
+
+    for (const path of possiblePaths) {
+      try {
+        await access(path, constants.F_OK);
+        logger.debug(`Found migrations directory at: ${path}`);
+        return path;
+      } catch {
+        // Path doesn't exist, try next
+        continue;
+      }
+    }
+
+    throw new Error(`No migrations directory found. Tried paths: ${possiblePaths.join(', ')}`);
   }
 
   /**
@@ -66,15 +93,20 @@ export class MigrationService {
    */
   async getAvailableMigrations(): Promise<Migration[]> {
     try {
-      const files = await readdir(this.migrationsPath);
+      // Find the correct migrations path
+      const migrationsPath = await this.findMigrationsPath();
+      
+      const files = await readdir(migrationsPath);
       const migrationFiles = files
         .filter(file => file.endsWith('.sql'))
         .sort();
 
+      logger.info(`Found ${migrationFiles.length} migration files in ${migrationsPath}`);
+
       const migrations: Migration[] = [];
 
       for (const file of migrationFiles) {
-        const filePath = join(this.migrationsPath, file);
+        const filePath = join(migrationsPath, file);
         const content = await readFile(filePath, 'utf-8');
         
         // Parse migration file

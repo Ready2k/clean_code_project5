@@ -5,9 +5,8 @@
  * and capability verification for dynamic providers.
  */
 
-import axios, { AxiosError } from 'axios';
+import fetch from 'node-fetch';
 import { logger } from '../utils/logger.js';
-// Removed unused imports
 import {
   Provider,
   Model,
@@ -16,68 +15,53 @@ import {
   ValidationError as DynamicValidationError,
   ValidationWarning,
   ProviderCapabilities,
-  ModelCapabilities,
   AuthConfig,
-  AuthMethod
+  AuthMethod,
 } from '../types/dynamic-providers.js';
-import { validateCapabilityConsistency, validateContextLengthConsistency } from '../types/dynamic-provider-validation.js';
 
-/**
- * Provider validation service
- */
 export class ProviderValidationService {
-  private readonly REQUEST_TIMEOUT = 30000; // 30 seconds
-  // Removed unused MAX_RETRIES constant
-
-  // ============================================================================
-  // Provider Configuration Validation
-  // ============================================================================
+  private readonly REQUEST_TIMEOUT = 10000; // 10 seconds
 
   /**
-   * Validate complete provider configuration
+   * Validate a complete provider configuration
    */
-  async validateProviderConfig(provider: Provider): Promise<ValidationResult> {
+  async validateProvider(provider: Provider): Promise<ValidationResult> {
     const errors: DynamicValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
     try {
-      // Validate API endpoint accessibility
-      const endpointValidation = await this.validateApiEndpoint(provider.apiEndpoint);
-      if (!endpointValidation.valid) {
-        errors.push(...endpointValidation.errors);
+      // Validate API endpoint
+      const endpointResult = await this.validateApiEndpoint(provider.apiEndpoint);
+      if (!endpointResult.valid) {
+        errors.push(...endpointResult.errors);
+        warnings.push(...endpointResult.warnings);
       }
-      warnings.push(...endpointValidation.warnings);
 
       // Validate authentication configuration
-      const authValidation = this.validateAuthConfiguration(provider.authMethod, provider.authConfig);
-      if (!authValidation.valid) {
-        errors.push(...authValidation.errors);
+      const authResult = await this.validateAuthConfiguration(provider.authMethod, provider.authConfig);
+      if (!authResult.valid) {
+        errors.push(...authResult.errors);
+        warnings.push(...authResult.warnings);
       }
-      warnings.push(...authValidation.warnings);
 
       // Validate provider capabilities
-      const capabilityValidation = this.validateProviderCapabilities(provider.capabilities);
-      if (!capabilityValidation.valid) {
-        errors.push(...capabilityValidation.errors);
+      const capabilitiesResult = await this.validateProviderCapabilities(provider.capabilities);
+      if (!capabilitiesResult.valid) {
+        errors.push(...capabilitiesResult.errors);
+        warnings.push(...capabilitiesResult.warnings);
       }
-      warnings.push(...capabilityValidation.warnings);
 
       return {
         valid: errors.length === 0,
-        invalid: [],
-        conflicts: [],
         errors,
         warnings
       };
-
     } catch (error) {
-      logger.error('Provider configuration validation failed:', error);
-      
+      logger.error('Provider validation failed:', error);
       errors.push({
-        field: 'general',
         code: 'VALIDATION_ERROR',
         message: 'Failed to validate provider configuration',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        field: 'provider'
       });
 
       return {
@@ -89,219 +73,164 @@ export class ProviderValidationService {
   }
 
   /**
-   * Validate model configuration against provider capabilities
-   */
-  async validateModelConfig(provider: Provider, model: Model): Promise<ValidationResult> {
-    const errors: DynamicValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-
-    try {
-      // Validate model capabilities against provider capabilities
-      const capabilityValidation = await this.validateModelCapabilities(
-        provider.capabilities,
-        model.capabilities
-      );
-
-      if (!capabilityValidation.valid) {
-        errors.push(...capabilityValidation.errors);
-      }
-      warnings.push(...capabilityValidation.warnings);
-
-      // Validate context length consistency
-      if (!validateContextLengthConsistency(provider.capabilities.maxContextLength, model.contextLength)) {
-        errors.push({
-          field: 'contextLength',
-          code: 'CONTEXT_LENGTH_EXCEEDS_PROVIDER',
-          message: `Model context length (${model.contextLength}) exceeds provider maximum (${provider.capabilities.maxContextLength})`
-        });
-      }
-
-      return {
-        valid: errors.length === 0,
-        invalid: [],
-        conflicts: [],
-        errors,
-        warnings
-      };
-
-    } catch (error) {
-      logger.error('Model configuration validation failed:', error);
-      
-      errors.push({
-        field: 'general',
-        code: 'VALIDATION_ERROR',
-        message: 'Failed to validate model configuration',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      return {
-        valid: false,
-        errors,
-        warnings
-      };
-    }
-  }
-
-  /**
-   * Validate model capabilities against provider capabilities
-   */
-  async validateModelCapabilities(
-    providerCapabilities: ProviderCapabilities,
-    modelCapabilities: ModelCapabilities
-  ): Promise<ValidationResult> {
-    const errors: DynamicValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-
-    // Use the utility function for capability consistency
-    const consistencyCheck = validateCapabilityConsistency(providerCapabilities, modelCapabilities);
-    
-    if (!consistencyCheck.valid) {
-      for (const conflict of consistencyCheck.conflicts) {
-        errors.push({
-          field: 'capabilities',
-          code: 'CAPABILITY_MISMATCH',
-          message: conflict
-        });
-      }
-    }
-
-    // Additional model-specific validations
-    if (modelCapabilities.maxContextLength > providerCapabilities.maxContextLength) {
-      errors.push({
-        field: 'maxContextLength',
-        code: 'CONTEXT_LENGTH_EXCEEDS_PROVIDER',
-        message: `Model context length (${modelCapabilities.maxContextLength}) exceeds provider maximum (${providerCapabilities.maxContextLength})`
-      });
-    }
-
-    // Check for advanced capabilities that might not be supported
-    if (modelCapabilities.supportsVision && !providerCapabilities.supportsTools) {
-      warnings.push({
-        field: 'supportsVision',
-        code: 'ADVANCED_CAPABILITY_WARNING',
-        message: 'Vision support may require tool support from the provider',
-        suggestion: 'Verify that the provider supports vision capabilities'
-      });
-    }
-
-    if (modelCapabilities.supportsFunctionCalling && !modelCapabilities.supportsTools) {
-      errors.push({
-        field: 'supportsFunctionCalling',
-        code: 'INCONSISTENT_CAPABILITIES',
-        message: 'Function calling requires tool support to be enabled'
-      });
-    }
-
-    return {
-      valid: errors.length === 0,
-      invalid: [],
-      conflicts: [],
-      errors,
-      warnings
-    };
-  }
-
-  // ============================================================================
-  // Connectivity Testing
-  // ============================================================================
-
-  /**
-   * Test provider connectivity and basic functionality
+   * Test provider connectivity and authentication
    */
   async testProviderConnectivity(provider: Provider): Promise<ProviderTestResult> {
     const startTime = Date.now();
-    
-    logger.info('Testing provider connectivity', {
-      providerId: provider.id,
-      identifier: provider.identifier,
-      endpoint: provider.apiEndpoint
-    });
 
     try {
-      // Test basic endpoint accessibility
-      const endpointTest = await this.testEndpointAccessibility(provider.apiEndpoint);
-      if (!endpointTest.success) {
+      // Test basic connectivity
+      const connectivityResult = await this.testEndpointAccessibility(provider.apiEndpoint);
+
+      if (!connectivityResult.success) {
         return {
           success: false,
-          error: `Endpoint not accessible: ${endpointTest.error}`,
+          error: connectivityResult.error,
           testedAt: new Date(),
           latency: Date.now() - startTime
         };
       }
 
       // Test authentication
-      const authTest = await this.testAuthentication(provider);
-      if (!authTest.success) {
+      const authResult = await this.testAuthentication(provider);
+
+      if (!authResult.success) {
         return {
           success: false,
-          error: `Authentication failed: ${authTest.error}`,
+          error: authResult.error,
           testedAt: new Date(),
           latency: Date.now() - startTime
         };
       }
 
-      // Test provider capabilities (if possible)
-      const capabilityTest = await this.testProviderCapabilities(provider);
-      
-      const latency = Date.now() - startTime;
+      // Test capabilities
+      const capabilitiesResult = await this.testProviderCapabilities(provider);
 
-      logger.info('Provider connectivity test completed', {
-        providerId: provider.id,
+      const result: ProviderTestResult = {
         success: true,
-        latency
-      });
-
-      return {
-        success: true,
-        latency,
         testedAt: new Date(),
-        availableModels: capabilityTest.availableModels || [],
-        capabilities: capabilityTest.detectedCapabilities || {}
+        latency: Date.now() - startTime
       };
 
-    } catch (error) {
-      const latency = Date.now() - startTime;
-      
-      logger.error('Provider connectivity test failed:', error);
+      if (capabilitiesResult.availableModels) {
+        result.availableModels = capabilitiesResult.availableModels;
+      }
 
+      if (capabilitiesResult.detectedCapabilities) {
+        result.capabilities = capabilitiesResult.detectedCapabilities;
+      }
+
+      return result;
+    } catch (error) {
+      logger.error('Provider connectivity test failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        latency,
-        testedAt: new Date()
+        testedAt: new Date(),
+        latency: Date.now() - startTime
       };
     }
   }
 
   /**
-   * Test basic endpoint accessibility
+   * Validate model capabilities
+   */
+  async validateModelCapabilities(model: Model): Promise<ValidationResult> {
+    const errors: DynamicValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    try {
+      // Validate required fields
+      if (!model.id) {
+        errors.push({
+          code: 'MISSING_FIELD',
+          message: 'Model ID is required',
+          field: 'id'
+        });
+      }
+
+      if (!model.name) {
+        errors.push({
+          code: 'MISSING_FIELD',
+          message: 'Model name is required',
+          field: 'name'
+        });
+      }
+
+      // Validate capabilities
+      if (model.capabilities) {
+        if (model.capabilities.maxContextLength <= 0) {
+          errors.push({
+            code: 'INVALID_VALUE',
+            message: 'Max context length must be greater than 0',
+            field: 'capabilities.maxContextLength'
+          });
+        }
+
+        if (!model.capabilities.supportedRoles || model.capabilities.supportedRoles.length === 0) {
+          errors.push({
+            code: 'INVALID_VALUE',
+            message: 'Model must support at least one role',
+            field: 'capabilities.supportedRoles'
+          });
+        }
+      }
+
+      return {
+        valid: errors.length === 0,
+        errors,
+        warnings
+      };
+    } catch (error) {
+      logger.error('Model validation failed:', error);
+      errors.push({
+        code: 'VALIDATION_ERROR',
+        message: 'Failed to validate model configuration',
+        field: 'model'
+      });
+
+      return {
+        valid: false,
+        errors,
+        warnings
+      };
+    }
+  }
+
+  /**
+   * Test endpoint accessibility
    */
   private async testEndpointAccessibility(endpoint: string): Promise<{
     success: boolean;
-    error?: string;
+    error: string;
   }> {
     try {
-      // Try a simple HEAD or GET request to check if endpoint is reachable
-      await axios.head(endpoint, {
-        timeout: this.REQUEST_TIMEOUT,
-        validateStatus: (status) => status < 500 // Accept 4xx as "accessible"
+      const response = await fetch(endpoint, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
       });
 
-      return { success: true };
+      if (response.status < 500) {
+        return { success: true, error: '' };
+      }
 
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-          return {
-            success: false,
-            error: 'Endpoint not reachable'
-          };
-        }
-        
-        if (error.response && error.response.status < 500) {
-          // 4xx errors are acceptable for accessibility test
-          return { success: true };
-        }
+      return {
+        success: false,
+        error: `Server error: ${response.status}`
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Request timeout'
+        };
+      }
+
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        return {
+          success: false,
+          error: 'Endpoint not reachable'
+        };
       }
 
       return {
@@ -312,29 +241,24 @@ export class ProviderValidationService {
   }
 
   /**
-   * Test provider authentication
+   * Test authentication
    */
   private async testAuthentication(provider: Provider): Promise<{
     success: boolean;
-    error?: string;
+    error: string;
   }> {
     try {
-      // Build authentication headers based on auth method
       const headers = await this.buildAuthHeaders(provider.authMethod, provider.authConfig);
-      
-      // Try to make an authenticated request to a common endpoint
       const testEndpoint = this.getAuthTestEndpoint(provider);
-      
-      const response = await axios.get(testEndpoint, {
+
+      const response = await fetch(testEndpoint, {
+        method: 'GET',
         headers,
-        timeout: this.REQUEST_TIMEOUT,
-        validateStatus: (status) => status === 200 || status === 401 || status === 403
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
       });
 
-      // 401/403 might indicate auth is working but credentials are wrong
-      // 200 indicates successful auth
       if (response.status === 200) {
-        return { success: true };
+        return { success: true, error: '' };
       } else if (response.status === 401) {
         return {
           success: false,
@@ -347,23 +271,20 @@ export class ProviderValidationService {
         };
       }
 
-      return { success: true }; // Other statuses might be acceptable
+      return { success: true, error: '' };
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Request timeout'
+        };
+      }
 
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        if (error.response?.status === 401) {
-          return {
-            success: false,
-            error: 'Invalid credentials'
-          };
-        }
-        
-        if (error.response?.status === 403) {
-          return {
-            success: false,
-            error: 'Access forbidden'
-          };
-        }
+      if (error.status === 401) {
+        return {
+          success: false,
+          error: 'Invalid credentials'
+        };
       }
 
       return {
@@ -374,7 +295,7 @@ export class ProviderValidationService {
   }
 
   /**
-   * Test provider capabilities by making actual API calls
+   * Test provider capabilities
    */
   private async testProviderCapabilities(provider: Provider): Promise<{
     availableModels?: string[];
@@ -382,139 +303,110 @@ export class ProviderValidationService {
   }> {
     try {
       const headers = await this.buildAuthHeaders(provider.authMethod, provider.authConfig);
-      
-      // Try to get available models
       const modelsEndpoint = this.getModelsEndpoint(provider);
+
       if (modelsEndpoint) {
         try {
-          const response = await axios.get(modelsEndpoint, {
+          const response = await fetch(modelsEndpoint, {
+            method: 'GET',
             headers,
-            timeout: this.REQUEST_TIMEOUT
+            signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
           });
 
-          const availableModels = this.extractModelList(response.data, provider);
-          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          const availableModels = this.extractModelList(data, provider);
+
           return {
             availableModels,
-            detectedCapabilities: {
-              // Could detect capabilities based on available models
-            }
+            detectedCapabilities: this.detectCapabilities(data, provider)
           };
         } catch (error) {
-          logger.debug('Failed to fetch models list', {
-            providerId: provider.id,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
+          logger.warn(`Failed to fetch models for provider ${provider.identifier}:`, error);
         }
       }
 
       return {};
-
     } catch (error) {
-      logger.debug('Failed to test provider capabilities', {
-        providerId: provider.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      
+      logger.error(`Failed to test capabilities for provider ${provider.identifier}:`, error);
       return {};
     }
   }
 
-  // ============================================================================
-  // Authentication Helpers
-  // ============================================================================
-
   /**
-   * Build authentication headers based on auth method and config
+   * Build authentication headers
    */
   private async buildAuthHeaders(authMethod: AuthMethod, authConfig: AuthConfig): Promise<Record<string, string>> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
 
     switch (authMethod) {
       case 'api_key':
-        if (authConfig.fields['apiKey']) {
+        if (authConfig.fields?.['apiKey']) {
           headers['Authorization'] = `Bearer ${authConfig.fields['apiKey']}`;
         }
-        if (authConfig.fields['organizationId']) {
-          headers['OpenAI-Organization'] = String(authConfig.fields['organizationId']);
-        }
         break;
-
       case 'oauth2':
-        // For OAuth2, we would need to handle token exchange
-        // This is a simplified implementation
-        if (authConfig.fields['accessToken']) {
-          headers['Authorization'] = `Bearer ${authConfig.fields['accessToken']}`;
+        // OAuth2 would require token exchange, simplified for now
+        if (authConfig.fields?.['token']) {
+          headers['Authorization'] = `Bearer ${authConfig.fields['token']}`;
         }
         break;
-
       case 'aws_iam':
-        // For AWS IAM, we would need to sign requests
-        // This would require AWS SDK integration
-        headers['Authorization'] = 'AWS4-HMAC-SHA256 ...'; // Placeholder
+        // AWS IAM would require signature calculation, simplified for now
+        if (authConfig.fields?.['accessKeyId']) {
+          headers['Authorization'] = `AWS4-HMAC-SHA256 ${authConfig.fields['accessKeyId']}`;
+        }
         break;
-
       case 'custom':
-        // Apply custom headers from config
         if (authConfig.headers) {
           Object.assign(headers, authConfig.headers);
         }
         break;
     }
 
-    // Apply any additional headers from config
-    if (authConfig.headers) {
-      Object.assign(headers, authConfig.headers);
-    }
-
     return headers;
   }
 
   /**
-   * Get appropriate test endpoint for authentication
+   * Get authentication test endpoint
    */
   private getAuthTestEndpoint(provider: Provider): string {
-    // Use custom test endpoint if provided
-    if (provider.authConfig.testEndpoint) {
-      return `${provider.apiEndpoint}${provider.authConfig.testEndpoint}`;
-    }
+    // Try common endpoints for testing authentication
+    const baseUrl = provider.apiEndpoint.replace(/\/$/, '');
 
-    // Default test endpoints for common providers
-    if (provider.apiEndpoint.includes('openai.com')) {
-      return `${provider.apiEndpoint}/models`;
+    switch (provider.identifier) {
+      case 'openai':
+        return `${baseUrl}/models`;
+      case 'anthropic':
+        return `${baseUrl}/messages`;
+      case 'meta':
+        return `${baseUrl}/chat/completions`;
+      default:
+        return `${baseUrl}/models`;
     }
-    
-    if (provider.apiEndpoint.includes('anthropic.com')) {
-      return `${provider.apiEndpoint}/v1/messages`;
-    }
-
-    if (provider.apiEndpoint.includes('bedrock')) {
-      return `${provider.apiEndpoint}/foundation-models`;
-    }
-
-    // Default to base endpoint
-    return provider.apiEndpoint;
   }
 
   /**
-   * Get models endpoint for the provider
+   * Get models endpoint
    */
   private getModelsEndpoint(provider: Provider): string | null {
-    if (provider.apiEndpoint.includes('openai.com')) {
-      return `${provider.apiEndpoint}/models`;
-    }
-    
-    // Anthropic doesn't have a public models endpoint
-    if (provider.apiEndpoint.includes('anthropic.com')) {
-      return null;
-    }
+    const baseUrl = provider.apiEndpoint.replace(/\/$/, '');
 
-    if (provider.apiEndpoint.includes('bedrock')) {
-      return `${provider.apiEndpoint}/foundation-models`;
+    switch (provider.identifier) {
+      case 'openai':
+        return `${baseUrl}/models`;
+      case 'anthropic':
+        return null; // Anthropic doesn't have a public models endpoint
+      case 'meta':
+        return `${baseUrl}/models`;
+      default:
+        return `${baseUrl}/models`;
     }
-
-    // Try common patterns
-    return `${provider.apiEndpoint}/models`;
   }
 
   /**
@@ -522,187 +414,170 @@ export class ProviderValidationService {
    */
   private extractModelList(responseData: any, provider: Provider): string[] {
     try {
-      // OpenAI format
-      if (responseData.data && Array.isArray(responseData.data)) {
-        return responseData.data.map((model: any) => model.id).filter(Boolean);
+      switch (provider.identifier) {
+        case 'openai':
+          return responseData.data?.map((model: any) => model.id) || [];
+        case 'meta':
+          return responseData.data?.map((model: any) => model.id) || [];
+        default:
+          // Generic extraction
+          if (Array.isArray(responseData.data)) {
+            return responseData.data.map((item: any) => item.id || item.name).filter(Boolean);
+          }
+          return [];
       }
-
-      // AWS Bedrock format
-      if (responseData.modelSummaries && Array.isArray(responseData.modelSummaries)) {
-        return responseData.modelSummaries.map((model: any) => model.modelId).filter(Boolean);
-      }
-
-      // Generic array format
-      if (Array.isArray(responseData)) {
-        return responseData.map((model: any) => model.id || model.name || model.modelId).filter(Boolean);
-      }
-
-      return [];
-
     } catch (error) {
-      logger.debug('Failed to extract model list', {
-        providerId: provider.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.warn(`Failed to extract model list for provider ${provider.identifier}:`, error);
       return [];
     }
   }
 
-  // ============================================================================
-  // Configuration Validation Helpers
-  // ============================================================================
+  /**
+   * Detect capabilities from API response
+   */
+  private detectCapabilities(_responseData: any, _provider: Provider): Partial<ProviderCapabilities> {
+    // Basic capability detection - can be enhanced based on provider responses
+    return {
+      supportsSystemMessages: true,
+      maxContextLength: 4096,
+      supportedRoles: ['user', 'assistant'],
+      supportsStreaming: true,
+      supportsTools: false,
+      supportedAuthMethods: ['api_key']
+    };
+  }
 
   /**
-   * Validate API endpoint format and accessibility
+   * Validate API endpoint
    */
   private async validateApiEndpoint(endpoint: string): Promise<ValidationResult> {
     const errors: DynamicValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
-    // Basic URL format validation
     try {
       new URL(endpoint);
     } catch (error) {
       errors.push({
-        field: 'apiEndpoint',
         code: 'INVALID_URL',
-        message: 'Invalid API endpoint URL format'
+        message: 'Invalid API endpoint URL',
+        field: 'apiEndpoint'
       });
-      
-      return { valid: false, invalid: [], conflicts: [], errors, warnings };
     }
 
-    // Check if HTTPS
     if (!endpoint.startsWith('https://')) {
       warnings.push({
-        field: 'apiEndpoint',
         code: 'INSECURE_ENDPOINT',
         message: 'API endpoint should use HTTPS for security',
-        suggestion: 'Use HTTPS endpoint if available'
+        field: 'apiEndpoint'
       });
     }
 
-    return { valid: true, invalid: [], conflicts: [], errors, warnings };
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
   }
 
   /**
    * Validate authentication configuration
    */
-  private validateAuthConfiguration(authMethod: AuthMethod, authConfig: AuthConfig): ValidationResult {
+  private async validateAuthConfiguration(authMethod: AuthMethod, authConfig: AuthConfig): Promise<ValidationResult> {
     const errors: DynamicValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
-    // Check if auth config type matches auth method
-    if (authConfig.type !== authMethod) {
+    if (!authConfig) {
       errors.push({
-        field: 'authConfig',
-        code: 'AUTH_METHOD_MISMATCH',
-        message: `Auth config type (${authConfig.type}) does not match auth method (${authMethod})`
+        code: 'MISSING_AUTH_CONFIG',
+        message: `Authentication configuration is required for ${authMethod}`,
+        field: 'authConfig'
       });
+      return { valid: false, errors, warnings };
     }
 
-    // Validate required fields based on auth method
     switch (authMethod) {
       case 'api_key':
-        if (!authConfig.fields['apiKey']) {
+        if (!authConfig.fields?.['apiKey']) {
           errors.push({
-            field: 'authConfig.fields.apiKey',
-            code: 'MISSING_REQUIRED_FIELD',
-            message: 'API key is required for api_key authentication'
+            code: 'MISSING_API_KEY',
+            message: 'API key is required for api_key authentication',
+            field: 'authConfig.fields.apiKey'
           });
         }
         break;
-
       case 'oauth2':
-        if (!authConfig.fields['clientId'] || !authConfig.fields['clientSecret']) {
+        if (!authConfig.fields?.['clientId'] || !authConfig.fields?.['clientSecret']) {
           errors.push({
-            field: 'authConfig.fields',
-            code: 'MISSING_REQUIRED_FIELD',
-            message: 'Client ID and client secret are required for OAuth2 authentication'
+            code: 'MISSING_OAUTH_CREDENTIALS',
+            message: 'Client ID and secret are required for oauth2 authentication',
+            field: 'authConfig.fields'
           });
         }
         break;
-
       case 'aws_iam':
-        if (!authConfig.fields['accessKeyId'] || !authConfig.fields['secretAccessKey'] || !authConfig.fields['region']) {
+        if (!authConfig.fields?.['accessKeyId'] || !authConfig.fields?.['secretAccessKey']) {
           errors.push({
-            field: 'authConfig.fields',
-            code: 'MISSING_REQUIRED_FIELD',
-            message: 'Access key ID, secret access key, and region are required for AWS IAM authentication'
+            code: 'MISSING_AWS_CREDENTIALS',
+            message: 'Access key ID and secret are required for aws_iam authentication',
+            field: 'authConfig.fields'
           });
         }
         break;
-
       case 'custom':
         if (!authConfig.fields || Object.keys(authConfig.fields).length === 0) {
           errors.push({
-            field: 'authConfig.fields',
-            code: 'MISSING_REQUIRED_FIELD',
-            message: 'At least one authentication field is required for custom authentication'
+            code: 'MISSING_CUSTOM_FIELDS',
+            message: 'Custom fields are required for custom authentication',
+            field: 'authConfig.fields'
           });
         }
         break;
     }
 
-    return { valid: errors.length === 0, invalid: [], conflicts: [], errors, warnings };
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
   }
 
   /**
-   * Validate provider capabilities configuration
+   * Validate provider capabilities
    */
-  private validateProviderCapabilities(capabilities: ProviderCapabilities): ValidationResult {
+  private async validateProviderCapabilities(capabilities: ProviderCapabilities): Promise<ValidationResult> {
     const errors: DynamicValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
-    // Validate context length
+    if (!capabilities) {
+      errors.push({
+        code: 'MISSING_CAPABILITIES',
+        message: 'Provider capabilities are required',
+        field: 'capabilities'
+      });
+      return { valid: false, errors, warnings };
+    }
+
     if (capabilities.maxContextLength <= 0) {
       errors.push({
-        field: 'capabilities.maxContextLength',
-        code: 'INVALID_VALUE',
-        message: 'Maximum context length must be greater than 0'
+        code: 'INVALID_MAX_CONTEXT_LENGTH',
+        message: 'Max context length must be greater than 0',
+        field: 'capabilities.maxContextLength'
       });
     }
 
-    if (capabilities.maxContextLength > 2000000) {
-      warnings.push({
-        field: 'capabilities.maxContextLength',
-        code: 'UNUSUALLY_HIGH_VALUE',
-        message: 'Maximum context length is unusually high',
-        suggestion: 'Verify that the provider actually supports this context length'
-      });
-    }
-
-    // Validate supported roles
     if (!capabilities.supportedRoles || capabilities.supportedRoles.length === 0) {
       errors.push({
-        field: 'capabilities.supportedRoles',
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one supported role must be specified'
+        code: 'NO_SUPPORTED_ROLES',
+        message: 'Provider must support at least one role',
+        field: 'capabilities.supportedRoles'
       });
     }
 
-    // Validate rate limits if provided
-    if (capabilities.rateLimits) {
-      const rateLimits = capabilities.rateLimits;
-      
-      if (rateLimits.requestsPerMinute && rateLimits.requestsPerMinute <= 0) {
-        errors.push({
-          field: 'capabilities.rateLimits.requestsPerMinute',
-          code: 'INVALID_VALUE',
-          message: 'Requests per minute must be greater than 0'
-        });
-      }
-
-      if (rateLimits.tokensPerMinute && rateLimits.tokensPerMinute <= 0) {
-        errors.push({
-          field: 'capabilities.rateLimits.tokensPerMinute',
-          code: 'INVALID_VALUE',
-          message: 'Tokens per minute must be greater than 0'
-        });
-      }
-    }
-
-    return { valid: errors.length === 0, invalid: [], conflicts: [], errors, warnings };
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
   }
 }
 
@@ -718,3 +593,5 @@ export function getProviderValidationService(): ProviderValidationService {
   }
   return providerValidationService;
 }
+
+export default ProviderValidationService;
