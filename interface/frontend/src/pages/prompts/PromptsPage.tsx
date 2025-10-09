@@ -16,6 +16,9 @@ import {
   Tabs,
   Tab,
   Badge,
+  Select,
+  MenuItem,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,6 +37,7 @@ import {
   deletePrompt,
   setFilters,
   clearFilters,
+  loadMorePrompts,
 } from '../../store/slices/promptsSlice';
 import {
   openExportDialog,
@@ -219,6 +223,11 @@ export const PromptsPage: React.FC = () => {
 
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     dispatch(setFilters({ page }));
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = pagination.page + 1;
+    dispatch(loadMorePrompts({ ...filters, page: nextPage }));
   };
 
   const handleRefresh = () => {
@@ -454,7 +463,25 @@ export const PromptsPage: React.FC = () => {
             Manage and organize your AI prompts
           </Typography>
         </Box>
-        <Box display="flex" gap={1} flexWrap="wrap">
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+          <FormControlLabel
+            control={
+              <Select
+                size="small"
+                value={filters.limit || 50}
+                onChange={(e) => dispatch(setFilters({ limit: Number(e.target.value), page: 1 }))}
+                sx={{ minWidth: 80 }}
+              >
+                <MenuItem value={25}>25</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+                <MenuItem value={100}>100</MenuItem>
+                <MenuItem value={200}>200</MenuItem>
+              </Select>
+            }
+            label="Per page:"
+            labelPlacement="start"
+            sx={{ mr: 2 }}
+          />
           <Button
             startIcon={<RefreshIcon />}
             onClick={handleRefresh}
@@ -633,16 +660,44 @@ export const PromptsPage: React.FC = () => {
             ))}
           </Grid>
 
-          {/* Pagination */}
+          {/* Load More / Pagination */}
           {pagination.totalPages > 1 && (
-            <Box display="flex" justifyContent="center" mt={4}>
-              <Pagination
-                count={pagination.totalPages}
-                page={pagination.page}
-                onChange={handlePageChange}
-                color="primary"
-                size="large"
-              />
+            <Box display="flex" flexDirection="column" alignItems="center" mt={4} gap={2}>
+              {/* Show Load More button if there are more pages */}
+              {pagination.page < pagination.totalPages && (
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={handleLoadMore}
+                  disabled={isLoading}
+                  sx={{ minWidth: 200 }}
+                >
+                  {isLoading ? (
+                    <>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Loading...
+                    </>
+                  ) : (
+                    `Load More (${pagination.total - filteredPrompts.length} remaining)`
+                  )}
+                </Button>
+              )}
+              
+              {/* Traditional pagination for jumping to specific pages */}
+              <Box display="flex" alignItems="center" gap={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {filteredPrompts.length} of {pagination.total} prompts
+                </Typography>
+                <Pagination
+                  count={pagination.totalPages}
+                  page={pagination.page}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="medium"
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
             </Box>
           )}
         </>

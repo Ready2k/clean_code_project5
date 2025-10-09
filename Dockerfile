@@ -32,8 +32,13 @@ COPY interface ./interface
 WORKDIR /app/interface
 RUN npm run install:all
 
-# Build the interface
+# Build frontend first
+RUN npm run build:frontend
+
+# Build backend with explicit working directory
+WORKDIR /app/interface/backend
 RUN npm run build
+WORKDIR /app/interface
 
 # Production stage
 FROM node:18-alpine AS production
@@ -51,12 +56,19 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 -G nodejs
 
-# Copy built application
+# Copy built application and dependencies
 COPY --from=interface-builder /app/interface/backend/dist ./backend
 COPY --from=interface-builder /app/interface/frontend/dist ./frontend
-COPY --from=interface-builder /app/interface/backend/node_modules ./backend/node_modules
-COPY --from=interface-builder /app/interface/backend/package.json ./backend/
+COPY --from=interface-builder /app/interface/backend/package*.json ./backend/
+
+# Copy core library source
 COPY --from=base /app/src ./src
+
+# Install production dependencies in the final stage
+WORKDIR /app/backend
+RUN npm install --only=production --silent && npm cache clean --force
+
+WORKDIR /app
 
 # Create directories with proper permissions
 RUN mkdir -p /app/data /app/logs /app/temp && \

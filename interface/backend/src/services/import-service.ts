@@ -869,7 +869,7 @@ export class ImportService {
     }
 
     // Try to find the base prompt
-    let basePrompt = null;
+    let basePrompt: any = null;
 
     // Strategy 1: Look for base prompt by similar title (without variant indicators)
     const baseTitle = this.extractBaseTitle(promptData.metadata.title);
@@ -900,7 +900,7 @@ export class ImportService {
         const basePromptData = this.createBasePromptFromVariant(promptData);
         basePrompt = await this.promptLibraryService.createPrompt(basePromptData);
         logger.info('Created base prompt for variant import', {
-          basePromptId: basePrompt.id,
+          basePromptId: basePrompt?.id,
           baseTitle: basePromptData.metadata.title
         });
       } else {
@@ -914,7 +914,7 @@ export class ImportService {
 
     logger.info('Successfully imported as variant', {
       variantId: variant.id,
-      basePromptId: basePrompt.id,
+      basePromptId: basePrompt?.id,
       variantTitle: variant.metadata.title
     });
 

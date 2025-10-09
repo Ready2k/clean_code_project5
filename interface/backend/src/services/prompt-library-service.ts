@@ -422,6 +422,56 @@ export class PromptLibraryService {
   }
 
   /**
+   * Clean up duplicate prompts and orphaned files
+   */
+  async cleanupDuplicates(): Promise<{ removedPrompts: number; removedFiles: number }> {
+    this.ensureInitialized();
+
+    logger.info('Starting duplicate cleanup process');
+
+    const originalCount = this.prompts.size;
+    const originalPrompts = Array.from(this.prompts.values());
+
+    // Remove duplicates from memory
+    const cleanedPrompts = this.removeDuplicatePrompts(originalPrompts);
+    const removedPrompts = originalCount - cleanedPrompts.length;
+
+    // Update in-memory storage
+    this.prompts.clear();
+    cleanedPrompts.forEach(prompt => {
+      this.prompts.set(prompt.id, prompt);
+    });
+
+    // Clean up orphaned files
+    let removedFiles = 0;
+    try {
+      const files = await fs.readdir(this.storageDir);
+      const yamlFiles = files.filter(file => file.endsWith('.yaml'));
+      
+      for (const file of yamlFiles) {
+        const promptId = file.replace('.yaml', '');
+        if (!this.prompts.has(promptId)) {
+          try {
+            await this.deletePromptFile(promptId);
+            removedFiles++;
+            logger.info('Removed orphaned file', { file, promptId });
+          } catch (error) {
+            logger.warn('Failed to remove orphaned file', { file, error });
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to clean up orphaned files', { error });
+    }
+
+    // Save cleaned prompts back to files
+    await this.saveAllPromptsToFiles();
+
+    logger.info('Duplicate cleanup completed', { removedPrompts, removedFiles });
+    return { removedPrompts, removedFiles };
+  }
+
+  /**
    * Load mock data for demonstration
    */
   private async loadMockData(): Promise<void> {
@@ -1027,13 +1077,17 @@ export class PromptLibraryService {
       logger.debug('Listing prompts', { filters });
       let prompts = Array.from(this.prompts.values());
 
+      // Remove duplicates (both ID and content-based)
+      prompts = this.removeDuplicatePrompts(prompts);
+
       // Apply filters
       if (filters?.search) {
         const searchTerm = filters.search.toLowerCase();
         prompts = prompts.filter(p =>
           p.metadata.title.toLowerCase().includes(searchTerm) ||
           p.metadata.summary.toLowerCase().includes(searchTerm) ||
-          p.humanPrompt.goal.toLowerCase().includes(searchTerm)
+          p.humanPrompt.goal.toLowerCase().includes(searchTerm) ||
+          p.metadata.tags.some(tag => tag.toLowerCase().includes(searchTerm))
         );
       }
 
@@ -1064,6 +1118,12 @@ export class PromptLibraryService {
               aVal = a.metadata.updated_at;
               bVal = b.metadata.updated_at;
               break;
+            case 'rating':
+              const ratingsA = this.ratings.get(a.id) || [];
+              const ratingsB = this.ratings.get(b.id) || [];
+              aVal = ratingsA.length > 0 ? ratingsA.reduce((sum, r) => sum + r.score, 0) / ratingsA.length : 0;
+              bVal = ratingsB.length > 0 ? ratingsB.reduce((sum, r) => sum + r.score, 0) / ratingsB.length : 0;
+              break;
             default:
               return 0;
           }
@@ -1072,6 +1132,13 @@ export class PromptLibraryService {
             return bVal > aVal ? 1 : -1;
           }
           return aVal > bVal ? 1 : -1;
+        });
+      } else {
+        // Default sort by updated_at desc
+        prompts.sort((a, b) => {
+          const aVal = new Date(a.metadata.updated_at).getTime();
+          const bVal = new Date(b.metadata.updated_at).getTime();
+          return bVal - aVal;
         });
       }
 
@@ -1112,6 +1179,180 @@ export class PromptLibraryService {
       return enrichedPrompts;
     } catch (error) {
       logger.error('Failed to list prompts:', error);
+      throw new ServiceUnavailableError('Failed to list prompts');
+    }
+  }
+
+  /**
+   * Remove duplicate prompts based on content similarity
+   */
+  private removeDuplicatePrompts(prompts: PromptRecord[]): PromptRecord[] {
+    const uniquePrompts = new Map<string, PromptRecord>();
+    const seenContent = new Map<string, PromptRecord>();
+
+    prompts.forEach(prompt => {
+      // First check for exact ID duplicates
+      if (uniquePrompts.has(prompt.id)) {
+        logger.warn('Found duplicate prompt ID, keeping first occurrence', { promptId: prompt.id });
+        return;
+      }
+
+      // Create a content signature for similarity detection
+      const contentSignature = this.createContentSignature(prompt);
+      
+      if (seenContent.has(contentSignature)) {
+        const existingPrompt = seenContent.get(contentSignature)!;
+        logger.info('Found similar prompt content, keeping newer version', {
+          existingId: existingPrompt.id,
+          existingTitle: existingPrompt.metadata.title,
+          duplicateId: prompt.id,
+          duplicateTitle: prompt.metadata.title
+        });
+        
+        // Keep the more recently updated prompt
+        if (new Date(prompt.metadata.updated_at) > new Date(existingPrompt.metadata.updated_at)) {
+          seenContent.set(contentSignature, prompt);
+          uniquePrompts.delete(existingPrompt.id);
+          uniquePrompts.set(prompt.id, prompt);
+        }
+      } else {
+        seenContent.set(contentSignature, prompt);
+        uniquePrompts.set(prompt.id, prompt);
+      }
+    });
+
+    return Array.from(uniquePrompts.values());
+  }
+
+  /**
+   * Create a content signature for duplicate detection
+   */
+  private createContentSignature(prompt: PromptRecord): string {
+    const normalizedTitle = prompt.metadata.title.toLowerCase().trim();
+    const normalizedGoal = prompt.humanPrompt.goal.toLowerCase().trim();
+    const normalizedSteps = prompt.humanPrompt.steps.map(step => step.toLowerCase().trim()).join('|');
+    
+    return `${normalizedTitle}:${normalizedGoal}:${normalizedSteps}`;
+  }
+
+  /**
+   * List prompts with proper pagination support
+   */
+  async listPromptsWithPagination(filters?: PromptFilters): Promise<{ items: PromptRecord[]; total: number }> {
+    this.ensureInitialized();
+
+    try {
+      logger.debug('Listing prompts with pagination', { filters });
+      let prompts = Array.from(this.prompts.values());
+
+      // Remove duplicates (both ID and content-based)
+      prompts = this.removeDuplicatePrompts(prompts);
+
+      // Apply filters
+      if (filters?.search) {
+        const searchTerm = filters.search.toLowerCase();
+        prompts = prompts.filter(p =>
+          p.metadata.title.toLowerCase().includes(searchTerm) ||
+          p.metadata.summary.toLowerCase().includes(searchTerm) ||
+          p.humanPrompt.goal.toLowerCase().includes(searchTerm) ||
+          p.metadata.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      if (filters?.tags && filters.tags.length > 0) {
+        prompts = prompts.filter(p =>
+          filters.tags!.some(tag => p.metadata.tags.includes(tag))
+        );
+      }
+
+      if (filters?.owner) {
+        prompts = prompts.filter(p => p.metadata.owner === filters.owner);
+      }
+
+      // Store total count after filtering but before pagination
+      const totalCount = prompts.length;
+
+      // Apply sorting
+      if (filters?.sortBy) {
+        prompts.sort((a, b) => {
+          let aVal: any, bVal: any;
+          switch (filters.sortBy) {
+            case 'title':
+              aVal = a.metadata.title;
+              bVal = b.metadata.title;
+              break;
+            case 'created_at':
+              aVal = a.metadata.created_at;
+              bVal = b.metadata.created_at;
+              break;
+            case 'updated_at':
+              aVal = a.metadata.updated_at;
+              bVal = b.metadata.updated_at;
+              break;
+            case 'rating':
+              const ratingsA = this.ratings.get(a.id) || [];
+              const ratingsB = this.ratings.get(b.id) || [];
+              aVal = ratingsA.length > 0 ? ratingsA.reduce((sum, r) => sum + r.score, 0) / ratingsA.length : 0;
+              bVal = ratingsB.length > 0 ? ratingsB.reduce((sum, r) => sum + r.score, 0) / ratingsB.length : 0;
+              break;
+            default:
+              return 0;
+          }
+
+          if (filters.sortOrder === 'desc') {
+            return bVal > aVal ? 1 : -1;
+          }
+          return aVal > bVal ? 1 : -1;
+        });
+      } else {
+        // Default sort by updated_at desc
+        prompts.sort((a, b) => {
+          const aVal = new Date(a.metadata.updated_at).getTime();
+          const bVal = new Date(b.metadata.updated_at).getTime();
+          return bVal - aVal;
+        });
+      }
+
+      // Apply pagination
+      if (filters?.page && filters?.limit) {
+        const start = (filters.page - 1) * filters.limit;
+        prompts = prompts.slice(start, start + filters.limit);
+      }
+
+      // Enrich prompts with ratings data and convert field names to camelCase
+      const enrichedPrompts = prompts.map(prompt => {
+        const ratings = this.ratings.get(prompt.id) || [];
+        const averageRating = ratings.length > 0
+          ? ratings.reduce((sum, rating) => sum + rating.score, 0) / ratings.length
+          : 0;
+
+        return {
+          ...prompt,
+          // Convert snake_case to camelCase for frontend compatibility
+          createdAt: prompt.metadata.created_at,
+          updatedAt: prompt.metadata.updated_at,
+          status: 'active' as const, // Add default status
+          metadata: {
+            ...prompt.metadata
+          },
+          // Convert variable fields to match frontend expectations
+          variables: prompt.variables.map(variable => ({
+            ...variable,
+            name: variable.key,
+            description: variable.label
+          })),
+          ratings,
+          averageRating,
+          totalRatings: ratings.length
+        };
+      });
+
+      return {
+        items: enrichedPrompts,
+        total: totalCount
+      };
+    } catch (error) {
+      logger.error('Failed to list prompts with pagination:', error);
       throw new ServiceUnavailableError('Failed to list prompts');
     }
   }
@@ -1934,7 +2175,7 @@ export class PromptLibraryService {
    * Build the complete original prompt text exactly as it was structured
    */
   private buildCompleteOriginalPrompt(humanPrompt: HumanPrompt): string {
-    const sections = [];
+    const sections: string[] = [];
 
     // Goal section
     sections.push(`**Goal:** ${humanPrompt.goal}`);
@@ -1965,7 +2206,7 @@ export class PromptLibraryService {
    * Build task definition for completion - preserving original structure
    */
   private buildTaskDefinition(humanPrompt: HumanPrompt): string {
-    const sections = [];
+    const sections: string[] = [];
 
     // Preserve original structure
     sections.push(`**Goal:** ${humanPrompt.goal}`);

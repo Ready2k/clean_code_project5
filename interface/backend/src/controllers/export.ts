@@ -300,7 +300,7 @@ export const previewBulkExport = async (req: ExtendedAuthenticatedRequest, res: 
     const promptLibraryService = getPromptLibraryService();
     
     // Validate prompts exist and get their metadata
-    const promptsInfo = [];
+    const promptsInfo: any[] = [];
     let totalSize = 0;
 
     for (const promptId of bulkOptions.promptIds) {

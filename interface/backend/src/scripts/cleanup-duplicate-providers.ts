@@ -30,7 +30,7 @@ async function cleanupDuplicateProviders() {
     logger.info(`Found ${providers.length} providers total`);
     
     // Find duplicates - providers that have both "basic" and non-basic versions
-    const duplicatesToRemove = [];
+    const duplicatesToRemove: any[] = [];
     const providerNames = new Map();
     
     // Group providers by name

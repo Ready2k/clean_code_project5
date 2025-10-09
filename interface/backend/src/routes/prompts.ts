@@ -44,4 +44,7 @@ router.get('/:id/versions/:version', requirePermission(Permission.READ_PROMPTS),
 router.post('/:id/export', requirePermission(Permission.EXPORT_PROMPTS), asyncHandler(promptController.exportPrompt));
 router.post('/:id/export/preview', requirePermission(Permission.EXPORT_PROMPTS), asyncHandler(promptController.previewExport));
 
+// Admin operations
+router.post('/admin/cleanup-duplicates', requirePermission(Permission.SYSTEM_CONFIG), asyncHandler(promptController.cleanupDuplicates));
+
 export { router as promptRoutes };

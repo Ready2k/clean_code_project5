@@ -11,6 +11,12 @@ A comprehensive web-based interface for managing AI prompts across multiple prov
 - **User Settings** and preferences
 - **Fully responsive design** that works on mobile/tablet
 
+### Recent Updates ✨
+- **🐳 Docker Build Fixed** - Resolved TypeScript compilation issues in Docker environment
+- **📄 Improved Pagination** - Enhanced Load More functionality with proper parameter handling
+- **🔧 TypeScript Optimization** - Relaxed strict settings for better Docker compatibility
+- **📁 Build Process Enhanced** - Fixed module resolution and dependency management
+
 ## 🎯 Features
 
 ### Core Features
@@ -31,6 +37,43 @@ A comprehensive web-based interface for managing AI prompts across multiple prov
 - **🌐 API-First Design** - RESTful API with OpenAPI 3.0 documentation
 - **🚀 Real-time Collaboration** - WebSocket-powered collaborative editing
 - **🐳 Production Ready** - Docker containerization with monitoring stack
+
+## 🐳 Docker Deployment
+
+### Quick Docker Setup
+
+```bash
+# Build the Docker image
+docker build -t prompt-library .
+
+# Run with Docker Compose (recommended)
+docker-compose up -d
+
+# Or run standalone container
+docker run -p 8000:8000 prompt-library
+```
+
+### Docker Build Features
+- **✅ Multi-stage Build** - Optimized for production with minimal image size
+- **🔧 TypeScript Compilation** - Fully resolved compilation issues in Docker environment
+- **📦 Production Dependencies** - Only necessary runtime dependencies included
+- **🔒 Security Hardened** - Non-root user, minimal attack surface
+- **📊 Health Checks** - Built-in container health monitoring
+
+### Docker Troubleshooting
+
+If you encounter build issues:
+
+```bash
+# Clean build (no cache)
+docker build --no-cache -t prompt-library .
+
+# Check build logs
+docker build -t prompt-library . 2>&1 | tee build.log
+
+# Verify image
+docker run --rm prompt-library node --version
+```
 
 ## 🛠️ Application Management
 
@@ -477,6 +520,34 @@ const exported = await library.export.exportPrompt(prompt.id, 'openai');
 **Test Coverage**: >90% across all services  
 **API Stability**: Production-ready with comprehensive OpenAPI docs  
 **Security**: JWT auth, RBAC, encryption at rest/transit
+
+## 📋 Changelog
+
+### Latest Updates (December 2024)
+
+#### 🐳 Docker Build Fixes
+- **Fixed TypeScript compilation errors** in Docker environment
+- **Resolved module resolution issues** for ES modules with `.js` extensions
+- **Updated `.dockerignore`** to properly include source data files
+- **Improved production build process** with optimized dependency management
+
+#### 🔧 Backend Improvements
+- **Enhanced pagination handling** with proper default values for `filters.limit` and `filters.page`
+- **Fixed array type inference issues** by adding explicit type annotations
+- **Improved null safety** with optional chaining for better error handling
+- **Relaxed strict TypeScript settings** for better Docker compatibility
+
+#### 📦 Build Process Enhancements
+- **Updated TypeScript configuration** with `downlevelIteration: true` for ES2015+ features
+- **Fixed import/export module resolution** for provider templates
+- **Optimized Docker multi-stage build** for smaller production images
+- **Enhanced error handling** throughout the application
+
+#### 🚀 Performance & Reliability
+- **Improved Load More functionality** in the prompt library interface
+- **Better error messages** and debugging information
+- **Enhanced logging** for troubleshooting Docker builds
+- **Streamlined development workflow** with better build scripts
 
 ## License
 

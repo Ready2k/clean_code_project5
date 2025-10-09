@@ -350,7 +350,7 @@ export async function getMigrationRecommendations(req: Request, res: Response): 
     const migrationService = getSystemMigrationService();
     const status = await migrationService.getMigrationStatus();
 
-    const recommendations = [];
+    const recommendations: any[] = [];
 
     if (!status.isSystemMigrated) {
       recommendations.push({

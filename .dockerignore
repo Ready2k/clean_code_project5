@@ -61,10 +61,12 @@ interface/temp
 **/temp
 **/tmp
 
-# Data directories
+# Data directories (exclude runtime data but keep source data)
 data
 interface/data
-**/data
+interface/temp
+interface/logs
+!interface/backend/src/data
 
 # Docker files
 Dockerfile*
@@ -103,9 +105,7 @@ test-*.md
 # Configuration files that shouldn't be in containers
 .eslintrc*
 .prettierrc*
-tsconfig*.json
 vitest.config.*
 vite.config.*
-**/tsconfig*.json
 **/vitest.config.*
 **/vite.config.*

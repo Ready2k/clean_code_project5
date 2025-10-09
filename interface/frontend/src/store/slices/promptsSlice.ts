@@ -21,7 +21,7 @@ const initialState: PromptsState = {
   currentPrompt: null,
   filters: {
     page: 1,
-    limit: 20,
+    limit: 50, // Increased default limit
     sortBy: 'updated_at',
     sortOrder: 'desc',
   },
@@ -29,7 +29,7 @@ const initialState: PromptsState = {
   error: null,
   pagination: {
     page: 1,
-    limit: 20,
+    limit: 50, // Increased default limit
     total: 0,
     totalPages: 0,
   },
@@ -96,6 +96,18 @@ export const deletePrompt = createAsyncThunk(
   }
 );
 
+export const loadMorePrompts = createAsyncThunk(
+  'prompts/loadMorePrompts',
+  async (filters: PromptFilters, { rejectWithValue }) => {
+    try {
+      const response = await promptsAPI.getPrompts(filters);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to load more prompts');
+    }
+  }
+);
+
 const promptsSlice = createSlice({
   name: 'prompts',
   initialState,
@@ -109,10 +121,15 @@ const promptsSlice = createSlice({
     clearFilters: (state) => {
       state.filters = {
         page: 1,
-        limit: 20,
+        limit: 50, // Increased default limit
         sortBy: 'updated_at',
         sortOrder: 'desc',
       };
+    },
+    incrementPage: (state) => {
+      if (state.pagination.page < state.pagination.totalPages) {
+        state.filters.page = state.pagination.page + 1;
+      }
     },
     setCurrentPrompt: (state, action: PayloadAction<PromptRecord | null>) => {
       state.currentPrompt = action.payload;
@@ -166,9 +183,27 @@ const promptsSlice = createSlice({
           state.currentPrompt = null;
         }
         state.pagination.total -= 1;
+      })
+      // Load more prompts
+      .addCase(loadMorePrompts.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loadMorePrompts.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Append new items to existing ones, avoiding duplicates
+        const existingIds = new Set(state.items.map(item => item.id));
+        const newItems = action.payload.items.filter(item => !existingIds.has(item.id));
+        state.items = [...state.items, ...newItems];
+        state.pagination = action.payload.pagination;
+        state.error = null;
+      })
+      .addCase(loadMorePrompts.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
-export const { clearError, setFilters, clearFilters, setCurrentPrompt } = promptsSlice.actions;
+export const { clearError, setFilters, clearFilters, setCurrentPrompt, incrementPage } = promptsSlice.actions;
 export default promptsSlice.reducer;

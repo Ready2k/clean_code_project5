@@ -321,7 +321,7 @@ export const previewTemplate = async (req: Request, res: Response): Promise<void
     };
 
     // Basic validation
-    const warnings = [];
+    const warnings: any[] = [];
     
     // Check for potential identifier conflicts (this would need to check against existing providers)
     if (!customizations.identifier) {

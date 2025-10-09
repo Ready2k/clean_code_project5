@@ -120,22 +120,25 @@ export const getPrompts = async (req: Request, res: Response): Promise<void> => 
       owner: req.query['owner'] as string,
       sortBy: req.query['sortBy'] as string,
       sortOrder: req.query['sortOrder'] as 'asc' | 'desc',
-      page: req.query['page'] ? parseInt(req.query['page'] as string) : undefined,
-      limit: req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
+      page: req.query['page'] ? parseInt(req.query['page'] as string) : 1,
+      limit: req.query['limit'] ? parseInt(req.query['limit'] as string) : 50 // Increased default limit
     };
 
     const promptLibraryService = getPromptLibraryService();
-    const prompts = await promptLibraryService.listPrompts(filters);
+    const result = await promptLibraryService.listPromptsWithPagination(filters);
 
-    const totalPages = filters.limit ? Math.ceil(prompts.length / filters.limit) : 1;
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
     
     res.json({
-      items: prompts,
+      items: result.items,
       pagination: {
-        page: filters.page || 1,
-        limit: filters.limit || prompts.length,
-        total: prompts.length,
-        totalPages
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit),
+        hasNextPage: page * limit < result.total,
+        hasPreviousPage: page > 1
       }
     });
   } catch (error) {
@@ -605,14 +608,16 @@ export const searchPrompts = async (req: Request, res: Response): Promise<void> 
     const promptLibraryService = getPromptLibraryService();
     const prompts = await promptLibraryService.listPrompts(filters);
 
-    const totalPages = filters.limit ? Math.ceil(prompts.length / filters.limit) : 1;
+    const page = filters.page || 1;
+    const limit = filters.limit || prompts.length;
+    const totalPages = limit ? Math.ceil(prompts.length / limit) : 1;
     
     res.json({
       query,
       items: prompts,
       pagination: {
-        page: filters.page || 1,
-        limit: filters.limit || prompts.length,
+        page,
+        limit,
         total: prompts.length,
         totalPages
       }
@@ -818,6 +823,32 @@ export const previewExport = async (req: ExtendedAuthenticatedRequest, res: Resp
     });
   } catch (error) {
     logger.error('Failed to preview export:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clean up duplicate prompts (admin only)
+ */
+export const cleanupDuplicates = async (req: ExtendedAuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const promptLibraryService = getPromptLibraryService();
+    const result = await promptLibraryService.cleanupDuplicates();
+
+    logger.info('Duplicate cleanup completed by admin', {
+      userId: req.user!.userId,
+      removedPrompts: result.removedPrompts,
+      removedFiles: result.removedFiles
+    });
+
+    res.json({
+      message: 'Duplicate cleanup completed successfully',
+      removedPrompts: result.removedPrompts,
+      removedFiles: result.removedFiles,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to cleanup duplicates:', error);
     throw error;
   }
 };
