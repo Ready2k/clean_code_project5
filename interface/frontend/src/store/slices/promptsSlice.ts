@@ -13,6 +13,8 @@ interface PromptsState {
     limit: number;
     total: number;
     totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
   };
 }
 
@@ -32,6 +34,8 @@ const initialState: PromptsState = {
     limit: 50, // Increased default limit
     total: 0,
     totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
   },
 };
 

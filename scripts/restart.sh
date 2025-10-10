@@ -139,28 +139,28 @@ main() {
     setup_logging
     
     # Phase 1: Stop services
-    show_progress "1" "Stopping all services"
-    log "Executing stop script..."
+    show_progress "1" "Stopping services"
+    log "Executing stop script with mode: ${MODE_ARG:-auto}"
     
-    if ! "$script_dir/stop.sh"; then
+    if ! "$script_dir/stop.sh" $MODE_ARG; then
         handle_error $? "Stop phase"
     fi
     
-    success "All services stopped successfully"
+    success "Services stopped successfully"
     
     # Phase 2: Wait for cleanup
     show_progress "2" "Waiting for cleanup"
     wait_with_countdown $RESTART_DELAY "Allowing system cleanup"
     
     # Phase 3: Start services
-    show_progress "3" "Starting all services"
-    log "Executing start script..."
+    show_progress "3" "Starting services"
+    log "Executing start script with mode: ${MODE_ARG:-auto}"
     
-    if ! "$script_dir/start.sh"; then
+    if ! "$script_dir/start.sh" $MODE_ARG; then
         handle_error $? "Start phase"
     fi
     
-    success "All services started successfully"
+    success "Services started successfully"
     
     # Phase 4: Final status
     show_progress "4" "Restart completed"
@@ -209,6 +209,7 @@ trap cleanup_on_interrupt INT TERM
 # Parse command line arguments
 FORCE_RESTART=false
 SKIP_CHECKS=false
+MODE_ARG=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -220,10 +221,20 @@ while [[ $# -gt 0 ]]; do
             SKIP_CHECKS=true
             shift
             ;;
+        --docker-only|--local-only|--full-docker)
+            MODE_ARG="$1"
+            shift
+            ;;
         -h|--help)
             echo "Prompt Library Application Restart Script"
             echo ""
-            echo "Usage: $0 [OPTIONS]"
+            echo "Usage: $0 [OPTIONS] [MODE]"
+            echo ""
+            echo "Modes:"
+            echo "  --docker-only      Restart only Docker services"
+            echo "  --local-only       Restart only local services"
+            echo "  --full-docker      Restart full Docker stack"
+            echo "  (no mode)          Restart all services"
             echo ""
             echo "Options:"
             echo "  -f, --force        Force restart even if services appear stopped"
@@ -231,9 +242,10 @@ while [[ $# -gt 0 ]]; do
             echo "  -h, --help         Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0                 # Normal restart"
-            echo "  $0 --force         # Force restart"
-            echo "  $0 --skip-checks   # Quick restart"
+            echo "  $0                      # Normal restart (all services)"
+            echo "  $0 --docker-only        # Restart only database services"
+            echo "  $0 --force              # Force restart all services"
+            echo "  $0 --local-only --force # Force restart app services only"
             exit 0
             ;;
         *)

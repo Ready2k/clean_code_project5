@@ -127,18 +127,15 @@ export const getPrompts = async (req: Request, res: Response): Promise<void> => 
     const promptLibraryService = getPromptLibraryService();
     const result = await promptLibraryService.listPromptsWithPagination(filters);
 
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-    
     res.json({
       items: result.items,
       pagination: {
-        page,
-        limit,
+        page: filters.page!,
+        limit: filters.limit!,
         total: result.total,
-        totalPages: Math.ceil(result.total / limit),
-        hasNextPage: page * limit < result.total,
-        hasPreviousPage: page > 1
+        totalPages: Math.ceil(result.total / filters.limit!),
+        hasNextPage: filters.page! * filters.limit! < result.total,
+        hasPreviousPage: filters.page! > 1
       }
     });
   } catch (error) {

@@ -8,8 +8,17 @@ This directory contains robust scripts for managing the entire Prompt Library ap
 Starts all services in the correct order with comprehensive health checks.
 
 ```bash
-./scripts/start.sh
+./scripts/start.sh [MODE] [OPTIONS]
 ```
+
+**Modes:**
+- `--docker-only`: Start only Docker services (PostgreSQL, Redis)
+- `--local-only`: Start only local services (Backend, Frontend) 
+- `--full-docker`: Start everything in Docker containers
+- *(no mode)*: Auto mode - Docker deps + local backend/frontend
+
+**Options:**
+- `--help, -h`: Show help information
 
 **What it does:**
 1. **Prerequisites Check**: Verifies Docker is running, builds are available
@@ -32,8 +41,17 @@ Starts all services in the correct order with comprehensive health checks.
 Gracefully stops all services in reverse order.
 
 ```bash
-./scripts/stop.sh
+./scripts/stop.sh [MODE] [OPTIONS]
 ```
+
+**Modes:**
+- `--docker-only`: Stop only Docker services
+- `--local-only`: Stop only local services
+- `--full-docker`: Stop full Docker stack
+- *(no mode)*: Stop all services
+
+**Options:**
+- `--help, -h`: Show help information
 
 **What it does:**
 1. **Frontend Shutdown**: Stops React development server
@@ -53,8 +71,14 @@ Gracefully stops all services in reverse order.
 Combines stop and start operations with safety checks.
 
 ```bash
-./scripts/restart.sh [OPTIONS]
+./scripts/restart.sh [MODE] [OPTIONS]
 ```
+
+**Modes:**
+- `--docker-only`: Restart only Docker services
+- `--local-only`: Restart only local services
+- `--full-docker`: Restart full Docker stack
+- *(no mode)*: Restart all services
 
 **Options:**
 - `-f, --force`: Force restart even if services appear stopped
@@ -82,6 +106,8 @@ Provides comprehensive status information for all services.
 
 **Options:**
 - `--quiet`: Show only basic service status
+- `--docker`: Show only Docker service status
+- `--local`: Show only local service status
 - `--help`: Show help information
 
 **What it shows:**
@@ -91,6 +117,40 @@ Provides comprehensive status information for all services.
 - 📝 Log file information and sizes
 - 💻 Resource usage (CPU, Memory)
 - 🛠️ Management command suggestions
+
+## 🎯 Deployment Modes
+
+### 🔄 Auto Mode (Recommended for Development)
+Docker for databases + local Node.js services for faster development:
+```bash
+./scripts/start.sh                    # Start all (Docker DB + local app)
+./scripts/status.sh                   # Check all services
+./scripts/stop.sh                     # Stop all services
+```
+
+### 🐳 Full Docker Mode (Production-like)
+Everything runs in Docker containers:
+```bash
+./scripts/start.sh --full-docker      # Start full Docker stack
+./scripts/status.sh --docker          # Check Docker services
+./scripts/stop.sh --full-docker       # Stop Docker stack
+```
+
+### 🔧 Split Mode (Advanced)
+Start services independently:
+```bash
+# Start databases only
+./scripts/start.sh --docker-only
+
+# Start application services (requires databases running)
+./scripts/start.sh --local-only
+
+# Stop just the application
+./scripts/stop.sh --local-only
+
+# Stop everything
+./scripts/stop.sh
+```
 
 ## 🔧 Configuration
 

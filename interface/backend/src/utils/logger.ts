@@ -3,8 +3,12 @@ import path from 'path';
 
 const logLevel = process.env['LOG_LEVEL'] || 'info';
 const nodeEnv = process.env['NODE_ENV'] || 'development';
-// Always use the centralized logs directory at project root
-const logsDir = process.env['LOGS_DIR'] || path.resolve(process.cwd(), '../../logs');
+// Use logs directory that the app has permission to write to
+const logsDir = process.env['LOGS_DIR'] || (
+  nodeEnv === 'production' 
+    ? path.resolve('/app/logs')  // In Docker container
+    : path.resolve(process.cwd(), '../../logs')  // Local development
+);
 
 // Custom format for structured logging
 const structuredFormat = winston.format.combine(

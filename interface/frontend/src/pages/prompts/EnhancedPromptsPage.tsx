@@ -275,6 +275,9 @@ export const EnhancedPromptsPage: React.FC = () => {
 
   const handleLoadMore = () => {
     const nextPage = pagination.page + 1;
+    // Update filters to reflect the new page
+    dispatch(setFilters({ page: nextPage }));
+    // Load more prompts with the updated page
     dispatch(loadMorePrompts({ ...filters, page: nextPage }));
   };
 
@@ -425,18 +428,44 @@ export const EnhancedPromptsPage: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Prompt Library
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage and organize your AI prompts with variants
-          </Typography>
+      <Box mb={3}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Prompt Library
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Manage and organize your AI prompts with variants
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowCreateWizard(true)}
+            size="large"
+          >
+            Create Prompt
+          </Button>
         </Box>
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-          <FormControlLabel
-            control={
+
+        {/* Toolbar */}
+        <Box 
+          display="flex" 
+          justifyContent="space-between" 
+          alignItems="center" 
+          flexWrap="wrap" 
+          gap={2}
+          p={2}
+          bgcolor="background.paper"
+          borderRadius={1}
+          border={1}
+          borderColor="divider"
+        >
+          <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="body2" color="text.secondary">
+                Per page:
+              </Typography>
               <Select
                 size="small"
                 value={filters.limit || 50}
@@ -448,67 +477,69 @@ export const EnhancedPromptsPage: React.FC = () => {
                 <MenuItem value={100}>100</MenuItem>
                 <MenuItem value={200}>200</MenuItem>
               </Select>
-            }
-            label="Per page:"
-            labelPlacement="start"
-            sx={{ mr: 2 }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showVariantsInline}
-                onChange={(e) => setShowVariantsInline(e.target.checked)}
+            </Box>
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showVariantsInline}
+                  onChange={(e) => setShowVariantsInline(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Show Variants Inline"
+            />
+            
+            <Tooltip title={viewMode === 'card' ? 'Switch to List View' : 'Switch to Card View'}>
+              <Button
+                variant="outlined"
                 size="small"
-              />
-            }
-            label="Show Variants Inline"
-            sx={{ mr: 2 }}
-          />
-          <Tooltip title={viewMode === 'card' ? 'Switch to List View' : 'Switch to Card View'}>
+                onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
+                startIcon={viewMode === 'card' ? <ListViewIcon /> : <CardViewIcon />}
+              >
+                {viewMode === 'card' ? 'List' : 'Cards'}
+              </Button>
+            </Tooltip>
+            
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={isLoading}
+              variant="outlined"
+              size="small"
+            >
+              Refresh
+            </Button>
+          </Box>
+
+          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
             <Button
               variant="outlined"
               size="small"
-              onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
-              startIcon={viewMode === 'card' ? <ListViewIcon /> : <CardViewIcon />}
+              onClick={() => setShowComparison(true)}
             >
-              {viewMode === 'card' ? 'List' : 'Cards'}
+              Compare Ratings
             </Button>
-          </Tooltip>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => setShowComparison(true)}
-          >
-            Compare Ratings
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<SelectIcon />}
-            onClick={handleToggleSelection}
-            color={selectionMode ? 'primary' : 'inherit'}
-          >
-            {selectionMode ? 'Exit Selection' : 'Select'}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<ImportIcon />}
-            onClick={() => setShowImportDialog(true)}
-          >
-            Import
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setShowCreateWizard(true)}
-          >
-            Create Prompt
-          </Button>
+            
+            <Button
+              variant="outlined"
+              startIcon={<SelectIcon />}
+              onClick={handleToggleSelection}
+              color={selectionMode ? 'primary' : 'inherit'}
+              size="small"
+            >
+              {selectionMode ? 'Exit Selection' : 'Select'}
+            </Button>
+            
+            <Button
+              variant="outlined"
+              startIcon={<ImportIcon />}
+              onClick={() => setShowImportDialog(true)}
+              size="small"
+            >
+              Import
+            </Button>
+          </Box>
         </Box>
       </Box>
 
@@ -599,33 +630,61 @@ export const EnhancedPromptsPage: React.FC = () => {
             ))}
           </Grid>
 
-          {/* Load More / Pagination */}
-          {pagination.totalPages > 1 && (
-            <Box display="flex" flexDirection="column" alignItems="center" mt={4} gap={2}>
-              {/* Show Load More button if there are more pages */}
-              {pagination.page < pagination.totalPages && (
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={handleLoadMore}
-                  disabled={isLoading}
-                  sx={{ minWidth: 200 }}
-                >
-                  {isLoading ? (
-                    <>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Loading...
-                    </>
-                  ) : (
-                    `Load More (${pagination.total - groupedPrompts.length} remaining)`
-                  )}
-                </Button>
-              )}
-              
-              {/* Traditional pagination for jumping to specific pages */}
-              <Box display="flex" alignItems="center" gap={2}>
+          {/* Pagination Controls */}
+          <Box 
+            display="flex" 
+            flexDirection="column" 
+            alignItems="center" 
+            mt={4} 
+            gap={3}
+            p={3}
+            bgcolor="background.paper"
+            borderRadius={1}
+            border={1}
+            borderColor="divider"
+          >
+            {/* Results Summary */}
+            <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+              <Typography variant="body2" color="text.secondary">
+                Showing {groupedPrompts.length} prompt groups of {pagination.total} total prompts
+              </Typography>
+              {pagination.totalPages > 1 && (
                 <Typography variant="body2" color="text.secondary">
-                  Showing {groupedPrompts.length} prompt groups of {pagination.total} total prompts
+                  • Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+              )}
+            </Box>
+
+            {/* Load More Button */}
+            {pagination.hasNextPage && (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleLoadMore}
+                disabled={isLoading}
+                sx={{ 
+                  minWidth: 200,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '1rem'
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Loading more prompts...
+                  </>
+                ) : (
+                  `Load More Prompts (${pagination.total - groupedPrompts.length} remaining)`
+                )}
+              </Button>
+            )}
+            
+            {/* Traditional Pagination */}
+            {pagination.totalPages > 1 && (
+              <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
+                <Typography variant="caption" color="text.secondary">
+                  Or jump to a specific page:
                 </Typography>
                 <Pagination
                   count={pagination.totalPages}
@@ -635,10 +694,19 @@ export const EnhancedPromptsPage: React.FC = () => {
                   size="medium"
                   showFirstButton
                   showLastButton
+                  siblingCount={1}
+                  boundaryCount={1}
                 />
               </Box>
-            </Box>
-          )}
+            )}
+
+            {/* No More Results */}
+            {!pagination.hasNextPage && pagination.total > 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                You've reached the end! All {pagination.total} prompts are displayed.
+              </Typography>
+            )}
+          </Box>
         </>
       )}
 

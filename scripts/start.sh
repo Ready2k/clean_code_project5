@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Prompt Library Startup (Docker deps + backend + frontend with robust health checks + TTY-safe Vite)
-# Works from any cwd. Intended path: repo_root/scripts/start.sh
+# Prompt Library Startup Script
+# Supports both Docker and local development modes
+# Usage: ./scripts/start.sh [--docker-only] [--local-only] [--help]
 #
 
 set -Eeuo pipefail
@@ -16,10 +17,17 @@ BACKEND_DIR="$INTERFACE_DIR/backend"
 FRONTEND_DIR="$INTERFACE_DIR/frontend"
 LOG_DIR="$PROJECT_ROOT/logs"
 DOCKER_COMPOSE_FILE="$INTERFACE_DIR/docker-compose.dev.yml"
+ROOT_DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
+
+# Mode configuration
+MODE="${MODE:-auto}"  # auto, docker-only, local-only, full-docker
+DOCKER_ONLY=false
+LOCAL_ONLY=false
+FULL_DOCKER=false
 
 # Env overrides allowed
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"   # desired port; we still auto-detect from logs
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 MAX_WAIT_TIME="${MAX_WAIT_TIME:-60}"
@@ -27,7 +35,6 @@ CHECK_INTERVAL="${CHECK_INTERVAL:-2}"
 
 BACKEND_PID_FILE="$INTERFACE_DIR/.backend.pid"
 FRONTEND_PID_FILE="$INTERFACE_DIR/.frontend.pid"
-FRONTEND_EFFECTIVE_PORT=""
 
 ############################################
 #                 Colors                   #
@@ -211,32 +218,47 @@ start_backend() {
   log "Backend started with PID $(cat "$BACKEND_PID_FILE" 2>/dev/null || echo unknown)"
 }
 
-# Start frontend in a new terminal session
-start_frontend() {
-  log "Starting frontend service in new terminal..."
+# Start frontend locally (background process)
+start_frontend_local() {
+  log "Starting frontend service locally..."
   
   # Clean up any existing processes
-  pkill -f "vite" 2>/dev/null || true
+  pkill -f "vite.*--port.*$FRONTEND_PORT" 2>/dev/null || true
   sleep 1
   
-  # Open new Terminal window and run frontend
-  local frontend_cmd="cd '$INTERFACE_DIR' && npm run dev"
+  # Start frontend in background
+  (cd "$INTERFACE_DIR" && nohup npm run dev > "$LOG_DIR/frontend.log" 2>&1 & echo $! > "$FRONTEND_PID_FILE")
+  sleep 2
   
-  if command -v osascript >/dev/null 2>&1; then
-    # macOS - use AppleScript to open new Terminal window
-    osascript -e "
-      tell application \"Terminal\"
-        do script \"$frontend_cmd\"
-        activate
-      end tell
-    " >/dev/null 2>&1
-    success "Frontend started in new Terminal window"
-    echo "new-terminal" > "$FRONTEND_PID_FILE"
+  local pid=$(cat "$FRONTEND_PID_FILE" 2>/dev/null || echo "unknown")
+  log "Frontend started with PID $pid"
+  
+  # Wait for frontend to be ready
+  local elapsed=0
+  local max_wait=30
+  while [ $elapsed -lt $max_wait ]; do
+    if check_port "$FRONTEND_PORT"; then
+      success "Frontend is ready on port $FRONTEND_PORT"
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  
+  warning "Frontend may still be starting up on port $FRONTEND_PORT"
+}
+
+# Start full Docker stack
+start_full_docker() {
+  log "Starting full Docker stack..."
+  
+  if [ -f "$ROOT_DOCKER_COMPOSE_FILE" ]; then
+    local dc; dc="$(compose_cmd)"
+    $dc -f "$ROOT_DOCKER_COMPOSE_FILE" up -d || { error "Full Docker stack failed"; exit 1; }
+    success "Full Docker stack started"
   else
-    # Fallback for non-macOS systems
-    warning "Cannot open new terminal on this system. Please run manually:"
-    warning "  cd $INTERFACE_DIR && npm run dev"
-    echo "manual" > "$FRONTEND_PID_FILE"
+    error "Root docker-compose.yml not found at $ROOT_DOCKER_COMPOSE_FILE"
+    exit 1
   fi
 }
 
@@ -259,26 +281,58 @@ explain_frontend_failure() {
 #              Final Output                #
 ############################################
 show_final_status() {
-  local FE_PORT="${FRONTEND_EFFECTIVE_PORT:-$FRONTEND_PORT}"
   echo ""
   echo "=========================================="
   success "🚀 Prompt Library Application is ready!"
   echo "=========================================="
   echo ""
   echo "📊 Service Status:"
-  echo "  • PostgreSQL:  localhost:$POSTGRES_PORT (Docker)"
-  echo "  • Redis:       localhost:$REDIS_PORT (Docker)"
-  echo "  • Backend API: http://localhost:$BACKEND_PORT"
-  echo "  • Frontend:    http://localhost:$FE_PORT"
+  if ! $LOCAL_ONLY; then
+    echo "  • PostgreSQL:  localhost:$POSTGRES_PORT (Docker)"
+    echo "  • Redis:       localhost:$REDIS_PORT (Docker)"
+  fi
+  if ! $DOCKER_ONLY; then
+    echo "  • Backend API: http://localhost:$BACKEND_PORT"
+    echo "  • Frontend:    http://localhost:$FRONTEND_PORT"
+  fi
   echo ""
   echo "🔗 Quick Links:"
-  echo "  • Application: http://localhost:$FE_PORT"
-  echo "  • API Health:  http://localhost:$BACKEND_PORT/api/health"
-  echo "  • API Docs:    http://localhost:$BACKEND_PORT/api/docs"
+  if ! $DOCKER_ONLY; then
+    echo "  • Application: http://localhost:$FRONTEND_PORT"
+    echo "  • API Health:  http://localhost:$BACKEND_PORT/api/health"
+    echo "  • API Docs:    http://localhost:$BACKEND_PORT/api/docs"
+  fi
   echo ""
-  echo "📝 Logs:"
-  echo "  • Backend:  tail -f $LOG_DIR/backend.log"
-  echo "  • Frontend: tail -f $LOG_DIR/frontend.log"
+  if ! $DOCKER_ONLY; then
+    echo "📝 Logs:"
+    echo "  • Backend:  tail -f $LOG_DIR/backend.log"
+    echo "  • Frontend: tail -f $LOG_DIR/frontend.log"
+    echo ""
+  fi
+  echo "🛑 To stop services: ./scripts/stop.sh"
+  echo "=========================================="
+}
+
+show_docker_status() {
+  echo ""
+  echo "=========================================="
+  success "🐳 Full Docker Application is ready!"
+  echo "=========================================="
+  echo ""
+  echo "📊 Service Status:"
+  echo "  • Application: http://localhost (via Nginx)"
+  echo "  • Backend API: http://localhost:8000"
+  echo "  • PostgreSQL:  localhost:5432"
+  echo "  • Redis:       localhost:6379"
+  echo ""
+  echo "🔗 Quick Links:"
+  echo "  • Application: http://localhost"
+  echo "  • API Health:  http://localhost:8000/api/health"
+  echo "  • API Docs:    http://localhost:8000/api/docs"
+  echo ""
+  echo "📝 Docker Logs:"
+  echo "  • All services: docker-compose logs -f"
+  echo "  • Backend only: docker-compose logs -f app"
   echo ""
   echo "🛑 To stop services: ./scripts/stop.sh"
   echo "=========================================="
@@ -304,71 +358,125 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT
 
 ############################################
+#            Argument Parsing              #
+############################################
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --docker-only)
+        DOCKER_ONLY=true
+        MODE="docker-only"
+        shift
+        ;;
+      --local-only)
+        LOCAL_ONLY=true
+        MODE="local-only"
+        shift
+        ;;
+      --full-docker)
+        FULL_DOCKER=true
+        MODE="full-docker"
+        shift
+        ;;
+      --help|-h)
+        show_help
+        exit 0
+        ;;
+      *)
+        error "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+    esac
+  done
+
+  # Validate mode combinations
+  local mode_count=0
+  $DOCKER_ONLY && mode_count=$((mode_count + 1))
+  $LOCAL_ONLY && mode_count=$((mode_count + 1))
+  $FULL_DOCKER && mode_count=$((mode_count + 1))
+  
+  if [ $mode_count -gt 1 ]; then
+    error "Cannot specify multiple modes simultaneously"
+    exit 1
+  fi
+}
+
+show_help() {
+  echo "Prompt Library Application Start Script"
+  echo ""
+  echo "Usage: $0 [OPTIONS]"
+  echo ""
+  echo "Modes:"
+  echo "  --docker-only    Start only Docker services (PostgreSQL, Redis)"
+  echo "  --local-only     Start only local services (Backend, Frontend)"
+  echo "  --full-docker    Start everything in Docker containers"
+  echo "  (no options)     Auto mode: Docker deps + local backend/frontend"
+  echo ""
+  echo "Options:"
+  echo "  --help, -h       Show this help message"
+  echo ""
+  echo "Environment Variables:"
+  echo "  BACKEND_PORT     Backend port (default: 8000)"
+  echo "  FRONTEND_PORT    Frontend port (default: 3000)"
+  echo "  REDIS_PORT       Redis port (default: 6379)"
+  echo "  POSTGRES_PORT    PostgreSQL port (default: 5432)"
+  echo ""
+  echo "Examples:"
+  echo "  $0                    # Start all services (recommended)"
+  echo "  $0 --docker-only      # Start only database services"
+  echo "  $0 --local-only       # Start only app services (requires DB running)"
+  echo "  $0 --full-docker      # Start everything in Docker"
+}
+
+############################################
 #                   Main                   #
 ############################################
 main() {
-  log "🚀 Starting Prompt Library Application..."
-  ensure_tools
-  check_prerequisites
-
-  log "📦 Phase 1: Starting Docker services..."
-  start_docker_services
-
-  log "⏳ Phase 2: Waiting for Docker services..."
-  wait_for_service "$POSTGRES_PORT" "PostgreSQL" 30
-  wait_for_service "$REDIS_PORT" "Redis" 30
-
-  log "🔧 Phase 3: Starting backend service..."
-  start_backend
-  wait_for_service "$BACKEND_PORT" "Backend API" 45
-  sleep 2
-  check_http_endpoint "http://localhost:$BACKEND_PORT/api/health" "Backend API" 200 200
-
-  log "🎨 Phase 4: Starting frontend service..."
-  start_frontend
-
-  log "🔍 Phase 5: Final status check..."
-  sleep 3
+  parse_arguments "$@"
   
-  # Quick check if services are running
-  local backend_ok=false
-  local frontend_ok=false
+  log "🚀 Starting Prompt Library Application in $MODE mode..."
   
-  if check_port "$BACKEND_PORT"; then
-    backend_ok=true
-    success "Backend is running on port $BACKEND_PORT"
-  else
-    warning "Backend may not be ready on port $BACKEND_PORT"
-  fi
-  
-  # Check frontend status
-  local frontend_status="$(cat "$FRONTEND_PID_FILE" 2>/dev/null || echo "")"
-  if [ "$frontend_status" = "new-terminal" ]; then
-    frontend_ok=true
-    success "Frontend started in new Terminal window"
-    FRONTEND_EFFECTIVE_PORT="$FRONTEND_PORT"
-    log "Frontend should be available on port $FRONTEND_EFFECTIVE_PORT (check the new Terminal window)"
-  elif [ "$frontend_status" = "manual" ]; then
-    warning "Frontend needs to be started manually"
-    FRONTEND_EFFECTIVE_PORT="$FRONTEND_PORT"
-  else
-    warning "Frontend status unknown"
-    FRONTEND_EFFECTIVE_PORT="$FRONTEND_PORT"
-  fi
-
-  # Show final status regardless
-  show_final_status
-  
-  if $backend_ok; then
-    echo "$(date): Services started - Backend: ✅, Frontend: $([ "$frontend_ok" = true ] && echo "✅" || echo "⚠️")" >> "$LOG_DIR/startup.log"
-    success "🎉 Startup complete! Check the URLs above."
-    if [ "$frontend_ok" != true ]; then
-      warning "If frontend is not responding, try: cd ../interface/ && npm run dev &"
-    fi
-  else
-    error "Backend failed to start properly"
-    exit 1
-  fi
+  case $MODE in
+    "docker-only")
+      log "📦 Docker-only mode: Starting database services..."
+      ensure_tools
+      start_docker_services
+      wait_for_service "$POSTGRES_PORT" "PostgreSQL" 30
+      wait_for_service "$REDIS_PORT" "Redis" 30
+      success "🎉 Docker services started successfully!"
+      echo "To start application services, run: $0 --local-only"
+      ;;
+    "local-only")
+      log "🔧 Local-only mode: Starting application services..."
+      check_prerequisites
+      start_backend
+      wait_for_service "$BACKEND_PORT" "Backend API" 45
+      check_http_endpoint "http://localhost:$BACKEND_PORT/api/health" "Backend API" 200 200
+      start_frontend_local
+      show_final_status
+      ;;
+    "full-docker")
+      log "🐳 Full Docker mode: Starting all services in containers..."
+      ensure_tools
+      start_full_docker
+      wait_for_service "80" "Application (via Nginx)" 60
+      show_docker_status
+      ;;
+    *)
+      log "🚀 Auto mode: Starting Docker deps + local application..."
+      ensure_tools
+      check_prerequisites
+      start_docker_services
+      wait_for_service "$POSTGRES_PORT" "PostgreSQL" 30
+      wait_for_service "$REDIS_PORT" "Redis" 30
+      start_backend
+      wait_for_service "$BACKEND_PORT" "Backend API" 45
+      check_http_endpoint "http://localhost:$BACKEND_PORT/api/health" "Backend API" 200 200
+      start_frontend_local
+      show_final_status
+      ;;
+  esac
 }
 
 main "$@"

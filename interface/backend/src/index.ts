@@ -161,8 +161,35 @@ app.use('/api/admin/usage-analytics', authenticateToken, usageAnalyticsRoutes);
 app.use('/api/admin/migration-utilities', authenticateToken, migrationUtilitiesRoutes);
 app.use('/api/admin/migration', authenticateToken, migrationRoutes);
 
-// 404 handler
-app.use('*', (req, res) => {
+// Serve static frontend files
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static files from the frontend build directory
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Handle client-side routing - serve index.html for non-API routes
+app.get('*', (req, res) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: `Route ${req.method} ${req.originalUrl} not found`
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  // Serve index.html for all other routes (client-side routing)
+  return res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// 404 handler for API routes only
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     error: {
       code: 'NOT_FOUND',
@@ -189,7 +216,7 @@ async function initializeServices() {
         database: dbUrl.pathname.slice(1), // Remove leading slash
         user: dbUrl.username,
         password: dbUrl.password,
-        ssl: process.env['NODE_ENV'] === 'production'
+        ssl: false
       });
 
       // Run database migrations

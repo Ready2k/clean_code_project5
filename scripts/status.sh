@@ -350,14 +350,11 @@ case "${1:-}" in
         echo ""
         echo "Options:"
         echo "  --help, -h     Show this help message"
-        echo "  --json         Output status in JSON format (future feature)"
         echo "  --quiet        Show only service status without details"
+        echo "  --docker       Show only Docker service status"
+        echo "  --local        Show only local service status"
         echo ""
         exit 0
-        ;;
-    --json)
-        echo "JSON output not implemented - remove this option if not needed"
-        exit 1
         ;;
     --quiet)
         # Quick status check
@@ -366,6 +363,16 @@ case "${1:-}" in
         check_port $REDIS_PORT && echo "  Redis: ✅" || echo "  Redis: ❌"
         check_port $BACKEND_PORT && echo "  Backend: ✅" || echo "  Backend: ❌"
         check_port $FRONTEND_PORT && echo "  Frontend: ✅" || echo "  Frontend: ❌"
+        exit 0
+        ;;
+    --docker)
+        echo "Docker Services Status:"
+        check_docker_status
+        exit 0
+        ;;
+    --local)
+        echo "Local Services Status:"
+        check_app_status
         exit 0
         ;;
     "")

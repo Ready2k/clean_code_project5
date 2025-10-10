@@ -101,6 +101,8 @@ export interface PromptsResponse {
     limit: number;
     total: number;
     totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
   };
 }
 

@@ -2,6 +2,7 @@
 
 # Prompt Library Application Stop Script
 # This script gracefully stops all services
+# Usage: ./scripts/stop.sh [--docker-only] [--local-only] [--full-docker] [--help]
 
 set -e  # Exit on any error
 
@@ -13,10 +14,19 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_COMPOSE_FILE="interface/docker-compose.dev.yml"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+DOCKER_COMPOSE_FILE="$PROJECT_ROOT/interface/docker-compose.dev.yml"
+ROOT_DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
 GRACEFUL_SHUTDOWN_TIMEOUT=10
+
+# Mode configuration
+MODE="${MODE:-auto}"
+DOCKER_ONLY=false
+LOCAL_ONLY=false
+FULL_DOCKER=false
 
 # Logging function
 log() {
@@ -192,32 +202,57 @@ stop_docker_services() {
     log "📦 Stopping Docker services..."
     
     if [ -f "$DOCKER_COMPOSE_FILE" ]; then
+        # Determine compose command
+        local dc_cmd="docker-compose"
+        if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+            dc_cmd="docker compose"
+        fi
+        
         # Graceful shutdown of Docker services
-        docker-compose -f "$DOCKER_COMPOSE_FILE" stop
+        $dc_cmd -f "$DOCKER_COMPOSE_FILE" stop
         
         if [ $? -eq 0 ]; then
             success "Docker services stopped gracefully"
-            
-            # Optional: Remove containers (uncomment if you want to remove containers)
-            # log "Removing Docker containers..."
-            # docker-compose -f "$DOCKER_COMPOSE_FILE" down
         else
             error "Failed to stop Docker services gracefully"
             
             # Force stop containers
             warning "Attempting to force stop Docker containers..."
-            docker-compose -f "$DOCKER_COMPOSE_FILE" kill
-            docker-compose -f "$DOCKER_COMPOSE_FILE" down
+            $dc_cmd -f "$DOCKER_COMPOSE_FILE" kill
+            $dc_cmd -f "$DOCKER_COMPOSE_FILE" down
         fi
     else
-        warning "Docker Compose file not found, checking for running containers..."
+        warning "Docker Compose file not found at $DOCKER_COMPOSE_FILE"
         
         # Stop any containers that might be related to the project
-        local containers=$(docker ps -q --filter "name=prompt-library" 2>/dev/null || true)
+        local containers=$(docker ps -q --filter "name=prompt-library\|redis\|postgres" 2>/dev/null || true)
         if [ -n "$containers" ]; then
-            log "Stopping prompt-library containers: $containers"
+            log "Stopping related containers: $containers"
             echo "$containers" | xargs -r docker stop
         fi
+    fi
+}
+
+# Function to stop full Docker stack
+stop_full_docker() {
+    log "📦 Stopping full Docker stack..."
+    
+    if [ -f "$ROOT_DOCKER_COMPOSE_FILE" ]; then
+        # Determine compose command
+        local dc_cmd="docker-compose"
+        if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+            dc_cmd="docker compose"
+        fi
+        
+        $dc_cmd -f "$ROOT_DOCKER_COMPOSE_FILE" down
+        
+        if [ $? -eq 0 ]; then
+            success "Full Docker stack stopped"
+        else
+            error "Failed to stop full Docker stack"
+        fi
+    else
+        warning "Root docker-compose.yml not found at $ROOT_DOCKER_COMPOSE_FILE"
     fi
 }
 
@@ -246,14 +281,34 @@ show_final_status() {
     success "🛑 Prompt Library Application stopped"
     echo "=========================================="
     echo ""
-    echo "📊 All services have been stopped:"
-    echo "  • Frontend service"
-    echo "  • Backend API service"
-    echo "  • Docker services (PostgreSQL, Redis)"
+    echo "📊 Services stopped based on mode ($MODE):"
+    if [ "$MODE" = "docker-only" ]; then
+        echo "  • Docker services (PostgreSQL, Redis)"
+    elif [ "$MODE" = "local-only" ]; then
+        echo "  • Frontend service"
+        echo "  • Backend API service"
+    elif [ "$MODE" = "full-docker" ]; then
+        echo "  • Full Docker stack (all containers)"
+    else
+        echo "  • Frontend service"
+        echo "  • Backend API service"
+        echo "  • Docker services (PostgreSQL, Redis)"
+    fi
     echo ""
     echo "🔄 To start services again: ./scripts/start.sh"
     echo "🔄 To restart services: ./scripts/restart.sh"
     echo "=========================================="
+}
+
+# Function to show manual cleanup commands
+show_manual_cleanup() {
+    echo ""
+    echo "Manual cleanup commands:"
+    echo "  • Kill backend: pkill -f 'node.*backend/dist/index.js'"
+    echo "  • Kill frontend: pkill -f 'vite.*--port 3000'"
+    echo "  • Stop Docker dev: docker-compose -f interface/docker-compose.dev.yml down"
+    echo "  • Stop Docker full: docker-compose -f docker-compose.yml down"
+    echo "  • Kill all Node processes: pkill -f node"
 }
 
 # Function to verify all services are stopped
@@ -295,33 +350,89 @@ verify_shutdown() {
     fi
 }
 
+# Function to parse arguments
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --docker-only)
+        DOCKER_ONLY=true
+        MODE="docker-only"
+        shift
+        ;;
+      --local-only)
+        LOCAL_ONLY=true
+        MODE="local-only"
+        shift
+        ;;
+      --full-docker)
+        FULL_DOCKER=true
+        MODE="full-docker"
+        shift
+        ;;
+      --help|-h)
+        show_help
+        exit 0
+        ;;
+      *)
+        error "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+    esac
+  done
+}
+
+show_help() {
+  echo "Prompt Library Application Stop Script"
+  echo ""
+  echo "Usage: $0 [OPTIONS]"
+  echo ""
+  echo "Modes:"
+  echo "  --docker-only    Stop only Docker services"
+  echo "  --local-only     Stop only local services"
+  echo "  --full-docker    Stop full Docker stack"
+  echo "  (no options)     Stop all services"
+  echo ""
+  echo "Options:"
+  echo "  --help, -h       Show this help message"
+}
+
 # Main execution
 main() {
-    log "🛑 Stopping Prompt Library Application..."
+    parse_arguments "$@"
     
-    # Stop services in reverse order (frontend -> backend -> docker)
-    log "📱 Phase 1: Stopping frontend..."
-    stop_frontend
+    log "🛑 Stopping Prompt Library Application in $MODE mode..."
     
-    log "🔧 Phase 2: Stopping backend..."
-    stop_backend
+    case $MODE in
+        "docker-only")
+            log "📦 Docker-only mode: Stopping database services..."
+            stop_docker_services
+            ;;
+        "local-only")
+            log "🔧 Local-only mode: Stopping application services..."
+            stop_frontend
+            stop_backend
+            cleanup_temp_files
+            ;;
+        "full-docker")
+            log "🐳 Full Docker mode: Stopping all containers..."
+            stop_full_docker
+            ;;
+        *)
+            log "🛑 Auto mode: Stopping all services..."
+            stop_frontend
+            stop_backend
+            stop_docker_services
+            cleanup_temp_files
+            ;;
+    esac
     
-    log "📦 Phase 3: Stopping Docker services..."
-    stop_docker_services
-    
-    log "🧹 Phase 4: Cleanup..."
-    cleanup_temp_files
-    
-    log "🔍 Phase 5: Verification..."
+    log "🔍 Verification..."
     if verify_shutdown; then
         show_final_status
     else
         warning "Some services may still be running. Check manually if needed."
-        echo ""
-        echo "Manual cleanup commands:"
-        echo "  • Kill backend: pkill -f 'node.*backend/dist/index.js'"
-        echo "  • Kill frontend: pkill -f 'vite.*--port 3000'"
-        echo "  • Stop Docker: docker-compose -f interface/docker-compose.dev.yml down"
+        show_manual_cleanup
     fi
 }
 
