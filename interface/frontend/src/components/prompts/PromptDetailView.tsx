@@ -210,7 +210,7 @@ export const PromptDetailView: React.FC<PromptDetailViewProps> = ({
                 •
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {formatDistanceToNow(new Date(prompt.updatedAt), { addSuffix: true })}
+                {formatDistanceToNow(new Date(prompt.metadata.updated_at), { addSuffix: true })}
               </Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
@@ -376,7 +376,7 @@ export const PromptDetailView: React.FC<PromptDetailViewProps> = ({
                 <Typography variant="body2" color="text.secondary">
                   Created: {(() => {
                     try {
-                      return prompt.createdAt ? format(new Date(prompt.createdAt), 'PPpp') : 'Unknown date';
+                      return prompt.metadata.created_at ? format(new Date(prompt.metadata.created_at), 'PPpp') : 'Unknown date';
                     } catch (error) {
                       return 'Invalid date';
                     }
@@ -385,7 +385,7 @@ export const PromptDetailView: React.FC<PromptDetailViewProps> = ({
                 <Typography variant="body2" color="text.secondary">
                   Updated: {(() => {
                     try {
-                      return prompt.updatedAt ? format(new Date(prompt.updatedAt), 'PPpp') : 'Unknown date';
+                      return prompt.metadata.updated_at ? format(new Date(prompt.metadata.updated_at), 'PPpp') : 'Unknown date';
                     } catch (error) {
                       return 'Invalid date';
                     }
@@ -496,7 +496,7 @@ export const PromptDetailView: React.FC<PromptDetailViewProps> = ({
                   <Paper key={index} sx={{ p: 2 }}>
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
                       <Typography variant="h6">
-                        {variable.name}
+                        {variable.key}
                         {variable.required && (
                           <Chip label="Required" size="small" color="error" sx={{ ml: 1 }} />
                         )}

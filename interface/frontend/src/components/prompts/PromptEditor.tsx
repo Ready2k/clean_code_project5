@@ -133,14 +133,22 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     if (!prompt || !validateForm()) return;
 
     try {
-      // Clean up the data before saving
+      // Clean up the data before saving - only send updatable fields
       const cleanedData: UpdatePromptRequest = {
-        ...formData,
-        humanPrompt: formData.humanPrompt ? {
-          ...formData.humanPrompt,
-          steps: formData.humanPrompt.steps?.filter(step => step.trim()) || [],
-          examples: formData.humanPrompt.examples?.filter(example => example.trim()) || [],
+        metadata: formData.metadata ? {
+          title: formData.metadata.title,
+          summary: formData.metadata.summary,
+          tags: formData.metadata.tags,
+          category: formData.metadata.category,
+          difficulty: formData.metadata.difficulty,
         } : undefined,
+        humanPrompt: formData.humanPrompt ? {
+          goal: formData.humanPrompt.goal,
+          audience: formData.humanPrompt.audience,
+          steps: formData.humanPrompt.steps?.filter(step => step.trim()) || [],
+          output_expectations: formData.humanPrompt.output_expectations,
+        } : undefined,
+        variables: formData.variables,
       };
 
       await onSave(prompt.id, cleanedData);
@@ -537,8 +545,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                   <Box display="flex" flexDirection="column" gap={2}>
                     <TextField
                       label="Name"
-                      value={variable.name}
-                      onChange={(e) => updateVariable(index, 'name', e.target.value)}
+                      value={variable.key}
+                      onChange={(e) => updateVariable(index, 'key', e.target.value)}
                       size="small"
                       required
                     />

@@ -189,7 +189,7 @@ export const EnhancedPromptsPage: React.FC = () => {
           // Sort variants by rating (highest first), then by creation date
           const ratingDiff = (b.averageRating || 0) - (a.averageRating || 0);
           if (ratingDiff !== 0) return ratingDiff;
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return new Date(b.metadata.created_at).getTime() - new Date(a.metadata.created_at).getTime();
         })
       });
 
@@ -212,7 +212,7 @@ export const EnhancedPromptsPage: React.FC = () => {
 
     return groups.sort((a, b) => {
       // Sort groups by base prompt update date
-      return new Date(b.basePrompt.updatedAt).getTime() - new Date(a.basePrompt.updatedAt).getTime();
+      return new Date(b.basePrompt.metadata.updated_at).getTime() - new Date(a.basePrompt.metadata.updated_at).getTime();
     });
   }, [prompts]);
 

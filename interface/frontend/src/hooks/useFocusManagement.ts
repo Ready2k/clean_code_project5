@@ -51,13 +51,13 @@ export const useFocusManagement = (
 
       if (event.shiftKey) {
         // Shift + Tab
-        if (document.activeElement === firstElement) {
+        if (typeof document !== 'undefined' && document.activeElement === firstElement) {
           event.preventDefault();
           lastElement.focus();
         }
       } else {
         // Tab
-        if (document.activeElement === lastElement) {
+        if (typeof document !== 'undefined' && document.activeElement === lastElement) {
           event.preventDefault();
           firstElement.focus();
         }
@@ -99,7 +99,7 @@ export const useFocusManagement = (
     if (!isActive) return;
 
     // Store the previously focused element
-    if (restoreFocus) {
+    if (restoreFocus && typeof document !== 'undefined') {
       previousActiveElement.current = document.activeElement;
     }
 
@@ -111,14 +111,14 @@ export const useFocusManagement = (
     }
 
     // Add event listeners
-    if (trapFocus) {
+    if (trapFocus && typeof document !== 'undefined') {
       document.addEventListener('keydown', handleKeyDown);
       document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
       // Remove event listeners
-      if (trapFocus) {
+      if (trapFocus && typeof document !== 'undefined') {
         document.removeEventListener('keydown', handleKeyDown);
         document.removeEventListener('keydown', handleEscapeKey);
       }

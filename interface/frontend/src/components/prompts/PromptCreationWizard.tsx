@@ -60,7 +60,6 @@ const initialFormData: FormData = {
       format: '',
       fields: [],
     },
-    examples: [''],
   },
 };
 
@@ -125,15 +124,22 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
     } else if (step === 1) {
       if (!formData.humanPrompt.goal.trim()) {
         newErrors.goal = 'Goal is required';
+      } else if (formData.humanPrompt.goal.trim().length < 10) {
+        newErrors.goal = 'Goal must be at least 10 characters long';
       }
       if (!formData.humanPrompt.audience.trim()) {
         newErrors.audience = 'Audience is required';
+      } else if (formData.humanPrompt.audience.trim().length < 5) {
+        newErrors.audience = 'Audience must be at least 5 characters long';
       }
       if (!formData.humanPrompt.output_expectations.format.trim()) {
         newErrors.outputExpectations = 'Output format is required';
       }
-      if (formData.humanPrompt.steps.every(step => !step.trim())) {
+      const validSteps = formData.humanPrompt.steps.filter(step => step.trim().length > 0);
+      if (validSteps.length === 0) {
         newErrors.steps = 'At least one step is required';
+      } else if (validSteps.some(step => step.trim().length < 1)) {
+        newErrors.steps = 'Each step must have at least 1 character';
       }
     }
 
@@ -142,7 +148,11 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (validateStep(1)) {
+    // Validate all steps before submission
+    const step0Valid = validateStep(0);
+    const step1Valid = validateStep(1);
+    
+    if (step0Valid && step1Valid) {
       try {
         // Clean up the data before submitting
         const cleanedData: CreatePromptRequest = {
@@ -159,10 +169,9 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
               format: formData.humanPrompt.output_expectations.format.trim(),
               fields: formData.humanPrompt.output_expectations.fields.filter(field => field.trim()),
             },
-            examples: formData.humanPrompt.examples?.filter(example => example.trim()) || [],
           },
         };
-
+        
         await onSubmit(cleanedData);
         handleClose();
       } catch (error) {
@@ -226,35 +235,7 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
     }
   };
 
-  const addExample = () => {
-    setFormData(prev => ({
-      ...prev,
-      humanPrompt: {
-        ...prev.humanPrompt,
-        examples: [...(prev.humanPrompt.examples || []), ''],
-      },
-    }));
-  };
 
-  const updateExample = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      humanPrompt: {
-        ...prev.humanPrompt,
-        examples: prev.humanPrompt.examples?.map((example, i) => i === index ? value : example) || [],
-      },
-    }));
-  };
-
-  const removeExample = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      humanPrompt: {
-        ...prev.humanPrompt,
-        examples: prev.humanPrompt.examples?.filter((_, i) => i !== index) || [],
-      },
-    }));
-  };
 
   const renderStepContent = (step: number) => {
     switch (step) {
@@ -366,7 +347,7 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
                 humanPrompt: { ...prev.humanPrompt, goal: e.target.value }
               }))}
               error={!!errors.goal}
-              helperText={errors.goal || "What is the main objective of this prompt?"}
+              helperText={errors.goal || "What is the main objective of this prompt? (minimum 10 characters)"}
               multiline
               rows={2}
               fullWidth
@@ -381,7 +362,7 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
                 humanPrompt: { ...prev.humanPrompt, audience: e.target.value }
               }))}
               error={!!errors.audience}
-              helperText={errors.audience || "Who is the target audience for this prompt?"}
+              helperText={errors.audience || "Who is the target audience for this prompt? (minimum 5 characters)"}
               fullWidth
               required
             />
@@ -500,38 +481,7 @@ export const PromptCreationWizard: React.FC<PromptCreationWizardProps> = ({
               </Button>
             </Box>
 
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Examples (Optional)
-              </Typography>
-              {formData.humanPrompt.examples?.map((example, index) => (
-                <Box key={index} display="flex" gap={1} mb={1}>
-                  <TextField
-                    placeholder={`Example ${index + 1}`}
-                    value={example}
-                    onChange={(e) => updateExample(index, e.target.value)}
-                    fullWidth
-                    size="small"
-                    multiline
-                    rows={2}
-                  />
-                  <IconButton
-                    onClick={() => removeExample(index)}
-                    size="small"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              ))}
-              <Button
-                startIcon={<AddIcon />}
-                onClick={addExample}
-                variant="outlined"
-                size="small"
-              >
-                Add Example
-              </Button>
-            </Box>
+
           </Box>
         );
 

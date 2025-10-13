@@ -33,11 +33,20 @@ interface Notification {
   }>;
 }
 
+// Safe localStorage access for SSR compatibility
+const getStoredValue = (key: string, defaultValue: any) => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const stored = localStorage.getItem(key);
+    return stored !== null ? stored : defaultValue;
+  }
+  return defaultValue;
+};
+
 const initialState: UIState = {
-  themeMode: (localStorage.getItem('themeMode') as ThemeMode) || 'auto',
-  highContrast: localStorage.getItem('highContrast') === 'true',
-  fontSize: (localStorage.getItem('fontSize') as FontSize) || 'medium',
-  reducedMotion: localStorage.getItem('reducedMotion') === 'true',
+  themeMode: (getStoredValue('themeMode', 'auto') as ThemeMode),
+  highContrast: getStoredValue('highContrast', 'false') === 'true',
+  fontSize: (getStoredValue('fontSize', 'medium') as FontSize),
+  reducedMotion: getStoredValue('reducedMotion', 'false') === 'true',
   sidebarOpen: true,
   loading: {
     global: false,
@@ -52,19 +61,27 @@ const uiSlice = createSlice({
   reducers: {
     setThemeMode: (state, action: PayloadAction<ThemeMode>) => {
       state.themeMode = action.payload;
-      localStorage.setItem('themeMode', action.payload);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('themeMode', action.payload);
+      }
     },
     setHighContrast: (state, action: PayloadAction<boolean>) => {
       state.highContrast = action.payload;
-      localStorage.setItem('highContrast', action.payload.toString());
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('highContrast', action.payload.toString());
+      }
     },
     setFontSize: (state, action: PayloadAction<FontSize>) => {
       state.fontSize = action.payload;
-      localStorage.setItem('fontSize', action.payload);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('fontSize', action.payload);
+      }
     },
     setReducedMotion: (state, action: PayloadAction<boolean>) => {
       state.reducedMotion = action.payload;
-      localStorage.setItem('reducedMotion', action.payload.toString());
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('reducedMotion', action.payload.toString());
+      }
     },
     toggleSidebar: (state) => {
       state.sidebarOpen = !state.sidebarOpen;

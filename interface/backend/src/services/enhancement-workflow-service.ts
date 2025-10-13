@@ -179,33 +179,27 @@ export class EnhancementWorkflowService extends EventEmitter {
     this.updateJobStatus(jobId, 'analyzing', 10, 'Starting enhancement process');
     
     try {
-      // Simulate enhancement process
+      const job = this.jobs.get(jobId);
+      if (!job) {
+        throw new Error('Job not found');
+      }
+
+      // Get the prompt library service to perform real enhancement
+      const { getPromptLibraryService } = await import('./prompt-library-service.js');
+      const promptLibraryService = getPromptLibraryService();
+      
       this.updateJobStatus(jobId, 'analyzing', 30, 'Analyzing prompt structure');
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call the real enhancement service
+      const result = await promptLibraryService.enhancePrompt(job.promptId, {
+        preserve_style: value.preserve_style || false,
+        target_provider: value.target_provider
+      });
       
-      this.updateJobStatus(jobId, 'enhancing', 60, 'Generating enhancements');
+      this.updateJobStatus(jobId, 'enhancing', 60, 'Generating AI enhancements');
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      this.updateJobStatus(jobId, 'enhancing', 90, 'Finalizing results');
-      
-      const result: EnhancementResult = {
-        structuredPrompt: {
-          schema_version: 1,
-          system: [`Enhanced: ${value}`],
-          capabilities: ['enhanced-reasoning'],
-          user_template: 'Enhanced user template',
-          rules: [{ name: 'enhancement', description: 'Enhanced for better performance' }],
-          variables: []
-        },
-        questions: [],
-        rationale: 'Enhanced prompt for better performance',
-        confidence: 0.9,
-        changes_made: ['Enhanced prompt structure'],
-        enhancement_model: 'gpt-4',
-        enhancement_provider: 'openai'
-      };
+      // The prompt library service handles creating variants automatically
+      this.updateJobStatus(jobId, 'enhancing', 90, 'Creating enhanced variant');
       
       this.updateJobStatus(jobId, 'completed', 100, 'Enhancement completed successfully', result);
       

@@ -397,13 +397,13 @@ export const useTheme = () => {
 
   const theme = useMemo(() => {
     const fontSizeMultiplier = fontSizeMultipliers[fontSize] || 1;
-    const prefersReducedMotion = reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = reducedMotion || (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     let selectedMode: 'light' | 'dark' = 'light';
     if (themeMode === 'dark') {
       selectedMode = 'dark';
     } else if (themeMode === 'auto') {
-      selectedMode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      selectedMode = (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     }
 
     let selectedPalette;

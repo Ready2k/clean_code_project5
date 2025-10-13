@@ -29,10 +29,10 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
   values,
   onChange,
 }) => {
-  const handleValueChange = (name: string, value: any) => {
+  const handleValueChange = (key: string, value: any) => {
     onChange({
       ...values,
-      [name]: value,
+      [key]: value,
     });
   };
 
@@ -41,43 +41,13 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
       return 'This field is required';
     }
 
-    if (value !== undefined && value !== '' && variable.validation) {
-      for (const rule of variable.validation) {
-        switch (rule.type) {
-          case 'minLength':
-            if (typeof value === 'string' && value.length < rule.value) {
-              return rule.message;
-            }
-            break;
-          case 'maxLength':
-            if (typeof value === 'string' && value.length > rule.value) {
-              return rule.message;
-            }
-            break;
-          case 'pattern':
-            if (typeof value === 'string' && !new RegExp(rule.value).test(value)) {
-              return rule.message;
-            }
-            break;
-          case 'min':
-            if (typeof value === 'number' && value < rule.value) {
-              return rule.message;
-            }
-            break;
-          case 'max':
-            if (typeof value === 'number' && value > rule.value) {
-              return rule.message;
-            }
-            break;
-        }
-      }
-    }
-
+    // Note: validation rules are not part of the new Variable interface
+    // This can be extended later if needed
     return null;
   };
 
   const renderInput = (variable: Variable) => {
-    const value = values[variable.name];
+    const value = values[variable.key];
     const error = validateValue(variable, value);
     const hasError = error !== null;
 
@@ -88,10 +58,10 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
             control={
               <Checkbox
                 checked={value || false}
-                onChange={(e) => handleValueChange(variable.name, e.target.checked)}
+                onChange={(e) => handleValueChange(variable.key, e.target.checked)}
               />
             }
-            label={variable.description || variable.name}
+            label={variable.label || variable.key}
           />
         );
 
@@ -99,33 +69,58 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
         return (
           <TextField
             fullWidth
-            label={variable.name}
+            label={variable.label || variable.key}
             type="number"
             value={value || ''}
-            onChange={(e) => handleValueChange(variable.name, parseFloat(e.target.value) || 0)}
+            onChange={(e) => handleValueChange(variable.key, parseFloat(e.target.value) || 0)}
             error={hasError}
-            helperText={error || variable.description || ''}
+            helperText={error}
             required={variable.required}
             size="small"
           />
         );
 
-      case 'array':
+      case 'select':
+        return (
+          <TextField
+            fullWidth
+            select
+            label={variable.label || variable.key}
+            value={value || ''}
+            onChange={(e) => handleValueChange(variable.key, e.target.value)}
+            error={hasError}
+            helperText={error}
+            required={variable.required}
+            size="small"
+            SelectProps={{
+              native: true,
+            }}
+          >
+            <option value="">Select an option</option>
+            {(variable.options || []).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </TextField>
+        );
+
+      case 'multiselect':
         return (
           <Box>
             <TextField
               fullWidth
-              label={variable.name}
+              label={variable.label || variable.key}
               value={Array.isArray(value) ? value.join(', ') : ''}
               onChange={(e) => {
                 const arrayValue = e.target.value
                   .split(',')
                   .map(item => item.trim())
                   .filter(item => item.length > 0);
-                handleValueChange(variable.name, arrayValue);
+                handleValueChange(variable.key, arrayValue);
               }}
               error={hasError}
-              helperText={error || `${variable.description || variable.name} (comma-separated)`}
+              helperText={error || `${variable.label || variable.key} (comma-separated)`}
               required={variable.required}
               size="small"
             />
@@ -138,7 +133,7 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
                     size="small"
                     onDelete={() => {
                       const newValue = value.filter((_, i) => i !== index);
-                      handleValueChange(variable.name, newValue);
+                      handleValueChange(variable.key, newValue);
                     }}
                   />
                 ))}
@@ -147,42 +142,18 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
           </Box>
         );
 
-      case 'object':
-        return (
-          <TextField
-            fullWidth
-            label={variable.name}
-            multiline
-            rows={3}
-            value={typeof value === 'object' ? JSON.stringify(value, null, 2) : value || ''}
-            onChange={(e) => {
-              try {
-                const objectValue = JSON.parse(e.target.value);
-                handleValueChange(variable.name, objectValue);
-              } catch {
-                handleValueChange(variable.name, e.target.value);
-              }
-            }}
-            error={hasError}
-            helperText={error || `${variable.description || variable.name} (JSON format)`}
-            required={variable.required}
-            size="small"
-          />
-        );
-
       default: // string
         return (
           <TextField
             fullWidth
-            label={variable.name}
-            multiline={variable.description?.toLowerCase().includes('long') || 
-                      variable.description?.toLowerCase().includes('paragraph')}
-            rows={variable.description?.toLowerCase().includes('long') || 
-                  variable.description?.toLowerCase().includes('paragraph') ? 3 : 1}
+            label={variable.label || variable.key}
+            multiline={variable.sensitive ? false : true}
+            type={variable.sensitive ? 'password' : 'text'}
+            rows={variable.sensitive ? 1 : 3}
             value={value || ''}
-            onChange={(e) => handleValueChange(variable.name, e.target.value)}
+            onChange={(e) => handleValueChange(variable.key, e.target.value)}
             error={hasError}
-            helperText={error || variable.description || ''}
+            helperText={error}
             required={variable.required}
             size="small"
           />
@@ -194,11 +165,11 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
   const optionalVariables = variables.filter(v => !v.required);
 
   const requiredErrors = requiredVariables.filter(v => 
-    validateValue(v, values[v.name]) !== null
+    validateValue(v, values[v.key]) !== null
   ).length;
 
   const optionalErrors = optionalVariables.filter(v => 
-    validateValue(v, values[v.name]) !== null
+    validateValue(v, values[v.key]) !== null
   ).length;
 
   if (variables.length === 0) {
@@ -236,7 +207,7 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {requiredVariables.map((variable) => (
-              <Box key={variable.name}>
+              <Box key={variable.key}>
                 {renderInput(variable)}
               </Box>
             ))}
@@ -264,7 +235,7 @@ const VariableInputForm: React.FC<VariableInputFormProps> = ({
           <AccordionDetails>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {optionalVariables.map((variable) => (
-                <Box key={variable.name}>
+                <Box key={variable.key}>
                   {renderInput(variable)}
                 </Box>
               ))}

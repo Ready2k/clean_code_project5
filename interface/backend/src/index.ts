@@ -71,8 +71,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "http://localhost", "http://localhost:8000", "ws://localhost:8000", "wss://localhost:8000"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
@@ -89,10 +91,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting - more generous for development
+// Rate limiting - industry standard limits
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env['NODE_ENV'] === 'production' ? 100 : 500, // Higher limit for development
+  max: process.env['NODE_ENV'] === 'production' ? 1500 : 5000, // Industry standard: ~100 req/min prod, ~333 req/min dev
   message: {
     error: {
       code: 'RATE_LIMIT_EXCEEDED',

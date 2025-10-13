@@ -1,12 +1,13 @@
 export interface PromptRecord {
   id: string;
-  metadata: PromptMetadata;
+  metadata: PromptMetadata & {
+    created_at: string;
+    updated_at: string;
+  };
   humanPrompt: HumanPrompt;
   structuredPrompt?: StructuredPrompt;
   variables: Variable[];
   status: PromptStatus;
-  createdAt: string;
-  updatedAt: string;
   version: number;
   ratings: Rating[];
   averageRating?: number;
@@ -29,7 +30,6 @@ export interface HumanPrompt {
     format: string;
     fields: string[];
   };
-  examples?: string[];
 }
 
 export interface StructuredPrompt {
@@ -41,12 +41,13 @@ export interface StructuredPrompt {
 }
 
 export interface Variable {
-  name: string;
-  description: string;
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'boolean' | 'select' | 'multiselect';
   required: boolean;
-  defaultValue?: any;
-  validation?: ValidationRule[];
+  sensitive: boolean;
+  options?: string[];
+  default?: any;
 }
 
 export interface ValidationRule {

@@ -24,10 +24,10 @@ export function useOfflineDetection(config: OfflineDetectionConfig = {}) {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   
   const [state, setState] = useState<OfflineState>({
-    isOnline: navigator.onLine,
-    isOffline: !navigator.onLine,
-    lastOnlineAt: navigator.onLine ? new Date() : undefined,
-    lastOfflineAt: !navigator.onLine ? new Date() : undefined
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isOffline: typeof navigator !== 'undefined' ? !navigator.onLine : false,
+    lastOnlineAt: (typeof navigator !== 'undefined' && navigator.onLine) ? new Date() : undefined,
+    lastOfflineAt: (typeof navigator !== 'undefined' && !navigator.onLine) ? new Date() : undefined
   });
 
   const checkOnlineStatus = useCallback(async (): Promise<boolean> => {
@@ -120,8 +120,8 @@ export function useOfflineDetection(config: OfflineDetectionConfig = {}) {
 
 // Global offline state hook
 let globalOfflineState: OfflineState = {
-  isOnline: navigator.onLine,
-  isOffline: !navigator.onLine
+  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  isOffline: typeof navigator !== 'undefined' ? !navigator.onLine : false
 };
 
 const offlineListeners: ((state: OfflineState) => void)[] = [];
@@ -154,20 +154,22 @@ function updateGlobalOfflineState(newState: OfflineState) {
 }
 
 // Browser event listeners for global state
-window.addEventListener('online', () => {
-  updateGlobalOfflineState({
-    ...globalOfflineState,
-    isOnline: true,
-    isOffline: false,
-    lastOnlineAt: new Date()
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    updateGlobalOfflineState({
+      ...globalOfflineState,
+      isOnline: true,
+      isOffline: false,
+      lastOnlineAt: new Date()
+    });
   });
-});
 
-window.addEventListener('offline', () => {
-  updateGlobalOfflineState({
-    ...globalOfflineState,
-    isOnline: false,
-    isOffline: true,
-    lastOfflineAt: new Date()
+  window.addEventListener('offline', () => {
+    updateGlobalOfflineState({
+      ...globalOfflineState,
+      isOnline: false,
+      isOffline: true,
+      lastOfflineAt: new Date()
+    });
   });
-});
+}

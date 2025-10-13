@@ -12,7 +12,9 @@ export const authAPI = {
   },
 
   async refreshToken(): Promise<AuthResponse> {
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = typeof window !== 'undefined' && window.localStorage 
+      ? localStorage.getItem('refreshToken') 
+      : null;
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }

@@ -225,7 +225,7 @@ export const EnhancedPromptCard: React.FC<EnhancedPromptCardProps> = ({
                 •
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {formatDistanceToNow(new Date(prompt.updatedAt), { addSuffix: true })}
+                {formatDistanceToNow(new Date(prompt.metadata.updated_at), { addSuffix: true })}
               </Typography>
             </Box>
           </Box>

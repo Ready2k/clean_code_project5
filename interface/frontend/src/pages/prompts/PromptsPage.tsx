@@ -18,7 +18,6 @@ import {
   Badge,
   Select,
   MenuItem,
-  FormControlLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -67,7 +66,7 @@ import {
   ExportHistoryDialog
 } from '../../components/prompts/export';
 import ExportProgressTracker from '../../components/prompts/export/ExportProgressTracker';
-import { PromptRecord, CreatePromptRequest, UpdatePromptRequest } from '../../types/prompts';
+import { PromptRecord, CreatePromptRequest, UpdatePromptRequest, Variable } from '../../types/prompts';
 import { promptsAPI } from '../../services/api/promptsAPI';
 
 export const PromptsPage: React.FC = () => {
@@ -326,34 +325,72 @@ export const PromptsPage: React.FC = () => {
         throw new Error('Prompt not found');
       }
 
-      // Apply the enhancement by updating the prompt with enhanced data
-      // For now, we'll enhance the human prompt with insights from the structured prompt
+      // Apply the enhancement by creating a more sophisticated update
+      const structuredPrompt = enhancementResult.structuredPrompt;
+
+      // Enhance the human prompt with insights from the structured prompt
       const enhancedHumanPrompt = {
         ...currentPrompt.humanPrompt,
-        // Enhance the goal with system instructions if available
-        goal: enhancementResult.structuredPrompt?.system?.length > 0
-          ? `${currentPrompt.humanPrompt.goal}\n\nEnhanced context: ${enhancementResult.structuredPrompt.system[0]}`
+        // Enhance the goal with system context if available
+        goal: structuredPrompt?.system?.length > 0
+          ? `${currentPrompt.humanPrompt.goal}\n\nEnhanced Instructions:\n${structuredPrompt.system.join('\n')}`
           : currentPrompt.humanPrompt.goal,
-        // Add any new steps from the structured template
+        // Enhance the audience description if capabilities are available
+        audience: structuredPrompt?.capabilities?.length > 0
+          ? `${currentPrompt.humanPrompt.audience}\n\nRequired Capabilities: ${structuredPrompt.capabilities.join(', ')}`
+          : currentPrompt.humanPrompt.audience,
+        // Keep original steps but add enhancement notes
         steps: [
           ...currentPrompt.humanPrompt.steps,
-          ...(enhancementResult.changes_made || []).map((change: string) => `Enhanced: ${change}`)
-        ]
+          ...(enhancementResult.changes_made || []).length > 0
+            ? [`Enhancement Notes: ${(enhancementResult.changes_made || []).join('; ')}`]
+            : []
+        ],
+        // Enhance output expectations with structured format if available
+        output_expectations: {
+          ...currentPrompt.humanPrompt.output_expectations,
+          format: structuredPrompt?.user_template
+            ? `${currentPrompt.humanPrompt.output_expectations.format}\n\nStructured Template:\n${structuredPrompt.user_template.substring(0, 200)}${structuredPrompt.user_template.length > 200 ? '...' : ''}`
+            : currentPrompt.humanPrompt.output_expectations.format
+        }
       };
 
-      const updateData: UpdatePromptRequest = {
-        humanPrompt: enhancedHumanPrompt,
-        // Add variables extracted from the structured prompt
-        variables: enhancementResult.structuredPrompt?.variables?.map((varName: string) => ({
+      // Create proper variable definitions from the structured prompt
+      const enhancedVariables: Variable[] = structuredPrompt?.variables?.length > 0
+        ? structuredPrompt.variables.map((varName: string): Variable => ({
           key: varName,
           label: varName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
           type: 'string' as const,
           required: true,
-          sensitive: false
-        })) || currentPrompt.variables
+          sensitive: varName.toLowerCase().includes('key') || varName.toLowerCase().includes('token') || varName.toLowerCase().includes('password')
+        }))
+        : currentPrompt.variables || [];
+
+      // Merge with existing variables, avoiding duplicates
+      const existingKeys = new Set((currentPrompt.variables || []).map((v: Variable) => v.key));
+      const newVariables = enhancedVariables.filter((v: Variable) => !existingKeys.has(v.key));
+      const finalVariables = [...(currentPrompt.variables || []), ...newVariables];
+
+      const updateData: UpdatePromptRequest = {
+        humanPrompt: enhancedHumanPrompt,
+        variables: finalVariables,
+        // Update metadata to reflect enhancement
+        metadata: {
+          ...currentPrompt.metadata,
+          summary: `${currentPrompt.metadata.summary} (AI Enhanced)`,
+          tags: [
+            ...(currentPrompt.metadata.tags || []),
+            'enhanced',
+            ...(enhancementResult.confidence > 0.8 ? ['high-confidence'] : [])
+          ].filter((tag, index, arr) => arr.indexOf(tag) === index) // Remove duplicates
+        }
       };
 
       await dispatch(updatePrompt({ id: promptId, data: updateData })).unwrap();
+
+      // Close the enhancement dialog
+      setShowEnhancementWorkflow(false);
+      setSelectedPrompt(null);
 
       setSnackbar({
         open: true,
@@ -886,7 +923,7 @@ export const PromptsPage: React.FC = () => {
               tags: prompt.metadata.tags,
               category: prompt.metadata.category,
               owner: prompt.metadata.owner,
-              createdAt: prompt.createdAt,
+              createdAt: prompt.metadata.created_at,
             }))}
             onLoadPromptData={async (promptId) => {
               const analytics = await promptsAPI.getPromptRatingAnalytics(promptId);
@@ -902,7 +939,7 @@ export const PromptsPage: React.FC = () => {
                 tags: prompt.metadata.tags,
                 category: prompt.metadata.category,
                 owner: prompt.metadata.owner,
-                createdAt: prompt.createdAt,
+                createdAt: prompt.metadata.created_at,
               };
             }}
           />

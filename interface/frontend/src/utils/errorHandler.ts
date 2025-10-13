@@ -72,11 +72,13 @@ export class ErrorHandler {
 
   private static handleAuthenticationError() {
     // Clear stored tokens
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+    }
     
     // Redirect to login if not already there
-    if (!window.location.pathname.includes('/login')) {
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
       window.location.href = '/login';
     }
   }

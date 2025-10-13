@@ -87,8 +87,8 @@ const MultiProviderRenderer: React.FC<MultiProviderRendererProps> = ({
   useEffect(() => {
     const defaultVariables: Record<string, any> = {};
     (prompt.variables || []).forEach((variable) => {
-      if (variable.defaultValue !== undefined) {
-        defaultVariables[variable.name] = variable.defaultValue;
+      if (variable.default !== undefined) {
+        defaultVariables[variable.key] = variable.default;
       }
     });
     setVariables(defaultVariables);
@@ -327,8 +327,8 @@ const MultiProviderRenderer: React.FC<MultiProviderRendererProps> = ({
 
   const hasRequiredVariables = prompt.variables.some(v => v.required);
   const missingRequiredVariables = prompt.variables
-    .filter(v => v.required && (variables[v.name] === undefined || variables[v.name] === ''))
-    .map(v => v.name);
+    .filter(v => v.required && (variables[v.key] === undefined || variables[v.key] === ''))
+    .map(v => v.key);
 
   const canRender = missingRequiredVariables.length === 0;
 

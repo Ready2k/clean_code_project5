@@ -235,7 +235,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
           <Typography variant="caption" color="text.secondary">
-            {formatDistanceToNow(new Date(prompt.updatedAt), { addSuffix: true })}
+            {formatDistanceToNow(new Date(prompt.metadata.updated_at), { addSuffix: true })}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             by {prompt.metadata.owner}

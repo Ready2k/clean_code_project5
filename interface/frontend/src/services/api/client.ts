@@ -22,7 +22,7 @@ class APIClientClass {
 
   constructor() {
     this.client = axios.create({
-      baseURL: ((import.meta.env?.VITE_API_URL as string) || (import.meta.env?.VITE_API_BASE_URL as string) || 'http://localhost:8000') + '/api',
+      baseURL: ((import.meta.env?.VITE_API_URL as string) || (import.meta.env?.VITE_API_BASE_URL as string) || (import.meta.env.PROD ? '' : 'http://localhost:8000')) + '/api',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
@@ -148,7 +148,7 @@ class APIClientClass {
 
     if (!error.response) {
       // Network error
-      if (!navigator.onLine) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
         return new AppError(
           ErrorType.OFFLINE_ERROR,
           'You appear to be offline',
@@ -177,7 +177,7 @@ class APIClientClass {
       duration: 5000,
     }));
     
-    if (!window.location.pathname.includes('/login')) {
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
       window.location.href = '/login';
     }
   }

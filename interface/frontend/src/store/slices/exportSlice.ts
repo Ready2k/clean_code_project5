@@ -156,15 +156,17 @@ export const exportPrompt = createAsyncThunk(
       const blob = await exportAPI.exportPrompt(promptId, options);
       
       // Create download
-      const url = window.URL.createObjectURL(blob);
-      const filename = `prompt_${promptId}.${options.format}`;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const url = window.URL.createObjectURL(blob);
+        const filename = `prompt_${promptId}.${options.format}`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
 
       dispatch(updateExportProgress({
         id: exportId,
@@ -225,15 +227,17 @@ export const bulkExportPrompts = createAsyncThunk(
       }));
 
       // Create download
-      const url = window.URL.createObjectURL(blob);
-      const filename = options.filename || `prompts_bulk_export.${options.archiveFormat || 'zip'}`;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const url = window.URL.createObjectURL(blob);
+        const filename = options.filename || `prompts_bulk_export.${options.archiveFormat || 'zip'}`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
 
       dispatch(updateExportProgress({
         id: exportId,

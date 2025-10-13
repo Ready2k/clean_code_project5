@@ -60,8 +60,8 @@ export const QuickRenderDialog: React.FC<QuickRenderDialogProps> = ({
       // Initialize variables with defaults
       const defaultVariables: Record<string, any> = {};
       (prompt.variables || []).forEach((variable) => {
-        if (variable.defaultValue !== undefined) {
-          defaultVariables[variable.name] = variable.defaultValue;
+        if (variable.default !== undefined) {
+          defaultVariables[variable.key] = variable.default;
         }
       });
       
@@ -89,8 +89,8 @@ export const QuickRenderDialog: React.FC<QuickRenderDialogProps> = ({
     }
   }, [open, prompt, selectedVariant]);
 
-  const handleVariableChange = (name: string, value: any) => {
-    setVariables(prev => ({ ...prev, [name]: value }));
+  const handleVariableChange = (key: string, value: any) => {
+    setVariables(prev => ({ ...prev, [key]: value }));
   };
 
   const handleRender = () => {
@@ -135,7 +135,7 @@ export const QuickRenderDialog: React.FC<QuickRenderDialogProps> = ({
   // Check if all required variables are filled
   const requiredVariables = prompt?.variables?.filter(v => v.required) || [];
   const missingRequired = requiredVariables.filter(v => 
-    !variables[v.name] || variables[v.name] === ''
+    !variables[v.key] || variables[v.key] === ''
   );
   const canRender = missingRequired.length === 0;
 
@@ -294,14 +294,14 @@ export const QuickRenderDialog: React.FC<QuickRenderDialogProps> = ({
                 </Typography>
                 <Box display="flex" flexDirection="column" gap={2}>
                   {prompt.variables.map((variable) => (
-                    <Box key={variable.name}>
+                    <Box key={variable.key}>
                       <TextField
                         fullWidth
-                        label={variable.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        value={variables[variable.name] || ''}
-                        onChange={(e) => handleVariableChange(variable.name, e.target.value)}
+                        label={variable.label || variable.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        value={variables[variable.key] || ''}
+                        onChange={(e) => handleVariableChange(variable.key, e.target.value)}
                         required={variable.required}
-                        helperText={variable.description}
+                        type={variable.sensitive ? 'password' : 'text'}
                         placeholder={variable.defaultValue?.toString() || ''}
                         variant="outlined"
                         size="small"
@@ -316,7 +316,7 @@ export const QuickRenderDialog: React.FC<QuickRenderDialogProps> = ({
           {/* Validation Messages */}
           {!canRender && (
             <Alert severity="warning">
-              Please fill in all required variables: {missingRequired.map(v => v.name).join(', ')}
+              Please fill in all required variables: {missingRequired.map(v => v.key).join(', ')}
             </Alert>
           )}
         </Box>

@@ -63,8 +63,8 @@ class FrontendLogger {
       message,
       service: this.service,
       environment: this.environment,
-      url: window.location.href,
-      userAgent: navigator.userAgent,
+      url: typeof window !== 'undefined' ? window.location.href : 'unknown',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
       ...meta
     };
   }
