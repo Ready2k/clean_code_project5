@@ -392,7 +392,7 @@ export class ProviderStorageService {
     const db = getDatabaseService();
 
     try {
-      const result = await db.query<{ auth_config: string }>(`
+      const result = await db.query<{ auth_config: any }>(`
         SELECT auth_config FROM providers WHERE id = $1
       `, [id]);
 
@@ -400,7 +400,8 @@ export class ProviderStorageService {
         throw new NotFoundError(`Provider with ID ${id} not found`);
       }
 
-      return EncryptionService.decryptConfig(result.rows[0].auth_config);
+      // Return the auth_config directly as it's stored as JSON, not encrypted
+      return result.rows[0].auth_config;
 
     } catch (error) {
       if (error instanceof NotFoundError) {
@@ -434,7 +435,7 @@ export class ProviderStorageService {
       `, [
         testResult.testedAt,
         JSON.stringify(testResult),
-        testResult.success ? 'active' : 'error',
+        testResult.success ? 'active' : 'inactive',
         id
       ]);
 

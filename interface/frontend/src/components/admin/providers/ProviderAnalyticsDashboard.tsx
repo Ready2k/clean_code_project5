@@ -25,14 +25,12 @@ import {
   Switch,
   FormControlLabel,
   Divider,
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  LinearProgress,
   Button,
   Menu,
   MenuItem,
@@ -41,20 +39,14 @@ import {
   InputLabel,
 } from '@mui/material';
 import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
   Speed as SpeedIcon,
   AttachMoney as AttachMoneyIcon,
   Assessment as AssessmentIcon,
   Lightbulb as LightbulbIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
-  DateRange as DateRangeIcon,
-  PieChart as PieChartIcon,
   BarChart as BarChartIcon,
   Timeline as TimelineIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import {
@@ -68,11 +60,7 @@ import {
   ResponsiveContainer,
   PieChart,
   Cell,
-  BarChart,
-  Bar,
 } from 'recharts';
-
-import { useAppDispatch } from '../../../hooks/redux';
 
 interface AnalyticsDashboardData {
   overview: {
@@ -146,7 +134,6 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 export const ProviderAnalyticsDashboard: React.FC<ProviderAnalyticsDashboardProps> = ({
   onRefresh,
 }) => {
-  const dispatch = useAppDispatch();
   
   // Local state
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);

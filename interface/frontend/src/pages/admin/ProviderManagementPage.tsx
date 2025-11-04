@@ -58,7 +58,7 @@ import {
   clearProviderFilters,
   setProviderPagination,
 } from '../../store/slices/providersSlice';
-import { ProviderStatus, AuthMethod } from '../../types/providers';
+import { Provider, ProviderStatus, AuthMethod } from '../../types/providers';
 
 // Import components
 import {
@@ -110,6 +110,8 @@ export const ProviderManagementPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Auto-refresh interval
@@ -180,6 +182,12 @@ export const ProviderManagementPage: React.FC = () => {
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
+
+  // Handle edit provider
+  const handleEditProvider = useCallback((provider: Provider) => {
+    setEditingProvider(provider);
+    setIsEditDialogOpen(true);
+  }, []);
 
   // Calculate health statistics
   const healthStats = React.useMemo(() => {
@@ -466,6 +474,7 @@ export const ProviderManagementPage: React.FC = () => {
             pagination={pagination.providers}
             onPageChange={(page: number) => dispatch(setProviderPagination({ page }))}
             onLimitChange={(limit: number) => dispatch(setProviderPagination({ limit }))}
+            onEdit={handleEditProvider}
           />
         </TabPanel>
 
@@ -519,11 +528,22 @@ export const ProviderManagementPage: React.FC = () => {
         <AddIcon />
       </Fab>
 
-      {/* Provider Configuration Dialog */}
+      {/* Provider Configuration Dialog - Create */}
       <ProviderConfigurationDialog
         open={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         mode="create"
+      />
+
+      {/* Provider Configuration Dialog - Edit */}
+      <ProviderConfigurationDialog
+        open={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingProvider(null);
+        }}
+        mode="edit"
+        providerId={editingProvider?.id}
       />
     </Box>
   );

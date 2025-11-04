@@ -1,4 +1,4 @@
-import { promptsAPI } from './api/promptsAPI';
+
 
 export interface AdaptationRequest {
   promptId: string;
@@ -25,8 +25,6 @@ export class PromptAdaptationService {
    */
   static async adaptPrompt(request: AdaptationRequest): Promise<AdaptationResult> {
     // This would call a backend endpoint that uses the selected LLM to adapt the prompt
-    const adaptationPrompt = this.buildAdaptationPrompt(request);
-    
     // For now, return a mock result - this would be replaced with actual API call
     return {
       adaptedPrompt: {
@@ -124,7 +122,7 @@ Format your response as JSON with the structure:
   /**
    * Get existing variant if it exists
    */
-  static getVariant(prompt: any, targetProvider: string, targetModel: string): any | null {
+  static getVariant(_prompt: any, _targetProvider: string, _targetModel: string): any | null {
     // This would look for stored variants in the prompt record
     // For now, return null - would be implemented with actual storage
     return null;

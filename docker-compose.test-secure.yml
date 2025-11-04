@@ -1,0 +1,92 @@
+# Test secure docker-compose configuration
+# Simplified version for testing security improvements without Docker Swarm
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.secure
+      target: production
+    ports:
+      - "8001:8000"  # Different port to avoid conflict
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - JWT_SECRET=test-jwt-secret-12345
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:secure-test-password@postgres:5432/promptlib
+      - DATABASE_SSL=false
+      - ENCRYPTION_KEY=test-encryption-key-67890
+      - STORAGE_DIR=/app/data
+      - LOG_LEVEL=info
+      - FRONTEND_URL=http://localhost:8001
+      - CORS_ORIGIN=http://localhost:8001
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - prompt_data_secure:/app/data
+      - app_logs_secure:/app/logs
+    networks:
+      - prompt-library-secure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    # No external port exposure - internal only
+    volumes:
+      - redis_data_secure:/data
+    networks:
+      - prompt-library-secure
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=promptlib
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secure-test-password
+    # No external port exposure - internal only
+    volumes:
+      - postgres_data_secure:/var/lib/postgresql/data
+      - ./interface/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - prompt-library-secure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  prompt_data_secure:
+    driver: local
+  app_logs_secure:
+    driver: local
+  redis_data_secure:
+    driver: local
+  postgres_data_secure:
+    driver: local
+
+networks:
+  prompt-library-secure:
+    driver: bridge

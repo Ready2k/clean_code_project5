@@ -15,10 +15,6 @@ import {
   LinearProgress,
   Chip,
   Avatar,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
   IconButton,
   Tooltip,
   Alert,
@@ -26,7 +22,6 @@ import {
   Switch,
   FormControlLabel,
   Divider,
-  Paper,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -35,16 +30,12 @@ import {
   Speed as SpeedIcon,
   Timeline as TimelineIcon,
   Refresh as RefreshIcon,
-  Notifications as NotificationsIcon,
-  NotificationsOff as NotificationsOffIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
   AccessTime as AccessTimeIcon,
 } from '@mui/icons-material';
 
 import { Provider, ProviderHealth } from '../../../types/providers';
 import { useAppDispatch } from '../../../hooks/redux';
-import { fetchProviderHealth, testProvider } from '../../../store/slices/providersSlice';
+import { fetchProviderHealth } from '../../../store/slices/providersSlice';
 
 interface ProviderHealthMonitorProps {
   providers: Provider[];

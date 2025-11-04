@@ -26,11 +26,9 @@ import {
   ListItemText,
   Pagination,
   FormControl,
-  InputLabel,
   Select,
   CircularProgress,
   Alert,
-  Badge,
 } from '@mui/material';
 import {
   MoreVert as MoreVertIcon,
@@ -40,7 +38,6 @@ import {
   Visibility as ViewIcon,
   ContentCopy as CopyIcon,
   Download as ExportIcon,
-  Settings as SettingsIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Warning as WarningIcon,
@@ -67,6 +64,7 @@ interface ProviderListProps {
   };
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
+  onEdit?: (provider: Provider) => void;
 }
 
 export const ProviderList: React.FC<ProviderListProps> = ({
@@ -75,6 +73,7 @@ export const ProviderList: React.FC<ProviderListProps> = ({
   pagination,
   onPageChange,
   onLimitChange,
+  onEdit,
 }) => {
   const dispatch = useAppDispatch();
   
@@ -102,16 +101,25 @@ export const ProviderList: React.FC<ProviderListProps> = ({
   };
 
   const handleEditProvider = (provider: Provider) => {
-    // TODO: Open edit dialog
-    console.log('Edit provider:', provider);
+    onEdit?.(provider);
     handleMenuClose();
   };
 
   const handleTestProvider = async (provider: Provider) => {
     setTestingProviders(prev => new Set(prev).add(provider.id));
     try {
-      await dispatch(testProvider(provider.id));
-    } finally {
+      const result = await dispatch(testProvider(provider.id));
+      console.log('Test result received:', result);
+      // Force a small delay to ensure state is updated
+      setTimeout(() => {
+        setTestingProviders(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(provider.id);
+          return newSet;
+        });
+      }, 100);
+    } catch (error) {
+      console.error('Test failed:', error);
       setTestingProviders(prev => {
         const newSet = new Set(prev);
         newSet.delete(provider.id);
@@ -130,13 +138,11 @@ export const ProviderList: React.FC<ProviderListProps> = ({
 
   const handleCopyProvider = (provider: Provider) => {
     // TODO: Implement provider duplication
-    console.log('Copy provider:', provider);
     handleMenuClose();
   };
 
   const handleExportProvider = (provider: Provider) => {
     // TODO: Implement provider export
-    console.log('Export provider:', provider);
     handleMenuClose();
   };
 

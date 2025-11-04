@@ -28,9 +28,6 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -42,7 +39,6 @@ import {
   Info as InfoIcon,
   CheckCircle as SuccessIcon,
   Search as SearchIcon,
-  ExpandMore as ExpandMoreIcon,
   Visibility as ViewIcon,
   GetApp as GetAppIcon,
 } from '@mui/icons-material';

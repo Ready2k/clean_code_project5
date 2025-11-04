@@ -57,7 +57,6 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ promptId }) => {
   } = useAppSelector((state) => state.export);
 
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
-  const [showAdvanced] = useState(false);
 
   useEffect(() => {
     if (exportDialogOpen && formats.length === 0) {

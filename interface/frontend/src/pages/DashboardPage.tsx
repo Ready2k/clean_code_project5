@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Grid,
-  Container,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -42,7 +41,7 @@ export const DashboardPage: React.FC = () => {
   const { status: systemStatus, stats: systemStats, isLoading: systemLoading } = useAppSelector(
     (state) => state.system
   );
-  const { items: prompts, pagination } = useAppSelector((state) => state.prompts);
+  const { pagination } = useAppSelector((state) => state.prompts);
   const { items: connections, testResults, isLoading: connectionsLoading } = useAppSelector(
     (state) => state.connections
   );

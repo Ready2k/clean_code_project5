@@ -131,7 +131,6 @@ export function useAsyncOperation<T>(
     error,
     isRetrying,
     retryCount,
-    handleError,
     clearError,
     retry,
     executeWithErrorHandling

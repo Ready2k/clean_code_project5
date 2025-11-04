@@ -234,7 +234,9 @@ export class ModelStorageService {
 
       // Get total count
       const countQuery = `SELECT COUNT(*) as count FROM models ${whereClause}`;
-      const countParams = params.slice(0, paramIndex - (options.limit ? (options.page ? 2 : 1) : 0));
+      // Count query should only include filter parameters, not limit/offset
+      const limitParamCount = options.limit ? (options.page && options.page > 1 ? 2 : 1) : 0;
+      const countParams = params.slice(0, Math.max(0, params.length - limitParamCount));
       const countResult = await db.query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].count);
 

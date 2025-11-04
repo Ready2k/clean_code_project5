@@ -314,7 +314,7 @@ export class DynamicProviderService {
   private async testProviderAsync(id: string): Promise<void> {
     try {
       await this.testProvider(id);
-    } catch (error) {
+    } catch (_error) {
       // Already logged in testProvider
     }
   }
@@ -572,7 +572,7 @@ export class DynamicProviderService {
   private async testModelAsync(id: string): Promise<void> {
     try {
       await this.testModel(id);
-    } catch (error) {
+    } catch (_error) {
       // Already logged in testModel
     }
   }
@@ -1673,7 +1673,7 @@ export class DynamicProviderService {
       if (!stats.isDirectory()) {
         throw new Error('Backup not found or is not a directory');
       }
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`Backup ${backupId} not found`);
     }
 

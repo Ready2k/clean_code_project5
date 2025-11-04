@@ -22,8 +22,6 @@ import {
 import {
   Add as AddIcon,
   Refresh as RefreshIcon,
-  GetApp as ExportIcon,
-  History as HistoryIcon,
   CheckBox as SelectIcon,
   Upload as ImportIcon,
   ViewModule as CardViewIcon,
@@ -44,10 +42,7 @@ import { renderPrompt, clearRenders } from '../../store/slices/renderingSlice';
 import { fetchConnections } from '../../store/slices/connectionsSlice';
 import {
   openExportDialog,
-  openBulkExportDialog,
   openShareDialog,
-  openHistoryDialog,
-  setSelectedPromptIds,
   addToSelection,
   removeFromSelection,
   clearSelection,
@@ -63,7 +58,7 @@ import {
 import { EnhancedPromptCard } from '../../components/prompts/EnhancedPromptCard';
 import { QuickRenderDialog } from '../../components/prompts/QuickRenderDialog';
 import { EnhancementWorkflowDialog } from '../../components/prompts/EnhancementWorkflowDialog';
-import { RatingFilters, RatingComparison } from '../../components/prompts/rating';
+import { RatingFilters } from '../../components/prompts/rating';
 import {
   ExportDialog,
   BulkExportDialog,
@@ -72,7 +67,6 @@ import {
 } from '../../components/prompts/export';
 import ExportProgressTracker from '../../components/prompts/export/ExportProgressTracker';
 import { PromptRecord, CreatePromptRequest, UpdatePromptRequest } from '../../types/prompts';
-import { promptsAPI } from '../../services/api/promptsAPI';
 
 interface GroupedPrompt {
   basePrompt: PromptRecord;
@@ -99,7 +93,6 @@ export const EnhancedPromptsPage: React.FC = () => {
   const [showEnhancementWorkflow, setShowEnhancementWorkflow] = React.useState(false);
   const [showRenderer, setShowRenderer] = React.useState(false);
   const [showQuickRender, setShowQuickRender] = React.useState(false);
-  const [showComparison, setShowComparison] = React.useState(false);
   const [showImportDialog, setShowImportDialog] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [promptToDelete, setPromptToDelete] = React.useState<PromptRecord | null>(null);
@@ -429,7 +422,7 @@ export const EnhancedPromptsPage: React.FC = () => {
       dispatch(clearRenders());
 
       // Execute the render
-      const renderResult = await dispatch(renderPrompt({
+      await dispatch(renderPrompt({
         promptId: promptToRender.id,
         connectionId: selectedConnection.id,
         provider: selectedConnection.provider,

@@ -47,7 +47,7 @@ export class ImportService {
     let parsedContent: any;
     try {
       parsedContent = JSON.parse(content);
-    } catch (error) {
+    } catch (_error) {
       // If JSON parsing fails, treat as string content (markdown/text)
       parsedContent = content;
     }

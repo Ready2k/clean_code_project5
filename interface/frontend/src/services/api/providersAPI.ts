@@ -116,8 +116,8 @@ class ProvidersAPIService {
    * Test provider connectivity and configuration
    */
   async testProvider(id: string): Promise<ProviderTestResult> {
-    const response = await apiClient.post<{ result: ProviderTestResult }>(`/admin/providers/${id}/test`);
-    return response.data.result;
+    const response = await apiClient.post<{ data: { testResult: ProviderTestResult } }>(`/admin/providers/${id}/test`);
+    return response.data.data.testResult;
   }
 
   /**

@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket } from './useWebSocket';
-import { useAppDispatch } from './redux';
-import { addNotification } from '../store/slices/uiSlice';
 
 export interface RenderProgress {
   promptId: string;
@@ -20,7 +18,6 @@ export interface RenderProgressState {
 
 export const useRenderProgress = (promptId?: string, connectionId?: string) => {
   const { addEventListener } = useWebSocket();
-  const dispatch = useAppDispatch();
   
   const [progressState, setProgressState] = useState<RenderProgressState>({
     isRendering: false,

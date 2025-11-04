@@ -29,7 +29,7 @@ export const renderPrompt = createAsyncThunk(
   async (
     { promptId, connectionId, provider, options }: 
     { promptId: string; connectionId: string; provider: string; options: RenderOptions },
-    { rejectWithValue, getState }
+    { rejectWithValue }
   ) => {
     // Create a unique key for this render request
     const renderKey = `${promptId}-${connectionId}-${provider}`;

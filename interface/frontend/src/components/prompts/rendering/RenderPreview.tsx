@@ -55,7 +55,6 @@ const RenderPreview: React.FC<RenderPreviewProps> = ({
   onDownload,
   onRerender,
   onSaveVariant,
-  originalPrompt,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);

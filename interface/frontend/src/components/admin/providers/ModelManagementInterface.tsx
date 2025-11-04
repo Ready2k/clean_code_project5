@@ -18,7 +18,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   IconButton,
   Tooltip,
@@ -44,7 +43,6 @@ import {
   Switch,
   Divider,
   Fab,
-  Badge,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -52,18 +50,9 @@ import {
   Delete as DeleteIcon,
   PlayArrow as TestIcon,
   MoreVert as MoreVertIcon,
-  CheckBox as CheckBoxIcon,
-  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
-  Visibility as VisibilityIcon,
-  ContentCopy as CopyIcon,
-  Download as ExportIcon,
-  Upload as ImportIcon,
   Refresh as RefreshIcon,
   FilterList as FilterIcon,
-  Search as SearchIcon,
-  Speed as SpeedIcon,
   Memory as MemoryIcon,
-  Settings as SettingsIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Warning as WarningIcon,
@@ -80,16 +69,12 @@ import {
   bulkDeleteModels,
   testModel,
   setModelFilters,
-  clearModelFilters,
   setModelPagination,
 } from '../../../store/slices/providersSlice';
 import {
   Model,
   ModelStatus,
-  CreateModelRequest,
-  UpdateModelRequest,
   ModelFormData,
-  ModelFilters,
 } from '../../../types/providers';
 
 interface ModelManagementInterfaceProps {

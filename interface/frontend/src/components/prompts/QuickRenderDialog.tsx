@@ -14,7 +14,6 @@ import {
   Chip,
   Rating,
   IconButton,
-  Tooltip,
   Alert,
   CircularProgress,
   Divider,
@@ -23,8 +22,6 @@ import {
   Close as CloseIcon,
   PlayArrow as RenderIcon,
   Settings as AdvancedIcon,
-  Star as StarIcon,
-  AutoFixHigh as EnhanceIcon,
 } from '@mui/icons-material';
 import { PromptRecord } from '../../types/prompts';
 import ModelBadge from './ModelBadge';

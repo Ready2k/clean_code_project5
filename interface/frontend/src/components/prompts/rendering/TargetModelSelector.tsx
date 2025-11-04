@@ -8,7 +8,6 @@ import {
   MenuItem,
   Alert,
   Chip,
-  Divider,
   CircularProgress,
 } from '@mui/material';
 import {
@@ -41,7 +40,7 @@ const TargetModelSelector: React.FC<TargetModelSelectorProps> = ({
   existingVariants = [],
 }) => {
   const [providers, setProviders] = useState<any[]>([]);
-  const [models, setModels] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

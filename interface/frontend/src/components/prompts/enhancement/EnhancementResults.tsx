@@ -12,7 +12,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
+
   Grid,
   Card,
   CardContent,
@@ -70,33 +70,43 @@ export const EnhancementResults: React.FC<EnhancementResultsProps> = ({
     setTabValue(newValue);
   };
 
-  const getChangeIcon = (type: EnhancementChange['type']) => {
-    switch (type) {
-      case 'added':
-        return <AddedIcon color="success" />;
-      case 'modified':
-        return <ModifiedIcon color="warning" />;
-      case 'removed':
-        return <RemovedIcon color="error" />;
-      default:
-        return <ModifiedIcon />;
+  if (!result) {
+    return (
+      <Alert severity="info">
+        No enhancement results to display.
+      </Alert>
+    );
+  }
+
+  const renderChangesList = () => {
+    if (!result.changes || result.changes.length === 0) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No specific changes detected.
+        </Typography>
+      );
     }
+
+    return (
+      <List>
+        {result.changes.map((change, index) => (
+          <ListItem key={index}>
+            <ListItemIcon>
+              {change.type === 'added' && <AddedIcon color="success" />}
+              {change.type === 'modified' && <ModifiedIcon color="warning" />}
+              {change.type === 'removed' && <RemovedIcon color="error" />}
+            </ListItemIcon>
+            <ListItemText
+              primary={change.field}
+              secondary={change.description}
+            />
+          </ListItem>
+        ))}
+      </List>
+    );
   };
 
-  const getChangeColor = (type: EnhancementChange['type']) => {
-    switch (type) {
-      case 'added':
-        return 'success.main';
-      case 'modified':
-        return 'warning.main';
-      case 'removed':
-        return 'error.main';
-      default:
-        return 'text.primary';
-    }
-  };
-
-  const renderDiffView = (_field: string, oldValue: any, newValue: any) => {
+  const renderDiffView = (field: string, oldValue: any, newValue: any) => {
     if (typeof oldValue === 'string' && typeof newValue === 'string') {
       return (
         <Box>

@@ -1,0 +1,137 @@
+# Secure production docker-compose configuration
+# Use this for production deployments with proper secrets management
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.secure
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres@postgres:5432/promptlib
+      - DATABASE_SSL=true
+      - STORAGE_DIR=/app/data
+      - LOG_LEVEL=info
+      - FRONTEND_URL=${FRONTEND_URL}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - ENCRYPTION_KEY_FILE=/run/secrets/encryption_key
+    secrets:
+      - jwt_secret
+      - encryption_key
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - prompt_data:/app/data
+      - app_logs:/app/logs
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+
+  redis:
+    image: redis:7-alpine
+    # Remove port exposure - only internal access needed
+    volumes:
+      - redis_data:/data
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=promptlib
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    # Remove port exposure - only internal access needed
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./interface/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    secrets:
+      - db_password
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./interface/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:noexec,nosuid,size=50m
+      - /var/run:noexec,nosuid,size=10m
+
+secrets:
+  jwt_secret:
+    external: true
+  encryption_key:
+    external: true
+  db_password:
+    external: true
+
+volumes:
+  prompt_data:
+    driver: local
+  app_logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  prompt-library:
+    driver: bridge
+    internal: false

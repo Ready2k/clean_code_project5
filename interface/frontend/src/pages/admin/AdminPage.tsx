@@ -14,8 +14,6 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  People as PeopleIcon,
-  Settings as SettingsIcon,
   CloudSync as CloudSyncIcon,
 } from '@mui/icons-material';
 

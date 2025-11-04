@@ -23,8 +23,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  Divider
+  ListItemIcon
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -507,7 +506,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose }) => {
         Supported Formats
       </Typography>
       
-      {supportedFormats.map((format, index) => (
+      {supportedFormats.map((format) => (
         <Paper key={format.provider} sx={{ p: 2, mb: 2 }}>
           <Typography variant="subtitle1" gutterBottom>
             {format.name}

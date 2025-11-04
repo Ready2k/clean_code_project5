@@ -1,6 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
-import { render } from '@/test/test-utils';
+import { describe, it, expect } from 'vitest';
 
 // Simple placeholder test for auth flow
 describe('Authentication Flow Integration', () => {
