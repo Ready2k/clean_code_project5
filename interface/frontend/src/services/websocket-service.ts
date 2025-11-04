@@ -1,9 +1,22 @@
 import { io, Socket } from 'socket.io-client';
-import { store } from '../store';
-import { setConnectionStatus } from '../store/slices/connectionsSlice';
-import { updateJobProgress } from '../store/slices/enhancementSlice';
-import { addNotification, removeNotification } from '../store/slices/uiSlice';
-import { updateSystemStatus } from '../store/slices/systemSlice';
+
+// Store and actions will be injected to avoid circular dependencies
+let storeInstance: any = null;
+let setConnectionStatusAction: any = null;
+let updateJobProgressAction: any = null;
+let addNotificationAction: any = null;
+let removeNotificationAction: any = null;
+let updateSystemStatusAction: any = null;
+
+// Function to inject store dependencies
+export const injectWebSocketDependencies = (store: any, actions: any) => {
+  storeInstance = store;
+  setConnectionStatusAction = actions.setConnectionStatus;
+  updateJobProgressAction = actions.updateJobProgress;
+  addNotificationAction = actions.addNotification;
+  removeNotificationAction = actions.removeNotification;
+  updateSystemStatusAction = actions.updateSystemStatus;
+};
 
 export interface WebSocketEvents {
   // Connection events
@@ -202,8 +215,8 @@ class WebSocketService {
       this.socket?.emit('join', userId);
       
       // Only show notification on reconnect, not initial connect
-      if (this.reconnectAttempts > 0) {
-        store.dispatch(addNotification({
+      if (this.reconnectAttempts > 0 && storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
           id: `ws-reconnected-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'success',
           title: 'Reconnected',
@@ -227,117 +240,143 @@ class WebSocketService {
     // Connection test events
     this.socket.on('connection:test:started', ({ connectionId }) => {
 
-      store.dispatch(setConnectionStatus({ id: connectionId, status: 'inactive' }));
+      if (storeInstance && setConnectionStatusAction) {
+        storeInstance.dispatch(setConnectionStatusAction({ id: connectionId, status: 'inactive' }));
+      }
       
-      store.dispatch(addNotification({
-        id: `conn-test-${connectionId}`,
-        type: 'info',
-        title: 'Connection Test',
-        message: 'Testing connection...',
-        timestamp: new Date().toISOString(),
-        autoHide: true,
-        duration: 5000
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `conn-test-${connectionId}`,
+          type: 'info',
+          title: 'Connection Test',
+          message: 'Testing connection...',
+          timestamp: new Date().toISOString(),
+          autoHide: true,
+          duration: 5000
+        }));
+      }
     });
 
     this.socket.on('connection:test:completed', ({ connectionId, result }) => {
 
       const status = result.success ? 'active' : 'error';
-      store.dispatch(setConnectionStatus({ id: connectionId, status }));
+      if (storeInstance && setConnectionStatusAction) {
+        storeInstance.dispatch(setConnectionStatusAction({ id: connectionId, status }));
+      }
       
-      store.dispatch(addNotification({
-        id: `conn-result-${connectionId}`,
-        type: result.success ? 'success' : 'error',
-        title: 'Connection Test',
-        message: result.success ? 'Connection successful' : `Connection failed: ${result.error}`,
-        timestamp: new Date().toISOString(),
-        autoHide: true,
-        duration: 5000
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `conn-result-${connectionId}`,
+          type: result.success ? 'success' : 'error',
+          title: 'Connection Test',
+          message: result.success ? 'Connection successful' : `Connection failed: ${result.error}`,
+          timestamp: new Date().toISOString(),
+          autoHide: true,
+          duration: 5000
+        }));
+      }
     });
 
     this.socket.on('connection:test:failed', ({ connectionId, error }) => {
 
-      store.dispatch(setConnectionStatus({ id: connectionId, status: 'error' }));
+      if (storeInstance && setConnectionStatusAction) {
+        storeInstance.dispatch(setConnectionStatusAction({ id: connectionId, status: 'error' }));
+      }
       
-      store.dispatch(addNotification({
-        id: `conn-error-${connectionId}`,
-        type: 'error',
-        title: 'Connection Test Failed',
-        message: error,
-        timestamp: new Date().toISOString(),
-        autoHide: false
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `conn-error-${connectionId}`,
+          type: 'error',
+          title: 'Connection Test Failed',
+          message: error,
+          timestamp: new Date().toISOString(),
+          autoHide: false
+        }));
+      }
     });
 
     // Enhancement events
     this.socket.on('enhancement:progress', (progress) => {
 
-      store.dispatch(updateJobProgress(progress));
+      if (storeInstance && updateJobProgressAction) {
+        storeInstance.dispatch(updateJobProgressAction(progress));
+      }
     });
 
     this.socket.on('enhancement:started', ({ jobId }) => {
-      store.dispatch(addNotification({
-        id: `enhancement-started-${jobId}`,
-        type: 'info',
-        title: 'Enhancement Started',
-        message: `AI enhancement started for prompt`,
-        timestamp: new Date().toISOString(),
-        autoHide: true,
-        duration: 5000
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `enhancement-started-${jobId}`,
+          type: 'info',
+          title: 'Enhancement Started',
+          message: `AI enhancement started for prompt`,
+          timestamp: new Date().toISOString(),
+          autoHide: true,
+          duration: 5000
+        }));
+      }
     });
 
     this.socket.on('enhancement:completed', ({ jobId, promptId }) => {
-      store.dispatch(addNotification({
-        id: `enhancement-completed-${jobId}`,
-        type: 'success',
-        title: 'Enhancement Complete',
-        message: 'AI enhancement completed successfully',
-        timestamp: new Date().toISOString(),
-        autoHide: false
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `enhancement-completed-${jobId}`,
+          type: 'success',
+          title: 'Enhancement Complete',
+          message: 'AI enhancement completed successfully',
+          timestamp: new Date().toISOString(),
+          autoHide: false
+        }));
+      }
     });
 
     this.socket.on('enhancement:failed', ({ jobId, error }) => {
-      store.dispatch(addNotification({
-        id: `enhancement-failed-${jobId}`,
-        type: 'error',
-        title: 'Enhancement Failed',
-        message: `Enhancement failed: ${error}`,
-        timestamp: new Date().toISOString(),
-        autoHide: false
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `enhancement-failed-${jobId}`,
+          type: 'error',
+          title: 'Enhancement Failed',
+          message: `Enhancement failed: ${error}`,
+          timestamp: new Date().toISOString(),
+          autoHide: false
+        }));
+      }
     });
 
     // System events
     this.socket.on('system:status:update', (statusUpdate) => {
 
-      store.dispatch(updateSystemStatus(statusUpdate));
+      if (storeInstance && updateSystemStatusAction) {
+        storeInstance.dispatch(updateSystemStatusAction(statusUpdate));
+      }
     });
 
     this.socket.on('system:alert', ({ level, message, timestamp }) => {
-      store.dispatch(addNotification({
-        id: `system-alert-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-        type: level === 'info' ? 'info' : level === 'warning' ? 'warning' : 'error',
-        title: 'System Alert',
-        message,
-        timestamp,
-        autoHide: level === 'info',
-        duration: level === 'info' ? 5000 : undefined
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `system-alert-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+          type: level === 'info' ? 'info' : level === 'warning' ? 'warning' : 'error',
+          title: 'System Alert',
+          message,
+          timestamp,
+          autoHide: level === 'info',
+          duration: level === 'info' ? 5000 : undefined
+        }));
+      }
     });
 
     this.socket.on('system:maintenance', ({ status, message, timestamp }) => {
-      store.dispatch(addNotification({
-        id: `maintenance-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-        type: status === 'started' ? 'warning' : 'info',
-        title: 'System Maintenance',
-        message,
-        timestamp,
-        autoHide: status === 'completed',
-        duration: status === 'completed' ? 5000 : undefined
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `maintenance-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+          type: status === 'started' ? 'warning' : 'info',
+          title: 'System Maintenance',
+          message,
+          timestamp,
+          autoHide: status === 'completed',
+          duration: status === 'completed' ? 5000 : undefined
+        }));
+      }
     });
 
     // Collaborative editing events
@@ -345,15 +384,17 @@ class WebSocketService {
       if (editorUserId !== userId) { // Don't notify self
         this.emitToListeners('prompt:editing:started', { promptId, userId: editorUserId, username, timestamp });
         
-        store.dispatch(addNotification({
-          id: `editing-${promptId}-${editorUserId}`,
-          type: 'info',
-          title: 'Collaborative Editing',
-          message: `${username} is now editing this prompt`,
-          timestamp,
-          autoHide: true,
-          duration: 5000
-        }));
+        if (storeInstance && addNotificationAction) {
+          storeInstance.dispatch(addNotificationAction({
+            id: `editing-${promptId}-${editorUserId}`,
+            type: 'info',
+            title: 'Collaborative Editing',
+            message: `${username} is now editing this prompt`,
+            timestamp,
+            autoHide: true,
+            duration: 5000
+          }));
+        }
       }
     });
 
@@ -367,22 +408,24 @@ class WebSocketService {
       if (updaterUserId !== userId) { // Don't notify self
         this.emitToListeners('prompt:updated', { promptId, userId: updaterUserId, username, changes, timestamp });
         
-        store.dispatch(addNotification({
-          id: `prompt-updated-${promptId}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'info',
-          title: 'Prompt Updated',
-          message: `${username} updated this prompt`,
-          timestamp,
-          autoHide: true,
-          duration: 5000
-        }));
+        if (storeInstance && addNotificationAction) {
+          storeInstance.dispatch(addNotificationAction({
+            id: `prompt-updated-${promptId}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'info',
+            title: 'Prompt Updated',
+            message: `${username} updated this prompt`,
+            timestamp,
+            autoHide: true,
+            duration: 5000
+          }));
+        }
       }
     });
 
     // Export events
     this.socket.on('export:started', ({ exportId, userId: exportUserId, type, timestamp }) => {
-      if (exportUserId === userId) {
-        store.dispatch(addNotification({
+      if (exportUserId === userId && storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
           id: `export-started-${exportId}`,
           type: 'info',
           title: 'Export Started',
@@ -399,25 +442,29 @@ class WebSocketService {
     });
 
     this.socket.on('export:completed', ({ exportId, downloadUrl, timestamp }) => {
-      store.dispatch(addNotification({
-        id: `export-completed-${exportId}`,
-        type: 'success',
-        title: 'Export Complete',
-        message: 'Your export is ready for download',
-        timestamp,
-        autoHide: false
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `export-completed-${exportId}`,
+          type: 'success',
+          title: 'Export Complete',
+          message: 'Your export is ready for download',
+          timestamp,
+          autoHide: false
+        }));
+      }
     });
 
     this.socket.on('export:failed', ({ exportId, error, timestamp }) => {
-      store.dispatch(addNotification({
-        id: `export-failed-${exportId}`,
-        type: 'error',
-        title: 'Export Failed',
-        message: `Export failed: ${error}`,
-        timestamp,
-        autoHide: false
-      }));
+      if (storeInstance && addNotificationAction) {
+        storeInstance.dispatch(addNotificationAction({
+          id: `export-failed-${exportId}`,
+          type: 'error',
+          title: 'Export Failed',
+          message: `Export failed: ${error}`,
+          timestamp,
+          autoHide: false
+        }));
+      }
     });
 
     // Rating events
@@ -446,19 +493,23 @@ class WebSocketService {
         this.emitToListeners('render:started', { promptId, provider, userId: renderUserId, connectionId, timestamp });
         
         // Clear any existing render notifications for this prompt/connection
-        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-completed-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-failed-${promptId}-${connectionId}`));
+        if (storeInstance && removeNotificationAction) {
+          storeInstance.dispatch(removeNotificationAction(`render-progress-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-completed-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-failed-${promptId}-${connectionId}`));
+        }
         
-        store.dispatch(addNotification({
-          id: `render-started-${promptId}-${connectionId}`,
-          type: 'info',
-          title: 'Rendering Started',
-          message: `Starting to render prompt with ${provider}...`,
-          timestamp,
-          autoHide: true,
-          duration: 3000
-        }));
+        if (storeInstance && addNotificationAction) {
+          storeInstance.dispatch(addNotificationAction({
+            id: `render-started-${promptId}-${connectionId}`,
+            type: 'info',
+            title: 'Rendering Started',
+            message: `Starting to render prompt with ${provider}...`,
+            timestamp,
+            autoHide: true,
+            duration: 3000
+          }));
+        }
       }
     });
 
@@ -478,17 +529,21 @@ class WebSocketService {
           // Only show progress notifications for meaningful stages, not completion messages
           if (status !== 'completing' && !message.includes('completed successfully')) {
             // Clear the started notification and update with progress
-            store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
+            if (storeInstance && removeNotificationAction) {
+              storeInstance.dispatch(removeNotificationAction(`render-started-${promptId}-${connectionId}`));
+            }
             
             // Update existing notification or create new one
-            store.dispatch(addNotification({
-              id: `render-progress-${promptId}-${connectionId}`,
-              type: 'info',
-              title: 'Rendering Progress',
-              message: message,
-              timestamp,
-              autoHide: false // Keep showing until completed
-            }));
+            if (storeInstance && addNotificationAction) {
+              storeInstance.dispatch(addNotificationAction({
+                id: `render-progress-${promptId}-${connectionId}`,
+                type: 'info',
+                title: 'Rendering Progress',
+                message: message,
+                timestamp,
+                autoHide: false // Keep showing until completed
+              }));
+            }
           }
         }
       }
@@ -505,19 +560,23 @@ class WebSocketService {
         this.emitToListeners('render:completed', { promptId, provider, userId: renderUserId, connectionId, result, renderTime, timestamp });
         
         // Clear all previous render notifications for this prompt/connection
-        store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-failed-${promptId}-${connectionId}`));
+        if (storeInstance && removeNotificationAction) {
+          storeInstance.dispatch(removeNotificationAction(`render-started-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-progress-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-failed-${promptId}-${connectionId}`));
+        }
         
-        store.dispatch(addNotification({
-          id: `render-completed-${promptId}-${connectionId}`,
-          type: 'success',
-          title: 'Rendering Complete',
-          message: `Prompt rendered successfully with ${provider} in ${(renderTime / 1000).toFixed(1)}s`,
-          timestamp,
-          autoHide: true,
-          duration: 5000
-        }));
+        if (storeInstance && addNotificationAction) {
+          storeInstance.dispatch(addNotificationAction({
+            id: `render-completed-${promptId}-${connectionId}`,
+            type: 'success',
+            title: 'Rendering Complete',
+            message: `Prompt rendered successfully with ${provider} in ${(renderTime / 1000).toFixed(1)}s`,
+            timestamp,
+            autoHide: true,
+            duration: 5000
+          }));
+        }
         
         // Clean up render state after a delay
         setTimeout(() => {
@@ -531,18 +590,22 @@ class WebSocketService {
         this.emitToListeners('render:failed', { promptId, provider, userId: renderUserId, connectionId, error, timestamp });
         
         // Clear all previous render notifications for this prompt/connection
-        store.dispatch(removeNotification(`render-started-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-progress-${promptId}-${connectionId}`));
-        store.dispatch(removeNotification(`render-completed-${promptId}-${connectionId}`));
+        if (storeInstance && removeNotificationAction) {
+          storeInstance.dispatch(removeNotificationAction(`render-started-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-progress-${promptId}-${connectionId}`));
+          storeInstance.dispatch(removeNotificationAction(`render-completed-${promptId}-${connectionId}`));
+        }
         
-        store.dispatch(addNotification({
-          id: `render-failed-${promptId}-${connectionId}`,
-          type: 'error',
-          title: 'Rendering Failed',
-          message: `Failed to render prompt with ${provider}: ${error}`,
-          timestamp,
-          autoHide: false
-        }));
+        if (storeInstance && addNotificationAction) {
+          storeInstance.dispatch(addNotificationAction({
+            id: `render-failed-${promptId}-${connectionId}`,
+            type: 'error',
+            title: 'Rendering Failed',
+            message: `Failed to render prompt with ${provider}: ${error}`,
+            timestamp,
+            autoHide: false
+          }));
+        }
       }
     });
   }

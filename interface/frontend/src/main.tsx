@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import App from './App';
 import { store } from './store';
+import { injectStoreDependencies } from './services/api/client';
+import { clearCredentials, refreshToken } from './store/slices/authSlice';
+import { addNotification } from './store/slices/uiSlice';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -23,6 +26,28 @@ const queryClient = new QueryClient({
 });
 
 console.log('Starting Prompt Library Professional Interface...');
+
+// Inject store dependencies to avoid circular imports
+injectStoreDependencies(store, {
+  clearCredentials,
+  refreshToken,
+  addNotification,
+});
+
+// Inject websocket dependencies
+import { injectWebSocketDependencies } from './services/websocket-service';
+import { setConnectionStatus } from './store/slices/connectionsSlice';
+import { updateJobProgress } from './store/slices/enhancementSlice';
+import { removeNotification } from './store/slices/uiSlice';
+import { updateSystemStatus } from './store/slices/systemSlice';
+
+injectWebSocketDependencies(store, {
+  setConnectionStatus,
+  updateJobProgress,
+  addNotification,
+  removeNotification,
+  updateSystemStatus,
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

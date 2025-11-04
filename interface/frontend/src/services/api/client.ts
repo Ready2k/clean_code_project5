@@ -1,7 +1,17 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
-import { store } from '../../store';
-import { clearCredentials, refreshToken } from '../../store/slices/authSlice';
-import { addNotification } from '../../store/slices/uiSlice';
+// Store and actions will be injected to avoid circular dependencies
+let storeInstance: any = null;
+let clearCredentialsAction: any = null;
+let refreshTokenAction: any = null;
+let addNotificationAction: any = null;
+
+// Function to inject store dependencies
+export const injectStoreDependencies = (store: any, actions: any) => {
+  storeInstance = store;
+  clearCredentialsAction = actions.clearCredentials;
+  refreshTokenAction = actions.refreshToken;
+  addNotificationAction = actions.addNotification;
+};
 import { AppError, ErrorType } from '../../types/errors';
 import { globalRetryMechanism } from '../../utils/retryMechanism';
 import { rateLimitTracker } from '../../utils/rateLimitTracker';
@@ -56,11 +66,13 @@ class APIClientClass {
         config.headers['X-Request-ID'] = this.generateRequestId();
         
         // Add auth token
-        const state = store.getState();
-        const token = state.auth.token;
+        if (storeInstance) {
+          const state = storeInstance.getState();
+          const token = state.auth.token;
         
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
         }
         
         // Add timestamp for performance tracking
@@ -104,14 +116,16 @@ class APIClientClass {
           originalRequest._retry = true;
           
           try {
-            await store.dispatch(refreshToken()).unwrap();
+            if (storeInstance && refreshTokenAction) {
+              await storeInstance.dispatch(refreshTokenAction()).unwrap();
+              
+              const state = storeInstance.getState();
+              const newToken = state.auth.token;
             
-            const state = store.getState();
-            const newToken = state.auth.token;
-            
-            if (newToken) {
-              originalRequest.headers!.Authorization = `Bearer ${newToken}`;
-              return this.client(originalRequest);
+              if (newToken) {
+                originalRequest.headers!.Authorization = `Bearer ${newToken}`;
+                return this.client(originalRequest);
+              }
             }
           } catch (refreshError) {
             await this.handleAuthenticationError();
@@ -166,16 +180,18 @@ class APIClientClass {
   }
 
   private async handleAuthenticationError() {
-    store.dispatch(clearCredentials());
-    store.dispatch(addNotification({
-      id: `session-expired-${Date.now()}`,
-      type: 'error',
-      title: 'Session Expired',
-      message: 'Please log in again.',
-      timestamp: new Date().toISOString(),
-      autoHide: true,
-      duration: 5000,
-    }));
+    if (storeInstance && clearCredentialsAction && addNotificationAction) {
+      storeInstance.dispatch(clearCredentialsAction());
+      storeInstance.dispatch(addNotificationAction({
+        id: `session-expired-${Date.now()}`,
+        type: 'error',
+        title: 'Session Expired',
+        message: 'Please log in again.',
+        timestamp: new Date().toISOString(),
+        autoHide: true,
+        duration: 5000,
+      }));
+    }
     
     if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
       window.location.href = '/login';
@@ -203,15 +219,17 @@ class APIClientClass {
     const messageStr = typeof message === 'string' ? message : String(message);
     const actionableStr = typeof actionableMessage === 'string' ? actionableMessage : String(actionableMessage);
     
-    store.dispatch(addNotification({
-      id: `api-error-${Date.now()}`,
-      type: notificationType,
-      title: this.getErrorTitle(error.type),
-      message: `${messageStr} ${actionableStr}`.trim(),
-      timestamp: new Date().toISOString(),
-      autoHide: error.type !== ErrorType.AUTHENTICATION_ERROR,
-      duration: 8000,
-    }));
+    if (storeInstance && addNotificationAction) {
+      storeInstance.dispatch(addNotificationAction({
+        id: `api-error-${Date.now()}`,
+        type: notificationType,
+        title: this.getErrorTitle(error.type),
+        message: `${messageStr} ${actionableStr}`.trim(),
+        timestamp: new Date().toISOString(),
+        autoHide: error.type !== ErrorType.AUTHENTICATION_ERROR,
+        duration: 8000,
+      }));
+    }
   }
 
   private getErrorTitle(errorType: ErrorType): string {

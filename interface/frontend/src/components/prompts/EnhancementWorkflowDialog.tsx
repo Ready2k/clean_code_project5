@@ -36,18 +36,22 @@ export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps>
   onClose,
   onApprove,
 }) => {
+  console.log('🔍 EnhancementWorkflowDialog: Rendering', { open, prompt: !!prompt });
+  
   const [currentStep, setCurrentStep] = React.useState(0);
   const [activeJob, setActiveJob] = React.useState<EnhancementProgress | null>(null);
 
   React.useEffect(() => {
     if (!open) {
       // Reset state when dialog closes
+      console.log('🔄 EnhancementWorkflowDialog: Resetting state (dialog closed)');
       setCurrentStep(0);
       setActiveJob(null);
     }
   }, [open]);
 
   const handleEnhancementStarted = (jobId: string, promptId: string) => {
+    console.log('🚀 EnhancementWorkflowDialog: Enhancement started', { jobId, promptId });
     setActiveJob({
       jobId,
       promptId,
@@ -59,15 +63,27 @@ export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps>
   };
 
   const handleProgressUpdate = (progress: EnhancementProgress) => {
+    console.log('📊 EnhancementWorkflowDialog: Progress update received', { 
+      status: progress.status, 
+      hasResult: !!progress.result,
+      hasQuestions: !!progress.result?.questions,
+      currentStep 
+    });
+    
     setActiveJob(progress);
     
     // Move to questionnaire step if questions are generated
     if (progress.status === 'generating_questions' && progress.result?.questions) {
+      console.log('❓ EnhancementWorkflowDialog: Moving to questionnaire step');
       setCurrentStep(2);
     }
     
     // Move to results step if enhancement is complete
     if (progress.status === 'completed' && progress.result) {
+      console.log('✅ EnhancementWorkflowDialog: Moving to results step', { 
+        resultType: typeof progress.result,
+        resultKeys: Object.keys(progress.result || {})
+      });
       setCurrentStep(3);
     }
   };

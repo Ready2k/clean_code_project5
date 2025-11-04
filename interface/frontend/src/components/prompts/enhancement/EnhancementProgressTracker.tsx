@@ -32,6 +32,12 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
   job,
   onProgressUpdate,
 }) => {
+  console.log('🔍 EnhancementProgressTracker: Component rendering', { 
+    jobId: job?.jobId, 
+    status: job?.status,
+    hasResult: !!job?.result 
+  });
+  
   const dispatch = useAppDispatch();
   const { error, jobs } = useAppSelector((state) => state.enhancement);
   const [, setIsPolling] = React.useState(false);
@@ -72,7 +78,18 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
     if (!job) return;
 
     const currentJob = jobs[job.jobId];
+    console.log('🔄 EnhancementProgressTracker: Job update check', { 
+      jobId: job.jobId,
+      hasCurrentJob: !!currentJob,
+      currentJobStatus: currentJob?.status,
+      jobChanged: currentJob !== job
+    });
+    
     if (currentJob && currentJob !== job) {
+      console.log('📤 EnhancementProgressTracker: Sending progress update to parent', {
+        status: currentJob.status,
+        hasResult: !!currentJob.result
+      });
       onProgressUpdate(currentJob);
     }
   }, [jobs, job, onProgressUpdate]);
@@ -92,6 +109,10 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
           jobId: job.jobId,
         })).unwrap();
 
+        console.log('📤 EnhancementProgressTracker: Sending polling result to parent', {
+          status: result.status,
+          hasResult: !!result.result
+        });
         onProgressUpdate(result);
 
         // Stop polling if job is complete or failed
