@@ -7,6 +7,14 @@ import { ValidationResult } from '../types/validation';
 import { EnhancementContext, VariableType } from '../types/common';
 import { IntelligentQuestionGenerator, IntelligentQuestionGeneratorImpl } from './intelligent-question-generator';
 
+// Import System Prompt Manager types and service
+import { TemplateCategory, TemplateContext } from '../types/prompt-templates';
+
+// Interface for System Prompt Manager (to avoid circular dependency)
+interface ISystemPromptManager {
+  getTemplate(category: TemplateCategory, key: string, context?: TemplateContext): Promise<string>;
+}
+
 export interface EnhancementAgent {
   /**
    * Enhance a human-readable prompt into structured format
@@ -62,10 +70,12 @@ export interface LLMService {
 export class EnhancementAgentImpl implements EnhancementAgent {
   private llmService: LLMService;
   private questionGenerator: IntelligentQuestionGenerator;
+  private systemPromptManager?: ISystemPromptManager;
 
-  constructor(llmService: LLMService) {
+  constructor(llmService: LLMService, systemPromptManager?: ISystemPromptManager) {
     this.llmService = llmService;
-    this.questionGenerator = new IntelligentQuestionGeneratorImpl();
+    this.questionGenerator = new IntelligentQuestionGeneratorImpl(systemPromptManager);
+    this.systemPromptManager = systemPromptManager;
   }
 
   async enhance(humanPrompt: HumanPrompt, context?: EnhancementContext): Promise<EnhancementResult> {
@@ -78,13 +88,13 @@ export class EnhancementAgentImpl implements EnhancementAgent {
       }
 
       // Build enhancement prompt for LLM
-      const enhancementPrompt = this.buildEnhancementPrompt(humanPrompt, context);
+      const enhancementPrompt = await this.buildEnhancementPrompt(humanPrompt, context);
       
       // Call LLM service
       const llmResponse = await this.llmService.complete(enhancementPrompt, {
         temperature: 0.3,
         maxTokens: 2000,
-        systemPrompt: this.getEnhancementSystemPrompt()
+        systemPrompt: await this.getEnhancementSystemPrompt()
       });
 
       // Parse LLM response
@@ -330,7 +340,36 @@ export class EnhancementAgentImpl implements EnhancementAgent {
     return `Enhanced the prompt by: ${changes.join('; ')}.`;
   }
 
-  private buildEnhancementPrompt(humanPrompt: HumanPrompt, context?: EnhancementContext): string {
+  private async buildEnhancementPrompt(humanPrompt: HumanPrompt, context?: EnhancementContext): Promise<string> {
+    // Try to use System Prompt Manager if available
+    if (this.systemPromptManager) {
+      try {
+        const templateContext: TemplateContext = {
+          provider: context?.targetProvider,
+          domainKnowledge: context?.domainKnowledge,
+          userContext: {
+            goal: humanPrompt.goal,
+            audience: humanPrompt.audience,
+            steps: humanPrompt.steps,
+            output_format: humanPrompt.output_expectations.format,
+            expected_fields: humanPrompt.output_expectations.fields.join(', '),
+            target_provider: context?.targetProvider,
+            domain_knowledge: context?.domainKnowledge
+          }
+        };
+
+        return await this.systemPromptManager.getTemplate(
+          TemplateCategory.ENHANCEMENT,
+          'main_enhancement_prompt',
+          templateContext
+        );
+      } catch (error) {
+        // Fall back to hardcoded prompt if template not found
+        console.warn('Failed to load enhancement template, using fallback:', error);
+      }
+    }
+
+    // Fallback to original hardcoded prompt for backward compatibility
     let prompt = `Please enhance the following human-readable prompt into a structured format.
 
 HUMAN PROMPT:
@@ -372,7 +411,21 @@ REQUIREMENTS:
     return prompt;
   }
 
-  private getEnhancementSystemPrompt(): string {
+  private async getEnhancementSystemPrompt(): Promise<string> {
+    // Try to use System Prompt Manager if available
+    if (this.systemPromptManager) {
+      try {
+        return await this.systemPromptManager.getTemplate(
+          TemplateCategory.ENHANCEMENT,
+          'system_enhancement_prompt'
+        );
+      } catch (error) {
+        // Fall back to hardcoded prompt if template not found
+        console.warn('Failed to load system enhancement template, using fallback:', error);
+      }
+    }
+
+    // Fallback to original hardcoded prompt for backward compatibility
     return `You are an expert prompt engineer specializing in converting human-readable prompts into structured, reusable formats. Your goal is to:
 
 1. Preserve the original intent and meaning

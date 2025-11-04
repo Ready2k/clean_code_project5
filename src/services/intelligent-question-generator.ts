@@ -4,6 +4,14 @@ import { HumanPrompt, StructuredPrompt, Variable } from '../models/prompt';
 import { Question, QuestionClass } from '../models/variable';
 import { EnhancementContext, VariableType } from '../types/common';
 
+// Import System Prompt Manager types
+import { TemplateCategory, TemplateContext } from '../types/prompt-templates';
+
+// Interface for System Prompt Manager (to avoid circular dependency)
+interface ISystemPromptManager {
+  getTemplate(category: TemplateCategory, key: string, context?: TemplateContext): Promise<string>;
+}
+
 export interface QuestionGenerationContext {
     humanPrompt: HumanPrompt;
     structuredPrompt?: StructuredPrompt;
@@ -46,6 +54,11 @@ export interface IntelligentQuestionGenerator {
 }
 
 export class IntelligentQuestionGeneratorImpl implements IntelligentQuestionGenerator {
+    private systemPromptManager?: ISystemPromptManager;
+
+    constructor(systemPromptManager?: ISystemPromptManager) {
+        this.systemPromptManager = systemPromptManager;
+    }
 
     async generateQuestions(context: QuestionGenerationContext): Promise<Question[]> {
         // First, check if we actually need questions
@@ -57,7 +70,7 @@ export class IntelligentQuestionGeneratorImpl implements IntelligentQuestionGene
         const taskType = this.detectTaskType(context.humanPrompt);
 
         // Generate task-specific questions
-        const taskQuestions = this.generateTaskSpecificQuestions(context, taskType);
+        const taskQuestions = await this.generateTaskSpecificQuestions(context, taskType);
         questions.push(...taskQuestions);
 
         // Generate variable-specific questions if we have a structured prompt
@@ -146,10 +159,23 @@ export class IntelligentQuestionGeneratorImpl implements IntelligentQuestionGene
         return true;
     }
 
-    private generateTaskSpecificQuestions(context: QuestionGenerationContext, taskType: TaskType): Question[] {
+    private async generateTaskSpecificQuestions(context: QuestionGenerationContext, taskType: TaskType): Promise<Question[]> {
         const questions: Question[] = [];
         const promptId = context.structuredPrompt?.schema_version.toString() || 'temp';
 
+        // Try to use System Prompt Manager templates if available
+        if (this.systemPromptManager) {
+            try {
+                const templateQuestions = await this.generateQuestionsFromTemplate(context, taskType, promptId);
+                if (templateQuestions.length > 0) {
+                    return templateQuestions;
+                }
+            } catch (error) {
+                console.warn(`Failed to load question template for task type ${taskType}, using fallback:`, error);
+            }
+        }
+
+        // Fallback to hardcoded question generation
         switch (taskType) {
             case 'analysis':
                 questions.push(...this.generateAnalysisQuestions(context, promptId));
@@ -458,5 +484,108 @@ export class IntelligentQuestionGeneratorImpl implements IntelligentQuestionGene
         const name = variableName.toLowerCase();
         const sensitiveKeywords = ['password', 'key', 'secret', 'token', 'credential'];
         return sensitiveKeywords.some(keyword => name.includes(keyword));
+    }
+
+    /**
+     * Generate questions from template system based on task type
+     */
+    private async generateQuestionsFromTemplate(
+        context: QuestionGenerationContext, 
+        taskType: TaskType, 
+        promptId: string
+    ): Promise<Question[]> {
+        if (!this.systemPromptManager) {
+            return [];
+        }
+
+        try {
+            const templateContext: TemplateContext = {
+                taskType,
+                userContext: {
+                    goal: context.humanPrompt.goal,
+                    audience: context.humanPrompt.audience,
+                    steps: context.humanPrompt.steps.join('; '),
+                    output_format: context.humanPrompt.output_expectations.format,
+                    expected_fields: context.humanPrompt.output_expectations.fields.join(', '),
+                    task_type: taskType
+                }
+            };
+
+            // Try to get task-specific template
+            const templateKey = `${taskType}_questions`;
+            const questionTemplate = await this.systemPromptManager.getTemplate(
+                TemplateCategory.QUESTION_GENERATION,
+                templateKey,
+                templateContext
+            );
+
+            // Parse the template response to extract questions
+            return this.parseQuestionTemplate(questionTemplate, promptId);
+
+        } catch (error) {
+            // Template not found or parsing failed, return empty array to fall back to hardcoded
+            return [];
+        }
+    }
+
+    /**
+     * Parse question template response into Question objects
+     */
+    private parseQuestionTemplate(template: string, promptId: string): Question[] {
+        const questions: Question[] = [];
+        
+        try {
+            // Try to parse as JSON first (structured template)
+            const parsed = JSON.parse(template);
+            if (Array.isArray(parsed.questions)) {
+                return parsed.questions.map((q: any) => new QuestionClass({
+                    prompt_id: promptId,
+                    variable_key: q.variable_key || q.key,
+                    text: q.text || q.question,
+                    type: q.type || 'string',
+                    required: q.required !== false,
+                    options: q.options,
+                    help_text: q.help_text || q.description
+                }));
+            }
+        } catch {
+            // Not JSON, try to parse as structured text
+            const lines = template.split('\n').filter(line => line.trim());
+            
+            for (const line of lines) {
+                // Look for question patterns like "Q: What is...?" or "- What is...?"
+                const questionMatch = line.match(/^(?:Q:|[-*])\s*(.+\?)\s*(?:\[([^\]]+)\])?/);
+                if (questionMatch) {
+                    const questionText = questionMatch[1].trim();
+                    const variableKey = this.extractVariableKeyFromQuestion(questionText);
+                    const type = questionMatch[2] || 'string';
+                    
+                    questions.push(new QuestionClass({
+                        prompt_id: promptId,
+                        variable_key: variableKey,
+                        text: questionText,
+                        type: type as any,
+                        required: false,
+                        help_text: `Generated from template for ${variableKey}`
+                    }));
+                }
+            }
+        }
+
+        return questions;
+    }
+
+    /**
+     * Extract variable key from question text
+     */
+    private extractVariableKeyFromQuestion(questionText: string): string {
+        // Simple heuristic to generate variable key from question
+        const words = questionText
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(word => word.length > 2 && !['what', 'how', 'when', 'where', 'why', 'which', 'should', 'the', 'and', 'for'].includes(word));
+        
+        return words.slice(0, 2).join('_') || 'generated_variable';
     }
 }

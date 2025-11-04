@@ -12,18 +12,16 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production --silent
+RUN npm install --silent
 
 # Development stage
 FROM base as development
-RUN npm ci --silent
 COPY . .
 EXPOSE 8000
 CMD ["npm", "run", "dev"]
 
 # Build stage
 FROM base as build
-RUN npm ci --silent
 COPY . .
 RUN npm run build
 
@@ -45,10 +43,12 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production --silent && npm cache clean --force
+RUN npm install --production --silent && npm cache clean --force
 
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
+# Copy migration files
+COPY --from=build /app/src/migrations ./dist/migrations
 
 # Create directories with proper permissions
 RUN mkdir -p /app/data /app/logs /app/temp && \

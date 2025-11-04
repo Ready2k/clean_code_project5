@@ -1,0 +1,337 @@
+# Template System Production Monitoring Configuration
+# Comprehensive monitoring, alerting, and observability for the template management system
+# This configuration includes Prometheus rules, Grafana dashboards, and alerting setup
+
+# Prometheus monitoring rules
+groups:
+  - name: template_system_alerts
+    rules:
+      # Template rendering performance
+      - alert: TemplateRenderingSlowdown
+        expr: histogram_quantile(0.95, rate(template_render_duration_seconds_bucket[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "Template rendering is slow"
+          description: "95th percentile template rendering time is {{ $value }}s, which is above the 100ms threshold"
+
+      - alert: TemplateRenderingCriticalSlowdown
+        expr: histogram_quantile(0.95, rate(template_render_duration_seconds_bucket[5m])) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          component: template_system
+        annotations:
+          summary: "Template rendering is critically slow"
+          description: "95th percentile template rendering time is {{ $value }}s, which is critically high"
+
+      # Template error rates
+      - alert: TemplateErrorRateHigh
+        expr: rate(template_render_errors_total[5m]) / rate(template_render_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "High template error rate"
+          description: "Template error rate is {{ $value | humanizePercentage }}, which is above 5%"
+
+      - alert: TemplateErrorRateCritical
+        expr: rate(template_render_errors_total[5m]) / rate(template_render_total[5m]) > 0.15
+        for: 1m
+        labels:
+          severity: critical
+          component: template_system
+        annotations:
+          summary: "Critical template error rate"
+          description: "Template error rate is {{ $value | humanizePercentage }}, which is critically high"
+
+      # Template cache performance
+      - alert: TemplateCacheHitRateLow
+        expr: rate(template_cache_hits_total[5m]) / (rate(template_cache_hits_total[5m]) + rate(template_cache_misses_total[5m])) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "Low template cache hit rate"
+          description: "Template cache hit rate is {{ $value | humanizePercentage }}, which is below 80%"
+
+      # Database connection issues
+      - alert: TemplateDBConnectionErrors
+        expr: rate(template_db_connection_errors_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          component: template_system
+        annotations:
+          summary: "Template database connection errors"
+          description: "Template system is experiencing database connection errors at {{ $value }} per second"
+
+      # Template validation failures
+      - alert: TemplateValidationFailures
+        expr: rate(template_validation_failures_total[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "High template validation failure rate"
+          description: "Template validation failures occurring at {{ $value }} per second"
+
+      # System resource usage
+      - alert: TemplateSystemMemoryUsageHigh
+        expr: template_system_memory_usage_bytes / template_system_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "High template system memory usage"
+          description: "Template system memory usage is {{ $value | humanizePercentage }} of limit"
+
+      - alert: TemplateSystemCPUUsageHigh
+        expr: rate(template_system_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "High template system CPU usage"
+          description: "Template system CPU usage is {{ $value | humanizePercentage }}"
+
+      # Template usage anomalies
+      - alert: TemplateUsageSpike
+        expr: rate(template_render_total[5m]) > 2 * rate(template_render_total[1h] offset 1h)
+        for: 2m
+        labels:
+          severity: info
+          component: template_system
+        annotations:
+          summary: "Unusual spike in template usage"
+          description: "Template usage is {{ $value }}x higher than usual"
+
+      - alert: TemplateUsageDrop
+        expr: rate(template_render_total[5m]) < 0.5 * rate(template_render_total[1h] offset 1h)
+        for: 10m
+        labels:
+          severity: warning
+          component: template_system
+        annotations:
+          summary: "Significant drop in template usage"
+          description: "Template usage has dropped to {{ $value }}x of normal levels"
+
+# Grafana Dashboard Configuration
+dashboard:
+  title: "Template System Monitoring"
+  tags: ["templates", "monitoring", "performance"]
+  
+  panels:
+    - title: "Template Rendering Performance"
+      type: "graph"
+      targets:
+        - expr: "histogram_quantile(0.50, rate(template_render_duration_seconds_bucket[5m]))"
+          legendFormat: "50th percentile"
+        - expr: "histogram_quantile(0.95, rate(template_render_duration_seconds_bucket[5m]))"
+          legendFormat: "95th percentile"
+        - expr: "histogram_quantile(0.99, rate(template_render_duration_seconds_bucket[5m]))"
+          legendFormat: "99th percentile"
+      yAxes:
+        left:
+          unit: "s"
+          min: 0
+
+    - title: "Template Usage Rate"
+      type: "graph"
+      targets:
+        - expr: "rate(template_render_total[5m])"
+          legendFormat: "Renders per second"
+        - expr: "rate(template_cache_hits_total[5m])"
+          legendFormat: "Cache hits per second"
+        - expr: "rate(template_cache_misses_total[5m])"
+          legendFormat: "Cache misses per second"
+
+    - title: "Template Error Rates"
+      type: "graph"
+      targets:
+        - expr: "rate(template_render_errors_total[5m]) / rate(template_render_total[5m])"
+          legendFormat: "Error rate"
+        - expr: "rate(template_validation_failures_total[5m])"
+          legendFormat: "Validation failures per second"
+      yAxes:
+        left:
+          unit: "percentunit"
+          max: 1
+
+    - title: "Template Cache Performance"
+      type: "stat"
+      targets:
+        - expr: "rate(template_cache_hits_total[5m]) / (rate(template_cache_hits_total[5m]) + rate(template_cache_misses_total[5m]))"
+          legendFormat: "Cache Hit Rate"
+      fieldConfig:
+        unit: "percentunit"
+        thresholds:
+          - color: "red"
+            value: 0
+          - color: "yellow"
+            value: 0.8
+          - color: "green"
+            value: 0.9
+
+    - title: "Active Templates by Category"
+      type: "piechart"
+      targets:
+        - expr: "template_active_count"
+          legendFormat: "{{ category }}"
+
+    - title: "Template System Resource Usage"
+      type: "graph"
+      targets:
+        - expr: "template_system_memory_usage_bytes"
+          legendFormat: "Memory Usage"
+        - expr: "rate(template_system_cpu_usage_seconds_total[5m])"
+          legendFormat: "CPU Usage"
+
+    - title: "Database Performance"
+      type: "graph"
+      targets:
+        - expr: "histogram_quantile(0.95, rate(template_db_query_duration_seconds_bucket[5m]))"
+          legendFormat: "95th percentile query time"
+        - expr: "rate(template_db_queries_total[5m])"
+          legendFormat: "Queries per second"
+        - expr: "template_db_connections_active"
+          legendFormat: "Active connections"
+
+    - title: "Top Templates by Usage"
+      type: "table"
+      targets:
+        - expr: "topk(10, rate(template_render_total[1h]))"
+          legendFormat: "{{ template_name }}"
+          format: "table"
+
+# Log aggregation rules for Loki
+log_rules:
+  - name: "template_errors"
+    query: '{job="template-system"} |= "ERROR"'
+    labels:
+      severity: "error"
+      component: "template_system"
+
+  - name: "template_warnings"
+    query: '{job="template-system"} |= "WARN"'
+    labels:
+      severity: "warning"
+      component: "template_system"
+
+  - name: "template_performance"
+    query: '{job="template-system"} |= "PERF"'
+    labels:
+      type: "performance"
+      component: "template_system"
+
+# Alertmanager routing configuration
+alertmanager_config:
+  route:
+    group_by: ['alertname', 'component']
+    group_wait: 10s
+    group_interval: 10s
+    repeat_interval: 1h
+    receiver: 'template-alerts'
+    routes:
+      - match:
+          component: template_system
+          severity: critical
+        receiver: 'template-critical'
+        group_wait: 0s
+        repeat_interval: 5m
+      
+      - match:
+          component: template_system
+          severity: warning
+        receiver: 'template-warnings'
+        repeat_interval: 30m
+
+  receivers:
+    - name: 'template-alerts'
+      webhook_configs:
+        - url: 'http://localhost:8000/api/system/alerts/webhook'
+          send_resolved: true
+
+    - name: 'template-critical'
+      email_configs:
+        - to: 'admin@example.com'
+          subject: 'CRITICAL: Template System Alert'
+          body: |
+            Alert: {{ .GroupLabels.alertname }}
+            Severity: {{ .GroupLabels.severity }}
+            Description: {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+            
+            Dashboard: http://grafana.example.com/d/template-system
+      slack_configs:
+        - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+          channel: '#alerts'
+          title: 'Template System Critical Alert'
+          text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+    - name: 'template-warnings'
+      slack_configs:
+        - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+          channel: '#monitoring'
+          title: 'Template System Warning'
+          text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+# Health check configuration
+health_checks:
+  - name: "template_service_health"
+    url: "http://localhost:8000/api/system/health/templates"
+    interval: "30s"
+    timeout: "5s"
+    expected_status: 200
+
+  - name: "template_database_health"
+    url: "http://localhost:8000/api/system/health/template-db"
+    interval: "60s"
+    timeout: "10s"
+    expected_status: 200
+
+  - name: "template_cache_health"
+    url: "http://localhost:8000/api/system/health/template-cache"
+    interval: "30s"
+    timeout: "5s"
+    expected_status: 200
+
+# Backup monitoring
+backup_monitoring:
+  - name: "template_data_backup"
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: "30d"
+    alert_on_failure: true
+    
+  - name: "template_config_backup"
+    schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+    retention: "90d"
+    alert_on_failure: true
+
+# Performance baselines
+performance_baselines:
+  template_render_time_p95: "100ms"
+  template_error_rate_max: "5%"
+  template_cache_hit_rate_min: "80%"
+  template_db_query_time_p95: "50ms"
+  template_memory_usage_max: "85%"
+  template_cpu_usage_max: "80%"
+
+# SLA definitions
+sla:
+  availability: "99.9%"
+  response_time_p95: "100ms"
+  error_rate_max: "1%"
+  
+# Runbook links
+runbooks:
+  template_performance_issues: "https://docs.example.com/runbooks/template-performance"
+  template_error_troubleshooting: "https://docs.example.com/runbooks/template-errors"
+  template_cache_issues: "https://docs.example.com/runbooks/template-cache"
+  template_database_issues: "https://docs.example.com/runbooks/template-database"

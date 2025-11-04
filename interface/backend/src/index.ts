@@ -18,6 +18,7 @@ import { importRoutes } from './routes/import.js';
 import { providerRoutes } from './routes/providers.js';
 import { modelRoutes } from './routes/models.js';
 import { templateRoutes } from './routes/templates.js';
+import { promptTemplateRoutes } from './routes/prompt-templates.js';
 import healthMonitoringRoutes from './routes/health-monitoring.js';
 import usageAnalyticsRoutes from './routes/usage-analytics.js';
 import migrationUtilitiesRoutes from './routes/migration-utilities.js';
@@ -36,6 +37,9 @@ import { initializeRatingService, getRatingService } from './services/rating-ser
 import { initializeExportService, getExportService } from './services/export-service.js';
 import { initializeAPIDocumentationService, getAPIDocumentationService } from './services/api-documentation-service.js';
 import { initializeSystemMonitoringService, getSystemMonitoringService } from './services/system-monitoring-service.js';
+import { initializeSystemPromptManager } from './services/system-prompt-manager.js';
+import { initializeTemplateAnalyticsService } from './services/template-analytics-service.js';
+import { initializeTemplateValidationService } from './services/template-validation-service.js';
 import { getWebSocketService } from './services/websocket-service.js';
 import { initializeDatabaseService } from './services/database-service.js';
 import { getMigrationService } from './services/migration-service.js';
@@ -163,6 +167,7 @@ app.use('/api/v1/logs', logsRoutes);
 app.use('/api/admin/providers', authenticateToken, providerRoutes);
 app.use('/api/admin/models', authenticateToken, modelRoutes);
 app.use('/api/admin/provider-templates', authenticateToken, templateRoutes);
+app.use('/api/admin/prompt-templates', authenticateToken, promptTemplateRoutes);
 app.use('/api/admin/health-monitoring', authenticateToken, healthMonitoringRoutes);
 app.use('/api/admin/usage-analytics', authenticateToken, usageAnalyticsRoutes);
 app.use('/api/admin/migration-utilities', authenticateToken, migrationUtilitiesRoutes);
@@ -286,6 +291,21 @@ async function initializeServices() {
     // Initialize system monitoring service
     await initializeSystemMonitoringService();
 
+    // Initialize system prompt manager (requires database)
+    if (process.env['DATABASE_URL']) {
+      logger.info('Initializing system prompt manager...');
+      initializeSystemPromptManager();
+      logger.info('System prompt manager initialized');
+
+      logger.info('Initializing template analytics service...');
+      initializeTemplateAnalyticsService();
+      logger.info('Template analytics service initialized');
+
+      logger.info('Initializing template validation service...');
+      initializeTemplateValidationService();
+      logger.info('Template validation service initialized');
+    }
+
     // Initialize enhancement workflow service
     getEnhancementWorkflowService(webSocketService);
 
@@ -298,6 +318,12 @@ async function initializeServices() {
     // Connect WebSocket service to system monitoring
     const systemMonitoringService = getSystemMonitoringService();
     systemMonitoringService.setWebSocketService(webSocketService);
+
+    // Set up template analytics WebSocket handlers
+    if (process.env['DATABASE_URL']) {
+      const { streamRealtimeMetrics } = await import('./controllers/prompt-templates.js');
+      streamRealtimeMetrics(io);
+    }
 
     // Make io and webSocketService available to routes
     app.set('io', io);

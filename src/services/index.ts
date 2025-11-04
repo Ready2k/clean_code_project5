@@ -13,3 +13,5 @@ export * from './version-manager';
 export * from './history-service';
 export * from './export-service';
 export * from './import-service';
+export * from './intelligent-question-generator';
+export * from './prompt-template-integration';

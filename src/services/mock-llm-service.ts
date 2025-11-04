@@ -2,18 +2,54 @@
 
 import { LLMService } from './enhancement-agent';
 
+// Import System Prompt Manager types
+import { TemplateCategory, TemplateContext } from '../types/prompt-templates';
+
+// Interface for System Prompt Manager (to avoid circular dependency)
+interface ISystemPromptManager {
+  getTemplate(category: TemplateCategory, key: string, context?: TemplateContext): Promise<string>;
+}
+
 export class MockLLMService implements LLMService {
   private responses: Map<string, string> = new Map();
   private defaultResponse: string;
+  private systemPromptManager?: ISystemPromptManager;
+  private isProductionEnvironment: boolean;
 
-  constructor() {
-    this.defaultResponse = this.generateDefaultEnhancementResponse();
-    this.setupDefaultResponses();
+  constructor(systemPromptManager?: ISystemPromptManager) {
+    this.systemPromptManager = systemPromptManager;
+    this.isProductionEnvironment = process.env.NODE_ENV === 'production';
+    
+    // Only initialize mock responses in non-production environments
+    if (!this.isProductionEnvironment) {
+      this.defaultResponse = this.generateDefaultEnhancementResponse();
+      this.setupDefaultResponses();
+    } else {
+      // In production, throw error if mock service is used
+      throw new Error('MockLLMService should not be used in production environment');
+    }
   }
 
   async complete(prompt: string): Promise<string> {
+    // Ensure we're not in production
+    if (this.isProductionEnvironment) {
+      throw new Error('MockLLMService cannot be used in production environment');
+    }
+
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Try to get response from template system first
+    if (this.systemPromptManager) {
+      try {
+        const templateResponse = await this.getResponseFromTemplate(prompt);
+        if (templateResponse) {
+          return templateResponse;
+        }
+      } catch (error) {
+        console.warn('Failed to get mock response from template, using fallback:', error);
+      }
+    }
 
     // Check for specific prompt patterns
     for (const [pattern, response] of this.responses) {
@@ -27,7 +63,8 @@ export class MockLLMService implements LLMService {
   }
 
   async isAvailable(): Promise<boolean> {
-    return true;
+    // Only available in non-production environments
+    return !this.isProductionEnvironment;
   }
 
   /**
@@ -45,10 +82,72 @@ export class MockLLMService implements LLMService {
   }
 
   private setupDefaultResponses(): void {
+    // Only setup in non-production environments
+    if (this.isProductionEnvironment) {
+      return;
+    }
+
     // Add some common test responses
     this.responses.set('write a blog post', this.generateBlogPostResponse());
     this.responses.set('analyze data', this.generateDataAnalysisResponse());
     this.responses.set('create a summary', this.generateSummaryResponse());
+  }
+
+  /**
+   * Get mock response from template system
+   */
+  private async getResponseFromTemplate(prompt: string): Promise<string | null> {
+    if (!this.systemPromptManager) {
+      return null;
+    }
+
+    try {
+      // Determine response type based on prompt content
+      const responseType = this.detectResponseType(prompt);
+      
+      const templateContext: TemplateContext = {
+        userContext: {
+          prompt_content: prompt,
+          response_type: responseType
+        }
+      };
+
+      // Try to get template for this response type
+      return await this.systemPromptManager.getTemplate(
+        TemplateCategory.MOCK_RESPONSES,
+        responseType,
+        templateContext
+      );
+
+    } catch (error) {
+      // Template not found, return null to fall back to hardcoded responses
+      return null;
+    }
+  }
+
+  /**
+   * Detect the type of response needed based on prompt content
+   */
+  private detectResponseType(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+
+    if (lowerPrompt.includes('blog post') || lowerPrompt.includes('article')) {
+      return 'blog_post_response';
+    }
+    if (lowerPrompt.includes('analyze') || lowerPrompt.includes('analysis')) {
+      return 'data_analysis_response';
+    }
+    if (lowerPrompt.includes('summary') || lowerPrompt.includes('summarize')) {
+      return 'summary_response';
+    }
+    if (lowerPrompt.includes('code') || lowerPrompt.includes('function') || lowerPrompt.includes('program')) {
+      return 'code_response';
+    }
+    if (lowerPrompt.includes('enhance') || lowerPrompt.includes('structured format')) {
+      return 'enhancement_response';
+    }
+
+    return 'default_response';
   }
 
   private generateDefaultEnhancementResponse(): string {

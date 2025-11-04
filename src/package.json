@@ -1,0 +1,33 @@
+{
+  "name": "@prompt-library/core",
+  "version": "1.0.0",
+  "description": "Core prompt library with AI enhancement and multi-provider support",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "yaml": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.5.0"
+  },
+  "keywords": [
+    "ai",
+    "prompts",
+    "llm",
+    "prompt-engineering"
+  ],
+  "author": "Prompt Library Team",
+  "license": "MIT"
+}

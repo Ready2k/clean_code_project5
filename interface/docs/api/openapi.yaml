@@ -798,6 +798,665 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # Template Management Endpoints
+  /templates:
+    get:
+      tags:
+        - Templates
+      summary: List prompt templates
+      description: Retrieve a paginated list of prompt templates with optional filtering by category
+      parameters:
+        - name: category
+          in: query
+          description: Filter by template category
+          schema:
+            type: string
+            enum: [enhancement, question_generation, mock_responses, system_prompts, custom]
+        - name: search
+          in: query
+          description: Search term for template name or description
+          schema:
+            type: string
+        - name: isActive
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [name, category, updated_at, usage_count]
+            default: updated_at
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TemplateInfo'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Templates
+      summary: Create new template
+      description: Create a new prompt template with content and metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateInfo'
+        '400':
+          description: Invalid request data or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}:
+    get:
+      tags:
+        - Templates
+      summary: Get template by ID
+      description: Retrieve detailed information about a specific template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetail'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Templates
+      summary: Update template
+      description: Update an existing template's content or metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetail'
+        '400':
+          description: Invalid request data or validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Templates
+      summary: Delete template
+      description: Delete a template (deactivates it, doesn't permanently delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Template deleted successfully
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}/validate:
+    post:
+      tags:
+        - Templates
+      summary: Validate template
+      description: Validate template syntax, variables, and security
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}/test:
+    post:
+      tags:
+        - Templates
+      summary: Test template
+      description: Test template rendering with sample data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateTestRequest'
+      responses:
+        '200':
+          description: Template test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateTestResult'
+        '400':
+          description: Invalid test data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}/history:
+    get:
+      tags:
+        - Templates
+      summary: Get template version history
+      description: Retrieve version history for a template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of versions per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Version history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TemplateVersion'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}/revert/{version}:
+    post:
+      tags:
+        - Templates
+      summary: Revert template to version
+      description: Revert a template to a previous version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          description: Version number to revert to
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Template reverted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetail'
+        '400':
+          description: Invalid version number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template or version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{id}/analytics:
+    get:
+      tags:
+        - Templates
+      summary: Get template analytics
+      description: Retrieve usage statistics and performance metrics for a template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID
+          schema:
+            type: string
+        - name: timeRange
+          in: query
+          description: Time range for analytics
+          schema:
+            type: string
+            enum: [1d, 7d, 30d, 90d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateAnalytics'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/categories:
+    get:
+      tags:
+        - Templates
+      summary: Get template categories
+      description: Retrieve all available template categories with counts
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateCategory'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/defaults:
+    get:
+      tags:
+        - Templates
+      summary: Get default templates
+      description: Retrieve all default system templates
+      responses:
+        '200':
+          description: Default templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateInfo'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Templates
+      summary: Reset to defaults
+      description: Reset all templates to default values or restore specific defaults
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                categories:
+                  type: array
+                  items:
+                    type: string
+                    enum: [enhancement, question_generation, mock_responses, system_prompts]
+                  description: Specific categories to reset (if not provided, resets all)
+      responses:
+        '200':
+          description: Templates reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Templates reset to defaults successfully
+                  resetCount:
+                    type: integer
+                    description: Number of templates reset
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/export:
+    post:
+      tags:
+        - Templates
+      summary: Export templates
+      description: Export templates in various formats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateIds:
+                  type: array
+                  items:
+                    type: string
+                  description: Specific template IDs to export (if not provided, exports all)
+                format:
+                  type: string
+                  enum: [json, yaml]
+                  default: json
+                  description: Export format
+                includeHistory:
+                  type: boolean
+                  default: false
+                  description: Include version history in export
+      responses:
+        '200':
+          description: Templates exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateExport'
+            application/x-yaml:
+              schema:
+                type: string
+        '400':
+          description: Invalid export parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/import:
+    post:
+      tags:
+        - Templates
+      summary: Import templates
+      description: Import templates from exported data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateImport'
+          application/x-yaml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Templates imported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Templates imported successfully
+                  importedCount:
+                    type: integer
+                    description: Number of templates imported
+                  skippedCount:
+                    type: integer
+                    description: Number of templates skipped due to conflicts
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: Import errors if any
+        '400':
+          description: Invalid import data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # System Endpoints
   /system/status:
     get:
@@ -1291,6 +1950,421 @@ components:
           type: boolean
           description: Whether there are previous pages
 
+    # Template Schemas
+    TemplateInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique template identifier
+        category:
+          type: string
+          enum: [enhancement, question_generation, mock_responses, system_prompts, custom]
+          description: Template category
+        key:
+          type: string
+          description: Template key within category
+        name:
+          type: string
+          description: Human-readable template name
+        description:
+          type: string
+          description: Template description
+        isActive:
+          type: boolean
+          description: Whether template is active
+        isDefault:
+          type: boolean
+          description: Whether this is a default system template
+        version:
+          type: integer
+          description: Current version number
+        usageCount:
+          type: integer
+          description: Number of times template has been used
+        lastModified:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+        createdBy:
+          type: string
+          description: Username of template creator
+        updatedBy:
+          type: string
+          description: Username of last modifier
+
+    TemplateDetail:
+      allOf:
+        - $ref: '#/components/schemas/TemplateInfo'
+        - type: object
+          properties:
+            content:
+              type: string
+              description: Template content with variable placeholders
+            variables:
+              type: array
+              items:
+                $ref: '#/components/schemas/TemplateVariable'
+              description: Template variables
+            metadata:
+              type: object
+              description: Additional template metadata
+              properties:
+                providerOptimized:
+                  type: array
+                  items:
+                    type: string
+                  description: LLM providers this template is optimized for
+                taskTypes:
+                  type: array
+                  items:
+                    type: string
+                  description: Task types this template supports
+                complexityLevel:
+                  type: string
+                  enum: [basic, intermediate, advanced]
+                  description: Template complexity level
+
+    TemplateVariable:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Variable name (without braces)
+        type:
+          type: string
+          enum: [string, number, boolean, array, object]
+          description: Variable data type
+        description:
+          type: string
+          description: Variable description
+        required:
+          type: boolean
+          description: Whether variable is required
+        defaultValue:
+          description: Default value for the variable
+        validation:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationRule'
+          description: Validation rules for the variable
+
+    ValidationRule:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [minLength, maxLength, pattern, min, max, enum]
+          description: Validation rule type
+        value:
+          description: Validation rule value
+        message:
+          type: string
+          description: Custom validation error message
+
+    CreateTemplateRequest:
+      type: object
+      required:
+        - category
+        - key
+        - name
+        - content
+      properties:
+        category:
+          type: string
+          enum: [enhancement, question_generation, mock_responses, system_prompts, custom]
+          description: Template category
+        key:
+          type: string
+          description: Unique key within category
+        name:
+          type: string
+          description: Human-readable template name
+        description:
+          type: string
+          description: Template description
+        content:
+          type: string
+          description: Template content with variable placeholders
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateVariable'
+          description: Template variables
+        metadata:
+          type: object
+          description: Additional template metadata
+
+    UpdateTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable template name
+        description:
+          type: string
+          description: Template description
+        content:
+          type: string
+          description: Template content with variable placeholders
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateVariable'
+          description: Template variables
+        metadata:
+          type: object
+          description: Additional template metadata
+        changeMessage:
+          type: string
+          description: Description of changes made
+
+    ValidationResult:
+      type: object
+      properties:
+        isValid:
+          type: boolean
+          description: Whether template is valid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          description: Validation errors
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationWarning'
+          description: Validation warnings
+
+    ValidationError:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [SYNTAX_ERROR, MISSING_VARIABLE, INVALID_VARIABLE, SECURITY_VIOLATION]
+          description: Error type
+        message:
+          type: string
+          description: Error message
+        line:
+          type: integer
+          description: Line number where error occurs
+        column:
+          type: integer
+          description: Column number where error occurs
+        suggestion:
+          type: string
+          description: Suggested fix for the error
+
+    ValidationWarning:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [UNUSED_VARIABLE, PERFORMANCE, BEST_PRACTICE]
+          description: Warning type
+        message:
+          type: string
+          description: Warning message
+        suggestion:
+          type: string
+          description: Suggested improvement
+
+    TemplateTestRequest:
+      type: object
+      properties:
+        testData:
+          type: object
+          description: Variable values for testing
+          additionalProperties:
+            description: Variable values
+        provider:
+          type: string
+          description: Target LLM provider for testing
+        options:
+          type: object
+          description: Additional test options
+
+    TemplateTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether test was successful
+        renderedContent:
+          type: string
+          description: Template content with variables substituted
+        executionTime:
+          type: number
+          description: Template rendering time in milliseconds
+        errors:
+          type: array
+          items:
+            type: string
+          description: Test errors if any
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Test warnings if any
+        providerResponse:
+          type: object
+          description: LLM provider response if tested
+
+    TemplateVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Version identifier
+        templateId:
+          type: string
+          description: Parent template ID
+        versionNumber:
+          type: integer
+          description: Version number
+        content:
+          type: string
+          description: Template content at this version
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateVariable'
+          description: Template variables at this version
+        metadata:
+          type: object
+          description: Template metadata at this version
+        changeMessage:
+          type: string
+          description: Description of changes in this version
+        createdAt:
+          type: string
+          format: date-time
+          description: Version creation timestamp
+        createdBy:
+          type: string
+          description: Username of version creator
+
+    TemplateAnalytics:
+      type: object
+      properties:
+        templateId:
+          type: string
+          description: Template ID
+        timeRange:
+          type: string
+          description: Analytics time range
+        usageStats:
+          $ref: '#/components/schemas/UsageStats'
+        performanceMetrics:
+          $ref: '#/components/schemas/PerformanceMetrics'
+        trends:
+          type: object
+          description: Usage and performance trends
+
+    UsageStats:
+      type: object
+      properties:
+        totalUsage:
+          type: integer
+          description: Total number of times template was used
+        uniqueUsers:
+          type: integer
+          description: Number of unique users who used the template
+        averageUsagePerDay:
+          type: number
+          description: Average daily usage
+        peakUsageDay:
+          type: string
+          format: date
+          description: Day with highest usage
+        usageByProvider:
+          type: object
+          description: Usage breakdown by LLM provider
+          additionalProperties:
+            type: integer
+
+    PerformanceMetrics:
+      type: object
+      properties:
+        averageRenderTime:
+          type: number
+          description: Average template rendering time in milliseconds
+        successRate:
+          type: number
+          description: Success rate as percentage (0-100)
+        errorRate:
+          type: number
+          description: Error rate as percentage (0-100)
+        averageResponseTime:
+          type: number
+          description: Average LLM response time in milliseconds
+        qualityScore:
+          type: number
+          description: Template quality score (0-100)
+
+    TemplateCategory:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [enhancement, question_generation, mock_responses, system_prompts, custom]
+          description: Category name
+        displayName:
+          type: string
+          description: Human-readable category name
+        description:
+          type: string
+          description: Category description
+        templateCount:
+          type: integer
+          description: Number of templates in this category
+        activeCount:
+          type: integer
+          description: Number of active templates in this category
+
+    TemplateExport:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Export format version
+        exportedAt:
+          type: string
+          format: date-time
+          description: Export timestamp
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateDetail'
+          description: Exported templates
+        metadata:
+          type: object
+          description: Export metadata
+
+    TemplateImport:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Import format version
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateDetail'
+          description: Templates to import
+        options:
+          type: object
+          properties:
+            overwriteExisting:
+              type: boolean
+              default: false
+              description: Whether to overwrite existing templates
+            preserveIds:
+              type: boolean
+              default: false
+              description: Whether to preserve template IDs from import
+
     # Error Schema
     ErrorResponse:
       type: object
@@ -1319,6 +2393,8 @@ tags:
     description: User authentication and session management
   - name: Prompts
     description: Prompt library management operations
+  - name: Templates
+    description: LLM prompt template management and customization
   - name: Connections
     description: LLM provider connection management
   - name: System

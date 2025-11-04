@@ -15,10 +15,12 @@ import {
 import {
   Dashboard as DashboardIcon,
   CloudSync as CloudSyncIcon,
+  Description as DescriptionIcon,
 } from '@mui/icons-material';
 
 import { ProviderManagementPage } from './ProviderManagementPage';
 import { AdminDashboard } from './AdminDashboard';
+import { PromptTemplatesPage } from './PromptTemplatesPage';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ export const AdminPage: React.FC = () => {
   const adminSections = [
     { path: '/admin', label: 'Dashboard', icon: <DashboardIcon /> },
     { path: '/admin/providers', label: 'Providers', icon: <CloudSyncIcon /> },
+    { path: '/admin/prompt-templates', label: 'Prompt Templates', icon: <DescriptionIcon /> },
   ];
 
   // Get current section based on path
@@ -35,6 +38,7 @@ export const AdminPage: React.FC = () => {
     const path = location.pathname;
     if (path === '/admin' || path === '/admin/') return 0;
     if (path.startsWith('/admin/providers')) return 1;
+    if (path.startsWith('/admin/prompt-templates')) return 2;
     return 0;
   };
 
@@ -66,6 +70,7 @@ export const AdminPage: React.FC = () => {
       <Routes>
         <Route path="/" element={<AdminDashboard />} />
         <Route path="/providers/*" element={<ProviderManagementPage />} />
+        <Route path="/prompt-templates/*" element={<PromptTemplatesPage />} />
       </Routes>
     </Box>
   );

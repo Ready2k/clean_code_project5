@@ -69,7 +69,14 @@ export enum Permission {
   EXPORT_PROMPTS = 'export:prompts',
   ADMIN_USERS = 'admin:users',
   SYSTEM_CONFIG = 'system:config',
-  VIEW_SYSTEM = 'view:system'
+  VIEW_SYSTEM = 'view:system',
+  // Template Management Permissions
+  READ_TEMPLATES = 'read:templates',
+  WRITE_TEMPLATES = 'write:templates',
+  DELETE_TEMPLATES = 'delete:templates',
+  TEST_TEMPLATES = 'test:templates',
+  MANAGE_TEMPLATE_VERSIONS = 'manage:template_versions',
+  VIEW_TEMPLATE_ANALYTICS = 'view:template_analytics'
 }
 
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
@@ -83,7 +90,14 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.EXPORT_PROMPTS,
     Permission.ADMIN_USERS,
     Permission.SYSTEM_CONFIG,
-    Permission.VIEW_SYSTEM
+    Permission.VIEW_SYSTEM,
+    // Template Management - Full Access
+    Permission.READ_TEMPLATES,
+    Permission.WRITE_TEMPLATES,
+    Permission.DELETE_TEMPLATES,
+    Permission.TEST_TEMPLATES,
+    Permission.MANAGE_TEMPLATE_VERSIONS,
+    Permission.VIEW_TEMPLATE_ANALYTICS
   ],
   user: [
     Permission.READ_PROMPTS,
@@ -92,12 +106,19 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.MANAGE_CONNECTIONS,
     Permission.RATE_PROMPTS,
     Permission.EXPORT_PROMPTS,
-    Permission.VIEW_SYSTEM
+    Permission.VIEW_SYSTEM,
+    // Template Management - Limited Access
+    Permission.READ_TEMPLATES,
+    Permission.TEST_TEMPLATES,
+    Permission.VIEW_TEMPLATE_ANALYTICS
   ],
   viewer: [
     Permission.READ_PROMPTS,
     Permission.RATE_PROMPTS,
-    Permission.VIEW_SYSTEM
+    Permission.VIEW_SYSTEM,
+    // Template Management - Read Only
+    Permission.READ_TEMPLATES,
+    Permission.VIEW_TEMPLATE_ANALYTICS
   ]
 };
 

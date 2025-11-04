@@ -158,6 +158,10 @@ export class APIDocumentationService {
             description: 'Prompt management operations'
           },
           {
+            name: 'Templates',
+            description: 'LLM prompt template management and customization'
+          },
+          {
             name: 'Export',
             description: 'Export and integration operations'
           },
@@ -302,6 +306,193 @@ export class APIDocumentationService {
         permissions: ['export:prompts']
       },
 
+      // Template endpoints
+      {
+        method: 'GET',
+        path: '/templates',
+        description: 'List all prompt templates with optional filtering',
+        parameters: {
+          category: { type: 'string', required: false, description: 'Filter by template category (enhancement, question_generation, etc.)' },
+          search: { type: 'string', required: false, description: 'Search term for template name or description' },
+          isActive: { type: 'boolean', required: false, description: 'Filter by active status' },
+          page: { type: 'number', required: false, description: 'Page number for pagination' },
+          limit: { type: 'number', required: false, description: 'Number of items per page' }
+        },
+        responses: {
+          '200': { description: 'List of templates with pagination info' }
+        },
+        authentication: true,
+        permissions: ['read:templates']
+      },
+
+      {
+        method: 'POST',
+        path: '/templates',
+        description: 'Create a new prompt template',
+        parameters: {
+          category: { type: 'string', required: true, description: 'Template category' },
+          key: { type: 'string', required: true, description: 'Unique key within category' },
+          name: { type: 'string', required: true, description: 'Human-readable template name' },
+          description: { type: 'string', required: false, description: 'Template description' },
+          content: { type: 'string', required: true, description: 'Template content with variable placeholders' },
+          variables: { type: 'array', required: false, description: 'Template variables definition' }
+        },
+        responses: {
+          '201': { description: 'Template created successfully' },
+          '400': { description: 'Validation error' }
+        },
+        authentication: true,
+        permissions: ['write:templates']
+      },
+
+      {
+        method: 'GET',
+        path: '/templates/{id}',
+        description: 'Get detailed information about a specific template',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' }
+        },
+        responses: {
+          '200': { description: 'Template details including content and variables' },
+          '404': { description: 'Template not found' }
+        },
+        authentication: true,
+        permissions: ['read:templates']
+      },
+
+      {
+        method: 'PUT',
+        path: '/templates/{id}',
+        description: 'Update an existing template',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' },
+          name: { type: 'string', required: false, description: 'Updated template name' },
+          description: { type: 'string', required: false, description: 'Updated description' },
+          content: { type: 'string', required: false, description: 'Updated template content' },
+          variables: { type: 'array', required: false, description: 'Updated variables definition' },
+          changeMessage: { type: 'string', required: false, description: 'Description of changes made' }
+        },
+        responses: {
+          '200': { description: 'Template updated successfully' },
+          '400': { description: 'Validation error' },
+          '404': { description: 'Template not found' }
+        },
+        authentication: true,
+        permissions: ['write:templates']
+      },
+
+      {
+        method: 'POST',
+        path: '/templates/{id}/test',
+        description: 'Test template rendering with sample data',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' },
+          testData: { type: 'object', required: true, description: 'Variable values for testing' },
+          provider: { type: 'string', required: false, description: 'Target LLM provider for testing' }
+        },
+        responses: {
+          '200': { description: 'Template test results including rendered content' },
+          '400': { description: 'Invalid test data' },
+          '404': { description: 'Template not found' }
+        },
+        authentication: true,
+        permissions: ['test:templates']
+      },
+
+      {
+        method: 'GET',
+        path: '/templates/{id}/analytics',
+        description: 'Get template usage statistics and performance metrics',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' },
+          timeRange: { type: 'string', required: false, description: 'Time range for analytics (1d, 7d, 30d, 90d, 1y)' }
+        },
+        responses: {
+          '200': { description: 'Template analytics including usage stats and performance metrics' },
+          '404': { description: 'Template not found' }
+        },
+        authentication: true,
+        permissions: ['read:analytics']
+      },
+
+      {
+        method: 'GET',
+        path: '/templates/{id}/history',
+        description: 'Get template version history',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' },
+          page: { type: 'number', required: false, description: 'Page number for pagination' },
+          limit: { type: 'number', required: false, description: 'Number of versions per page' }
+        },
+        responses: {
+          '200': { description: 'Template version history with pagination' },
+          '404': { description: 'Template not found' }
+        },
+        authentication: true,
+        permissions: ['read:templates']
+      },
+
+      {
+        method: 'POST',
+        path: '/templates/{id}/revert/{version}',
+        description: 'Revert template to a previous version',
+        parameters: {
+          id: { type: 'string', required: true, description: 'Template ID' },
+          version: { type: 'number', required: true, description: 'Version number to revert to' }
+        },
+        responses: {
+          '200': { description: 'Template reverted successfully' },
+          '400': { description: 'Invalid version number' },
+          '404': { description: 'Template or version not found' }
+        },
+        authentication: true,
+        permissions: ['write:templates']
+      },
+
+      {
+        method: 'GET',
+        path: '/templates/categories',
+        description: 'Get all available template categories with counts',
+        responses: {
+          '200': { description: 'List of template categories with template counts' }
+        },
+        authentication: true,
+        permissions: ['read:templates']
+      },
+
+      {
+        method: 'POST',
+        path: '/templates/export',
+        description: 'Export templates in various formats',
+        parameters: {
+          templateIds: { type: 'array', required: false, description: 'Specific template IDs to export (if not provided, exports all)' },
+          format: { type: 'string', required: false, description: 'Export format (json, yaml)' },
+          includeHistory: { type: 'boolean', required: false, description: 'Include version history in export' }
+        },
+        responses: {
+          '200': { description: 'Exported templates data' },
+          '400': { description: 'Invalid export parameters' }
+        },
+        authentication: true,
+        permissions: ['export:templates']
+      },
+
+      {
+        method: 'POST',
+        path: '/templates/import',
+        description: 'Import templates from exported data',
+        parameters: {
+          templates: { type: 'array', required: true, description: 'Templates to import' },
+          overwriteExisting: { type: 'boolean', required: false, description: 'Whether to overwrite existing templates' }
+        },
+        responses: {
+          '200': { description: 'Import results with counts and errors' },
+          '400': { description: 'Invalid import data' }
+        },
+        authentication: true,
+        permissions: ['import:templates']
+      },
+
       // Connection endpoints
       {
         method: 'GET',
@@ -394,6 +585,130 @@ export class APIDocumentationService {
           substituteVariables: { type: 'boolean', default: false, description: 'Replace variable placeholders' },
           variableValues: { type: 'object', description: 'Variable values for substitution' },
           template: { type: 'string', enum: ['minimal', 'full', 'provider-ready'], default: 'full' }
+        }
+      },
+      TemplateInfo: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Unique template identifier' },
+          category: { type: 'string', enum: ['enhancement', 'question_generation', 'mock_responses', 'system_prompts', 'custom'], description: 'Template category' },
+          key: { type: 'string', description: 'Template key within category' },
+          name: { type: 'string', description: 'Human-readable template name' },
+          description: { type: 'string', description: 'Template description' },
+          isActive: { type: 'boolean', description: 'Whether template is active' },
+          isDefault: { type: 'boolean', description: 'Whether this is a default system template' },
+          version: { type: 'integer', description: 'Current version number' },
+          usageCount: { type: 'integer', description: 'Number of times template has been used' },
+          lastModified: { type: 'string', format: 'date-time', description: 'Last modification timestamp' },
+          createdBy: { type: 'string', description: 'Username of template creator' },
+          updatedBy: { type: 'string', description: 'Username of last modifier' }
+        }
+      },
+      TemplateDetail: {
+        allOf: [
+          { $ref: '#/components/schemas/TemplateInfo' },
+          {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'Template content with variable placeholders' },
+              variables: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/TemplateVariable' },
+                description: 'Template variables'
+              },
+              metadata: {
+                type: 'object',
+                properties: {
+                  providerOptimized: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'LLM providers this template is optimized for'
+                  },
+                  taskTypes: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Task types this template supports'
+                  },
+                  complexityLevel: {
+                    type: 'string',
+                    enum: ['basic', 'intermediate', 'advanced'],
+                    description: 'Template complexity level'
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      TemplateVariable: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Variable name (without braces)' },
+          type: { type: 'string', enum: ['string', 'number', 'boolean', 'array', 'object'], description: 'Variable data type' },
+          description: { type: 'string', description: 'Variable description' },
+          required: { type: 'boolean', description: 'Whether variable is required' },
+          defaultValue: { description: 'Default value for the variable' }
+        }
+      },
+      TemplateTestResult: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', description: 'Whether test was successful' },
+          renderedContent: { type: 'string', description: 'Template content with variables substituted' },
+          executionTime: { type: 'number', description: 'Template rendering time in milliseconds' },
+          errors: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Test errors if any'
+          },
+          warnings: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Test warnings if any'
+          },
+          providerResponse: {
+            type: 'object',
+            description: 'LLM provider response if tested'
+          }
+        }
+      },
+      TemplateAnalytics: {
+        type: 'object',
+        properties: {
+          templateId: { type: 'string', description: 'Template ID' },
+          timeRange: { type: 'string', description: 'Analytics time range' },
+          usageStats: {
+            type: 'object',
+            properties: {
+              totalUsage: { type: 'integer', description: 'Total number of times template was used' },
+              uniqueUsers: { type: 'integer', description: 'Number of unique users who used the template' },
+              averageUsagePerDay: { type: 'number', description: 'Average daily usage' },
+              usageByProvider: {
+                type: 'object',
+                description: 'Usage breakdown by LLM provider',
+                additionalProperties: { type: 'integer' }
+              }
+            }
+          },
+          performanceMetrics: {
+            type: 'object',
+            properties: {
+              averageRenderTime: { type: 'number', description: 'Average template rendering time in milliseconds' },
+              successRate: { type: 'number', description: 'Success rate as percentage (0-100)' },
+              errorRate: { type: 'number', description: 'Error rate as percentage (0-100)' },
+              qualityScore: { type: 'number', description: 'Template quality score (0-100)' }
+            }
+          }
+        }
+      },
+      TemplateCategory: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', enum: ['enhancement', 'question_generation', 'mock_responses', 'system_prompts', 'custom'], description: 'Category name' },
+          displayName: { type: 'string', description: 'Human-readable category name' },
+          description: { type: 'string', description: 'Category description' },
+          templateCount: { type: 'integer', description: 'Number of templates in this category' },
+          activeCount: { type: 'integer', description: 'Number of active templates in this category' }
         }
       }
     };
@@ -504,6 +819,124 @@ export class APIDocumentationService {
             'Content-Disposition': 'attachment; filename="my_prompts.zip"'
           },
           body: 'Binary ZIP archive containing exported prompts'
+        }
+      },
+      'Create Template': {
+        request: {
+          method: 'POST',
+          url: '/api/templates',
+          headers: {
+            'Authorization': 'Bearer <jwt-token>',
+            'Content-Type': 'application/json'
+          },
+          body: {
+            category: 'custom',
+            key: 'my_custom_template',
+            name: 'My Custom Template',
+            description: 'A custom template for specific use case',
+            content: 'You are a {{role}} assistant. Help the user with {{task_type}} tasks.\n\nUser request: {{user_input}}\n\nProvide a {{output_format}} response.',
+            variables: [
+              {
+                name: 'role',
+                type: 'string',
+                description: 'Assistant role',
+                required: true
+              },
+              {
+                name: 'task_type',
+                type: 'string',
+                description: 'Type of task to help with',
+                required: true
+              },
+              {
+                name: 'user_input',
+                type: 'string',
+                description: 'User input or request',
+                required: true
+              },
+              {
+                name: 'output_format',
+                type: 'string',
+                description: 'Expected output format',
+                required: false,
+                defaultValue: 'detailed'
+              }
+            ]
+          }
+        },
+        response: {
+          id: 'template-789',
+          category: 'custom',
+          key: 'my_custom_template',
+          name: 'My Custom Template',
+          description: 'A custom template for specific use case',
+          isActive: true,
+          isDefault: false,
+          version: 1,
+          usageCount: 0,
+          lastModified: '2024-01-01T00:00:00Z',
+          createdBy: 'user-123',
+          updatedBy: 'user-123'
+        }
+      },
+      'Test Template': {
+        request: {
+          method: 'POST',
+          url: '/api/templates/template-789/test',
+          headers: {
+            'Authorization': 'Bearer <jwt-token>',
+            'Content-Type': 'application/json'
+          },
+          body: {
+            testData: {
+              role: 'helpful',
+              task_type: 'code review',
+              user_input: 'Please review this Python function for best practices',
+              output_format: 'markdown'
+            },
+            provider: 'openai'
+          }
+        },
+        response: {
+          success: true,
+          renderedContent: 'You are a helpful assistant. Help the user with code review tasks.\n\nUser request: Please review this Python function for best practices\n\nProvide a markdown response.',
+          executionTime: 12.5,
+          errors: [],
+          warnings: [],
+          providerResponse: {
+            status: 'success',
+            responseTime: 1250,
+            tokenCount: 45
+          }
+        }
+      },
+      'Get Template Analytics': {
+        request: {
+          method: 'GET',
+          url: '/api/templates/template-123/analytics?timeRange=30d',
+          headers: {
+            'Authorization': 'Bearer <jwt-token>'
+          }
+        },
+        response: {
+          templateId: 'template-123',
+          timeRange: '30d',
+          usageStats: {
+            totalUsage: 1247,
+            uniqueUsers: 89,
+            averageUsagePerDay: 41.6,
+            usageByProvider: {
+              openai: 756,
+              anthropic: 321,
+              meta: 170
+            }
+          },
+          performanceMetrics: {
+            averageRenderTime: 8.3,
+            successRate: 98.7,
+            errorRate: 1.3,
+            qualityScore: 87.5
+          }
         }
       }
     };
@@ -639,6 +1072,277 @@ export class APIDocumentationService {
             },
             '404': { $ref: '#/components/responses/NotFoundError' },
             '400': { $ref: '#/components/responses/ValidationError' }
+          }
+        }
+      },
+      '/templates': {
+        get: {
+          tags: ['Templates'],
+          summary: 'List prompt templates',
+          parameters: [
+            {
+              name: 'category',
+              in: 'query',
+              schema: { 
+                type: 'string',
+                enum: ['enhancement', 'question_generation', 'mock_responses', 'system_prompts', 'custom']
+              },
+              description: 'Filter by template category'
+            },
+            {
+              name: 'search',
+              in: 'query',
+              schema: { type: 'string' },
+              description: 'Search term for template name or description'
+            },
+            {
+              name: 'isActive',
+              in: 'query',
+              schema: { type: 'boolean' },
+              description: 'Filter by active status'
+            },
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, default: 1 },
+              description: 'Page number (1-based)'
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+              description: 'Number of items per page'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Templates retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/TemplateInfo' }
+                      },
+                      pagination: {
+                        type: 'object',
+                        properties: {
+                          page: { type: 'integer' },
+                          limit: { type: 'integer' },
+                          total: { type: 'integer' },
+                          totalPages: { type: 'integer' }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            '401': { $ref: '#/components/responses/UnauthorizedError' },
+            '403': { $ref: '#/components/responses/ForbiddenError' }
+          }
+        },
+        post: {
+          tags: ['Templates'],
+          summary: 'Create new template',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['category', 'key', 'name', 'content'],
+                  properties: {
+                    category: {
+                      type: 'string',
+                      enum: ['enhancement', 'question_generation', 'mock_responses', 'system_prompts', 'custom']
+                    },
+                    key: { type: 'string' },
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    content: { type: 'string' },
+                    variables: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/TemplateVariable' }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '201': {
+              description: 'Template created successfully',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/TemplateInfo' }
+                }
+              }
+            },
+            '400': { $ref: '#/components/responses/ValidationError' },
+            '401': { $ref: '#/components/responses/UnauthorizedError' },
+            '403': { $ref: '#/components/responses/ForbiddenError' }
+          }
+        }
+      },
+      '/templates/{id}': {
+        get: {
+          tags: ['Templates'],
+          summary: 'Get template by ID',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Template ID'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Template retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/TemplateDetail' }
+                }
+              }
+            },
+            '404': { $ref: '#/components/responses/NotFoundError' },
+            '401': { $ref: '#/components/responses/UnauthorizedError' }
+          }
+        },
+        put: {
+          tags: ['Templates'],
+          summary: 'Update template',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Template ID'
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    content: { type: 'string' },
+                    variables: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/TemplateVariable' }
+                    },
+                    changeMessage: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Template updated successfully',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/TemplateDetail' }
+                }
+              }
+            },
+            '400': { $ref: '#/components/responses/ValidationError' },
+            '404': { $ref: '#/components/responses/NotFoundError' },
+            '401': { $ref: '#/components/responses/UnauthorizedError' },
+            '403': { $ref: '#/components/responses/ForbiddenError' }
+          }
+        }
+      },
+      '/templates/{id}/test': {
+        post: {
+          tags: ['Templates'],
+          summary: 'Test template',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Template ID'
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    testData: {
+                      type: 'object',
+                      description: 'Variable values for testing'
+                    },
+                    provider: {
+                      type: 'string',
+                      description: 'Target LLM provider for testing'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Template test completed',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/TemplateTestResult' }
+                }
+              }
+            },
+            '400': { $ref: '#/components/responses/ValidationError' },
+            '404': { $ref: '#/components/responses/NotFoundError' },
+            '401': { $ref: '#/components/responses/UnauthorizedError' }
+          }
+        }
+      },
+      '/templates/{id}/analytics': {
+        get: {
+          tags: ['Templates'],
+          summary: 'Get template analytics',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Template ID'
+            },
+            {
+              name: 'timeRange',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['1d', '7d', '30d', '90d', '1y'],
+                default: '30d'
+              },
+              description: 'Time range for analytics'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Analytics retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/TemplateAnalytics' }
+                }
+              }
+            },
+            '404': { $ref: '#/components/responses/NotFoundError' },
+            '401': { $ref: '#/components/responses/UnauthorizedError' }
           }
         }
       }

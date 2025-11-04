@@ -7,18 +7,16 @@ RUN apk add --no-cache curl
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production --silent
+RUN npm install --silent
 
 # Development stage
 FROM base as development
-RUN npm ci --silent
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Build stage
 FROM base as build
-RUN npm ci --silent
 COPY . .
 RUN npm run build
 

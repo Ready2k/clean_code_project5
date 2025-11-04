@@ -28,7 +28,8 @@
     "migrate:providers:dry-run": "tsx src/scripts/migrate-system-providers.ts dry-run",
     "migrate:providers:status": "tsx src/scripts/migrate-system-providers.ts status",
     "migrate:providers:validate": "tsx src/scripts/migrate-system-providers.ts validate",
-    "validate:data": "tsx src/scripts/validate-data-integrity.ts"
+    "validate:data": "tsx src/scripts/validate-data-integrity.ts",
+    "seed-templates": "tsx src/scripts/seed-templates.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.36.0",

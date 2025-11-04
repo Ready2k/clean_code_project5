@@ -575,9 +575,9 @@ export const EnhancedPromptsPage: React.FC = () => {
             <Button
               variant="outlined"
               size="small"
-              onClick={() => setShowComparison(true)}
+              onClick={() => setShowRatingFilters(!showRatingFilters)}
             >
-              Compare Ratings
+              {showRatingFilters ? 'Hide Ratings' : 'Show Ratings'}
             </Button>
             
             <Button
