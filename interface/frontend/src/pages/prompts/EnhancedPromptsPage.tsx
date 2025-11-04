@@ -40,6 +40,8 @@ import {
   clearFilters,
   loadMorePrompts,
 } from '../../store/slices/promptsSlice';
+import { renderPrompt, clearRenders } from '../../store/slices/renderingSlice';
+import { fetchConnections } from '../../store/slices/connectionsSlice';
 import {
   openExportDialog,
   openBulkExportDialog,
@@ -86,6 +88,8 @@ export const EnhancedPromptsPage: React.FC = () => {
     error,
     pagination,
   } = useAppSelector((state) => state.prompts);
+
+  const { items: connections } = useAppSelector((state) => state.connections);
 
   const [selectedPrompt, setSelectedPrompt] = React.useState<PromptRecord | null>(null);
   const [selectedVariant, setSelectedVariant] = React.useState<PromptRecord | null>(null);
@@ -246,9 +250,10 @@ export const EnhancedPromptsPage: React.FC = () => {
   // Initialize WebSocket for real-time updates
   const { addEventListener } = useWebSocket();
 
-  // Load prompts on mount and when filters change
+  // Load prompts and connections on mount and when filters change
   React.useEffect(() => {
     dispatch(fetchPrompts(filters));
+    dispatch(fetchConnections());
   }, [dispatch, filters]);
 
   // Listen for enhancement completion to refresh prompts list
@@ -371,21 +376,82 @@ export const EnhancedPromptsPage: React.FC = () => {
       // Close the quick render dialog
       setShowQuickRender(false);
 
-      // Show the advanced renderer with the selected prompt and variant
-      setSelectedPrompt(prompt);
-      setShowRenderer(true);
+      // Determine which prompt to render (variant or original)
+      const promptToRender = variant || prompt;
+      
+      // Get provider and model preferences from the selected prompt/variant
+      const metadata = promptToRender.metadata as any;
+      const preferredProvider = metadata?.tuned_for_provider;
+      const preferredModel = metadata?.preferred_model;
+
+      // Find a suitable connection
+      const availableConnections = connections.filter(conn => conn.status === 'active');
+      
+      let selectedConnection = null;
+      
+      if (preferredProvider) {
+        // Try to find a connection matching the preferred provider
+        selectedConnection = availableConnections.find(conn => 
+          conn.provider.toLowerCase() === preferredProvider.toLowerCase()
+        );
+      }
+      
+      // If no preferred provider match, use the first available connection
+      if (!selectedConnection && availableConnections.length > 0) {
+        selectedConnection = availableConnections[0];
+      }
+
+      if (!selectedConnection) {
+        setSnackbar({
+          open: true,
+          message: 'No active LLM connections available. Please configure a connection first.',
+          severity: 'error',
+        });
+        return;
+      }
+
+      // Prepare render options
+      const renderOptions = {
+        variables: variables || {},
+        ...(preferredModel && { model: preferredModel }),
+        temperature: 0.7, // Default temperature
+        maxTokens: 2000, // Default max tokens
+      };
 
       // Show info message
       setSnackbar({
         open: true,
-        message: `Opening renderer for ${variant ? `${variant.metadata.title}` : prompt.metadata.title}...`,
+        message: `Rendering ${promptToRender.metadata.title} with ${selectedConnection.name}...`,
         severity: 'info',
       });
 
-    } catch (error) {
+      // Clear any existing renders for this prompt to avoid confusion
+      dispatch(clearRenders());
+
+      // Execute the render
+      const renderResult = await dispatch(renderPrompt({
+        promptId: promptToRender.id,
+        connectionId: selectedConnection.id,
+        provider: selectedConnection.provider,
+        options: renderOptions,
+      })).unwrap();
+
+      // Show the advanced renderer with the result
+      // Use the same prompt that was rendered so the results show up
+      setSelectedPrompt(promptToRender);
+      setShowRenderer(true);
+
+      // Show success message
       setSnackbar({
         open: true,
-        message: 'Failed to open renderer',
+        message: `Render completed! Results are now displayed.`,
+        severity: 'success',
+      });
+
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to render prompt',
         severity: 'error',
       });
     }
@@ -817,7 +883,7 @@ export const EnhancedPromptsPage: React.FC = () => {
       />
 
       {/* Export Dialogs */}
-      <ExportDialog promptId={selectedPrompt?.id} />
+      <ExportDialog promptId={selectedPromptIds[0]} />
       <BulkExportDialog />
       <ShareDialog />
       <ExportHistoryDialog />

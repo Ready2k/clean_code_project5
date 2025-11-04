@@ -956,7 +956,7 @@ export const PromptsPage: React.FC = () => {
       />
 
       {/* Export Dialogs */}
-      <ExportDialog promptId={selectedPrompt?.id} />
+      <ExportDialog promptId={selectedPromptIds[0]} />
       <BulkExportDialog />
       <ShareDialog />
       <ExportHistoryDialog />

@@ -25,6 +25,8 @@ import { migrationRoutes } from './routes/migration.js';
 import logsRoutes from './routes/logs.js';
 import { authenticateToken } from './middleware/auth.js';
 import { recordMetrics, trackAPIUsage, trackSecurityEvents } from './middleware/metrics.js';
+import * as systemController from './controllers/system.js';
+import { asyncHandler } from './middleware/error-handler.js';
 import { initializePromptLibraryService, getPromptLibraryService } from './services/prompt-library-service.js';
 import { getEnhancementWorkflowService } from './services/enhancement-workflow-service.js';
 import { initializeConnectionManagementService, getConnectionManagementService } from './services/connection-management-service.js';
@@ -133,7 +135,7 @@ app.use('/api', recordMetrics);
 app.use('/api', trackAPIUsage);
 app.use('/api', trackSecurityEvents);
 
-// Health check endpoint (no auth required)
+// Health check endpoints (no auth required)
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'healthy',
@@ -142,6 +144,9 @@ app.get('/api/health', (_req, res) => {
     version: process.env['npm_package_version'] || '1.0.0'
   });
 });
+
+// Detailed system health check (no auth required for monitoring)
+app.get('/api/system/health', asyncHandler(systemController.getSystemHealth));
 
 // API routes
 app.use('/api/auth', authRoutes);

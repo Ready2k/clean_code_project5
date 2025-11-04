@@ -8,7 +8,8 @@ const router = Router();
 
 // System status and health
 router.get('/status', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemStatus));
-router.get('/health', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemHealth));
+// Health endpoint should be publicly accessible for monitoring systems
+router.get('/health', asyncHandler(systemController.getSystemHealth));
 router.get('/stats', requirePermission(Permission.VIEW_SYSTEM), asyncHandler(systemController.getSystemStats));
 
 // System configuration (admin only)

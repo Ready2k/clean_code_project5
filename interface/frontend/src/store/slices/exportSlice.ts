@@ -155,10 +155,12 @@ export const exportPrompt = createAsyncThunk(
 
       const blob = await exportAPI.exportPrompt(promptId, options);
       
+      // Generate filename
+      const filename = `prompt_${promptId}.${options.format}`;
+      
       // Create download
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         const url = window.URL.createObjectURL(blob);
-        const filename = `prompt_${promptId}.${options.format}`;
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
@@ -226,10 +228,12 @@ export const bulkExportPrompts = createAsyncThunk(
         message: 'Creating archive...'
       }));
 
+      // Generate filename
+      const filename = options.filename || `prompts_bulk_export.${options.archiveFormat || 'zip'}`;
+
       // Create download
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         const url = window.URL.createObjectURL(blob);
-        const filename = options.filename || `prompts_bulk_export.${options.archiveFormat || 'zip'}`;
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
