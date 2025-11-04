@@ -77,6 +77,10 @@ RUN mkdir -p /app/data /app/logs /app/temp && \
 # Switch to non-root user
 USER nodejs
 
+# Set environment variables for proper paths
+ENV LOGS_DIR=/app/logs
+ENV STORAGE_DIR=/app/data
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/system/health || exit 1
