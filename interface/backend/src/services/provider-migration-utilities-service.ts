@@ -130,6 +130,37 @@ export class ProviderMigrationUtilitiesService extends EventEmitter {
   }
 
   /**
+   * Helper function to safely parse JSON or return object if already parsed
+   * This handles PostgreSQL JSONB columns that are automatically parsed by the driver
+   */
+  private safeJsonParse(value: any, defaultValue: any) {
+    if (value === null || value === undefined) {
+      return defaultValue;
+    }
+    if (typeof value === 'object') {
+      return value; // Already parsed by PostgreSQL JSONB
+    }
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        logger.warn('Failed to parse JSON value in ProviderMigrationUtilitiesService:', {
+          value: typeof value === 'string' ? value.substring(0, 100) : value,
+          error: error instanceof Error ? error.message : String(error),
+          defaultValue
+        });
+        return defaultValue;
+      }
+    }
+    logger.warn('Unexpected value type in safeJsonParse:', {
+      type: typeof value,
+      value: value,
+      defaultValue
+    });
+    return defaultValue;
+  }
+
+  /**
    * Analyze existing connections and create migration plan
    */
   async createMigrationPlan(): Promise<MigrationPlan> {
@@ -1079,11 +1110,11 @@ export class ProviderMigrationUtilitiesService extends EventEmitter {
       return {
         id: row.id,
         totalConnections: row.total_connections,
-        connectionsByProvider: JSON.parse(row.connections_by_provider),
-        requiredProviders: JSON.parse(row.required_providers),
-        requiredModels: JSON.parse(row.required_models),
+        connectionsByProvider: this.safeJsonParse(row.connections_by_provider, {}),
+        requiredProviders: this.safeJsonParse(row.required_providers, []),
+        requiredModels: this.safeJsonParse(row.required_models, []),
         estimatedDuration: row.estimated_duration,
-        risks: JSON.parse(row.risks),
+        risks: this.safeJsonParse(row.risks, []),
         createdAt: row.created_at
       };
 
@@ -1113,12 +1144,12 @@ export class ProviderMigrationUtilitiesService extends EventEmitter {
         success: row.success,
         migratedConnections: row.migrated_connections,
         failedConnections: row.failed_connections,
-        createdProviders: JSON.parse(row.created_providers),
-        createdModels: JSON.parse(row.created_models),
-        errors: JSON.parse(row.errors),
-        warnings: JSON.parse(row.warnings),
+        createdProviders: this.safeJsonParse(row.created_providers, []),
+        createdModels: this.safeJsonParse(row.created_models, []),
+        errors: this.safeJsonParse(row.errors, []),
+        warnings: this.safeJsonParse(row.warnings, []),
         duration: row.duration,
-        rollbackInfo: row.rollback_info ? JSON.parse(row.rollback_info) : undefined
+        rollbackInfo: row.rollback_info ? this.safeJsonParse(row.rollback_info, null) : undefined
       };
 
     } catch (error) {

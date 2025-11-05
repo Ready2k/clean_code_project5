@@ -54,6 +54,39 @@ export class SystemPromptManager {
     };
   }
 
+  /**
+   * Helper function to safely parse JSON or return object if already parsed
+   * This handles PostgreSQL JSONB columns that are automatically parsed by the driver
+   */
+  private safeJsonParse(value: any, defaultValue: any) {
+    if (value === null || value === undefined) {
+      return defaultValue;
+    }
+    if (typeof value === 'object') {
+      return value; // Already parsed by PostgreSQL JSONB
+    }
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        // Log the error with more context for debugging
+        console.warn('Failed to parse JSON value in SystemPromptManager:', {
+          value: typeof value === 'string' ? value.substring(0, 100) : value,
+          error: error instanceof Error ? error.message : String(error),
+          defaultValue
+        });
+        return defaultValue;
+      }
+    }
+    // Handle unexpected types gracefully
+    console.warn('Unexpected value type in safeJsonParse:', {
+      type: typeof value,
+      value: value,
+      defaultValue
+    });
+    return defaultValue;
+  }
+
   // ============================================================================
   // Template Management
   // ============================================================================
@@ -776,8 +809,8 @@ export class SystemPromptManager {
         templateId: row.template_id,
         versionNumber: row.version_number,
         content: row.content,
-        variables: JSON.parse(row.variables || '[]'),
-        metadata: JSON.parse(row.metadata || '{}'),
+        variables: this.safeJsonParse(row.variables, []),
+        metadata: this.safeJsonParse(row.metadata, {}),
         changeMessage: row.change_message,
         createdAt: row.created_at,
         createdBy: row.created_by
@@ -811,8 +844,8 @@ export class SystemPromptManager {
       // Update template with version data
       const updateRequest: UpdateTemplateRequest = {
         content: versionData.content,
-        variables: JSON.parse(versionData.variables || '[]'),
-        metadata: JSON.parse(versionData.metadata || '{}'),
+        variables: this.safeJsonParse(versionData.variables, []),
+        metadata: this.safeJsonParse(versionData.metadata, {}),
         changeMessage: `Reverted to version ${version}`
       };
 
@@ -957,13 +990,26 @@ export class SystemPromptManager {
    * Get template by ID
    */
   async getTemplateById(id: string): Promise<TemplateInfo> {
-    const result = await this.db.query('SELECT * FROM prompt_templates WHERE id = $1', [id]);
+    try {
+      const result = await this.db.query('SELECT * FROM prompt_templates WHERE id = $1', [id]);
 
-    if (result.rows.length === 0) {
-      throw new NotFoundError(`Template with id '${id}' not found`);
+      if (result.rows.length === 0) {
+        throw new NotFoundError(`Template with id '${id}' not found`);
+      }
+
+      return this.mapDbRowToTemplate(result.rows[0]);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      // Log the error with context for debugging
+      console.error('Error in getTemplateById:', {
+        templateId: id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new Error(`Failed to retrieve template: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    return this.mapDbRowToTemplate(result.rows[0]);
   }
 
   /**
@@ -986,8 +1032,8 @@ export class SystemPromptManager {
       name: row.name,
       description: row.description,
       content: row.content,
-      variables: JSON.parse(row.variables || '[]'),
-      metadata: JSON.parse(row.metadata || '{}')
+      variables: this.safeJsonParse(row.variables, []),
+      metadata: this.safeJsonParse(row.metadata, {})
     };
   }
 
@@ -1002,8 +1048,8 @@ export class SystemPromptManager {
       name: row.name,
       description: row.description,
       content: row.content,
-      variables: JSON.parse(row.variables || '[]'),
-      metadata: JSON.parse(row.metadata || '{}'),
+      variables: this.safeJsonParse(row.variables, []),
+      metadata: this.safeJsonParse(row.metadata, {}),
       isActive: row.is_active,
       isDefault: row.is_default,
       version: row.version || 1,
