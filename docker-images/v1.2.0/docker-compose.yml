@@ -1,0 +1,108 @@
+# Root docker-compose.yml for the entire Prompt Library project
+# This orchestrates the complete application stack
+
+services:
+  # Core application (backend + frontend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - JWT_SECRET=${JWT_SECRET:-dev-super-secret-jwt-key-change-in-production}
+      - JWT_EXPIRES_IN=24h
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/promptlib
+      - DATABASE_SSL=false
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-416822c2c0884e36166151afd2c8b6b7d18db97d808c82bdafad12967a49d811}
+      - STORAGE_DIR=/app/data
+      - LOG_LEVEL=info
+      - FRONTEND_URL=http://localhost
+      - CORS_ORIGIN=http://localhost
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - prompt_data:/app/data
+      - app_logs:/app/logs
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis cache and session store
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=promptlib
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./interface/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./interface/docker/nginx/nginx.simple.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - prompt-library
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  prompt_data:
+    driver: local
+  app_logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  prompt-library:
+    driver: bridge

@@ -50,4 +50,11 @@ temp/
 .prompt-library/
 data/prompts/
 interface/data/prompts/
-interface/backend/data/prompts/
+interface/backend/data/prompts/# Docker image archives (too large for Git)
+docker-images/**/*.tar
+docker-images/**/*.tar.gz
+
+# Runtime data files
+interface/backend/data/
+interface/backend/logs/
+interface/backend/temp/

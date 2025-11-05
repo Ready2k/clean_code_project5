@@ -1,0 +1,12 @@
+{
+  "version": "v1.2.0",
+  "created": "2025-11-05T16:55:31Z",
+  "git_commit": "588c1d643895e9c5684a8b3e8fad01f61550f1cb",
+  "git_tag": "unknown",
+  "images": {
+    "application": "project5-app-v1.2.0.tar",
+    "dependencies": "dependencies-v1.2.0.tar"
+  },
+  "docker_compose": "docker-compose.yml",
+  "description": "LLM Prompt Templates Interface Fixes - Production Ready"
+}
