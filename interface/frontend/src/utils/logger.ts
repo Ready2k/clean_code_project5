@@ -1,193 +1,191 @@
 /**
- * Frontend logging utility
- * Provides structured logging for the frontend application
+ * Centralized logging utility for the frontend application
+ * Provides different log levels and can be configured for different environments
  */
 
 export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3
+  ERROR = 0,
+  WARN = 1,
+  INFO = 2,
+  DEBUG = 3,
+  TRACE = 4,
 }
 
-interface LogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
-  service: string;
-  environment: string;
-  url?: string;
-  userAgent?: string;
-  userId?: string;
-  sessionId?: string;
-  [key: string]: any;
+export interface LogConfig {
+  level: LogLevel;
+  enableConsole: boolean;
+  enableRemote: boolean;
+  prefix?: string;
 }
 
-class FrontendLogger {
-  private logLevel: LogLevel;
-  private service: string;
-  private environment: string;
-  private logBuffer: LogEntry[] = [];
-  private maxBufferSize = 100;
+class Logger {
+  private config: LogConfig;
+  private context: string;
 
-  constructor() {
-    this.logLevel = this.getLogLevel();
-    this.service = 'prompt-library-frontend';
-    this.environment = import.meta.env.MODE || 'development';
-    
-    // Send logs to backend periodically in production
-    if (this.environment === 'production') {
-      setInterval(() => this.flushLogs(), 30000); // Every 30 seconds
-    }
-  }
-
-  private getLogLevel(): LogLevel {
-    const level = import.meta.env.VITE_LOG_LEVEL || 'info';
-    switch (level.toLowerCase()) {
-      case 'debug': return LogLevel.DEBUG;
-      case 'info': return LogLevel.INFO;
-      case 'warn': return LogLevel.WARN;
-      case 'error': return LogLevel.ERROR;
-      default: return LogLevel.INFO;
-    }
-  }
-
-  private shouldLog(level: LogLevel): boolean {
-    return level >= this.logLevel;
-  }
-
-  private createLogEntry(level: string, message: string, meta: any = {}): LogEntry {
-    return {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      service: this.service,
-      environment: this.environment,
-      url: typeof window !== 'undefined' ? window.location.href : 'unknown',
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      ...meta
+  constructor(context: string = 'App', config?: Partial<LogConfig>) {
+    this.context = context;
+    this.config = {
+      level: this.getDefaultLogLevel(),
+      enableConsole: true,
+      enableRemote: false,
+      prefix: '🔍',
+      ...this.getGlobalConfig(),
+      ...config,
     };
   }
 
-  private log(level: LogLevel, levelName: string, message: string, meta: any = {}) {
-    if (!this.shouldLog(level)) return;
-
-    const entry = this.createLogEntry(levelName, message, meta);
-    
-    // Console output for development
-    if (this.environment === 'development') {
-      const consoleMethod = level === LogLevel.ERROR ? 'error' : 
-                           level === LogLevel.WARN ? 'warn' : 'log';
-      console[consoleMethod](`[${entry.timestamp}] [${levelName}] ${message}`, meta);
-    }
-
-    // Buffer for production logging
-    this.logBuffer.push(entry);
-    if (this.logBuffer.length > this.maxBufferSize) {
-      this.logBuffer.shift(); // Remove oldest entry
-    }
-
-    // Send critical errors immediately
-    if (level === LogLevel.ERROR && this.environment === 'production') {
-      this.sendLogEntry(entry);
-    }
-  }
-
-  private async sendLogEntry(entry: LogEntry) {
+  private getGlobalConfig(): Partial<LogConfig> {
     try {
-      await fetch('/api/v1/logs/frontend', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(entry)
-      });
+      // Dynamically import config to avoid circular dependencies
+      const { getLoggingConfig, DISABLE_ALL_LOGGING } = require('../config/logging');
+      
+      if (DISABLE_ALL_LOGGING) {
+        return {
+          level: LogLevel.ERROR,
+          enableConsole: false,
+          enableRemote: false,
+        };
+      }
+      
+      return getLoggingConfig();
     } catch (error) {
-      // Fallback to console if backend is unavailable
-      console.error('Failed to send log to backend:', error);
+      // Fallback if config is not available
+      return {};
     }
   }
 
-  private async flushLogs() {
-    if (this.logBuffer.length === 0) return;
-
-    try {
-      await fetch('/api/v1/logs/frontend/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.logBuffer)
-      });
-      this.logBuffer = []; // Clear buffer after successful send
-    } catch (error) {
-      console.error('Failed to flush logs to backend:', error);
+  private getDefaultLogLevel(): LogLevel {
+    // In development, show all logs
+    if (import.meta.env?.DEV) {
+      return LogLevel.TRACE;
     }
-  }
-
-  debug(message: string, meta?: any) {
-    this.log(LogLevel.DEBUG, 'debug', message, meta);
-  }
-
-  info(message: string, meta?: any) {
-    this.log(LogLevel.INFO, 'info', message, meta);
-  }
-
-  warn(message: string, meta?: any) {
-    this.log(LogLevel.WARN, 'warn', message, meta);
-  }
-
-  error(message: string, meta?: any) {
-    this.log(LogLevel.ERROR, 'error', message, meta);
-  }
-
-  // Performance logging
-  performance(operation: string, duration: number, meta?: any) {
-    this.info(`Performance: ${operation}`, {
-      type: 'performance',
-      operation,
-      duration,
-      ...meta
-    });
-  }
-
-  // User action logging
-  userAction(action: string, meta?: any) {
-    this.info(`User action: ${action}`, {
-      type: 'user_action',
-      action,
-      ...meta
-    });
-  }
-
-  // API call logging
-  apiCall(method: string, url: string, duration: number, status: number, meta?: any) {
-    const level = status >= 400 ? LogLevel.ERROR : LogLevel.INFO;
-    const levelName = status >= 400 ? 'error' : 'info';
     
-    this.log(level, levelName, `API ${method} ${url}`, {
-      type: 'api_call',
-      method,
-      url,
-      duration,
-      status,
-      ...meta
-    });
+    // In production, only show errors and warnings by default
+    if (import.meta.env?.PROD) {
+      return LogLevel.WARN;
+    }
+    
+    // Default to INFO for other environments
+    return LogLevel.INFO;
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    return level <= this.config.level;
+  }
+
+  private formatMessage(level: string, message: string, data?: any): string {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    const prefix = this.config.prefix || '';
+    const context = this.context ? `[${this.context}]` : '';
+    
+    let formattedMessage = `${prefix} ${timestamp} ${level} ${context} ${message}`;
+    
+    if (data) {
+      formattedMessage += ` ${JSON.stringify(data)}`;
+    }
+    
+    return formattedMessage;
+  }
+
+  private log(level: LogLevel, levelName: string, message: string, data?: any): void {
+    if (!this.shouldLog(level)) {
+      return;
+    }
+
+    if (this.config.enableConsole) {
+      const formattedMessage = this.formatMessage(levelName, message, data);
+      
+      switch (level) {
+        case LogLevel.ERROR:
+          console.error(formattedMessage);
+          break;
+        case LogLevel.WARN:
+          console.warn(formattedMessage);
+          break;
+        case LogLevel.INFO:
+          console.info(formattedMessage);
+          break;
+        case LogLevel.DEBUG:
+        case LogLevel.TRACE:
+          console.log(formattedMessage);
+          break;
+      }
+    }
+
+    // TODO: Implement remote logging if needed
+    if (this.config.enableRemote) {
+      // Send to remote logging service
+    }
+  }
+
+  error(message: string, data?: any): void {
+    this.log(LogLevel.ERROR, 'ERROR', message, data);
+  }
+
+  warn(message: string, data?: any): void {
+    this.log(LogLevel.WARN, 'WARN', message, data);
+  }
+
+  info(message: string, data?: any): void {
+    this.log(LogLevel.INFO, 'INFO', message, data);
+  }
+
+  debug(message: string, data?: any): void {
+    this.log(LogLevel.DEBUG, 'DEBUG', message, data);
+  }
+
+  trace(message: string, data?: any): void {
+    this.log(LogLevel.TRACE, 'TRACE', message, data);
+  }
+
+  // Create a child logger with additional context
+  child(context: string): Logger {
+    return new Logger(`${this.context}:${context}`, this.config);
+  }
+
+  // Update configuration
+  configure(config: Partial<LogConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 }
 
-// Create singleton instance
-export const logger = new FrontendLogger();
+// Create default logger instances for different parts of the app
+export const logger = new Logger('App');
+export const enhancementLogger = new Logger('Enhancement');
+export const apiLogger = new Logger('API');
+export const wsLogger = new Logger('WebSocket');
 
-// Export convenience functions
-export const logDebug = (message: string, meta?: any) => logger.debug(message, meta);
-export const logInfo = (message: string, meta?: any) => logger.info(message, meta);
-export const logWarn = (message: string, meta?: any) => logger.warn(message, meta);
-export const logError = (message: string, meta?: any) => logger.error(message, meta);
-export const logPerformance = (operation: string, duration: number, meta?: any) => 
-  logger.performance(operation, duration, meta);
-export const logUserAction = (action: string, meta?: any) => logger.userAction(action, meta);
-export const logApiCall = (method: string, url: string, duration: number, status: number, meta?: any) =>
-  logger.apiCall(method, url, duration, status, meta);
+// Export the Logger class for creating custom loggers
+export { Logger };
 
-export default logger;
+// Convenience function to create a logger for a specific component
+export const createLogger = (context: string, config?: Partial<LogConfig>): Logger => {
+  return new Logger(context, config);
+};
+
+// Global logging controls (accessible from browser console)
+if (typeof window !== 'undefined') {
+  (window as any).PromptLibraryLogging = {
+    setLevel: (level: LogLevel) => {
+      logger.configure({ level });
+      enhancementLogger.configure({ level });
+      apiLogger.configure({ level });
+      wsLogger.configure({ level });
+      console.log(`Logging level set to: ${LogLevel[level]}`);
+    },
+    enableConsole: (enable: boolean) => {
+      logger.configure({ enableConsole: enable });
+      enhancementLogger.configure({ enableConsole: enable });
+      apiLogger.configure({ enableConsole: enable });
+      wsLogger.configure({ enableConsole: enable });
+      console.log(`Console logging ${enable ? 'enabled' : 'disabled'}`);
+    },
+    LogLevel,
+    // Quick access to common levels
+    debug: () => (window as any).PromptLibraryLogging.setLevel(LogLevel.DEBUG),
+    info: () => (window as any).PromptLibraryLogging.setLevel(LogLevel.INFO),
+    warn: () => (window as any).PromptLibraryLogging.setLevel(LogLevel.WARN),
+    error: () => (window as any).PromptLibraryLogging.setLevel(LogLevel.ERROR),
+    silent: () => (window as any).PromptLibraryLogging.enableConsole(false),
+  };
+}

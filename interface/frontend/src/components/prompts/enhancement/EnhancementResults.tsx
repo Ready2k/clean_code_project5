@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { PromptRecord } from '../../../types/prompts';
 import { EnhancementProgress, EnhancementChange } from '../../../types/enhancement';
+import { createLogger } from '../../../utils/logger';
 
 interface EnhancementResultsProps {
   prompt: PromptRecord | null;
@@ -58,13 +59,15 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const logger = createLogger('EnhancementResults');
+
 export const EnhancementResults: React.FC<EnhancementResultsProps> = ({
   prompt,
   job,
   onApprove,
   onRestart,
 }) => {
-  console.log('🔍 EnhancementResults: Component rendering', { prompt: !!prompt, job: !!job, hasResult: !!job?.result });
+  logger.debug('Component rendering', { prompt: !!prompt, job: !!job, hasResult: !!job?.result });
   
   const [tabValue, setTabValue] = React.useState(0);
 
@@ -73,7 +76,7 @@ export const EnhancementResults: React.FC<EnhancementResultsProps> = ({
   };
 
   if (!prompt || !job || !job.result) {
-    console.log('⚠️ EnhancementResults: Missing required props', { prompt: !!prompt, job: !!job, hasResult: !!job?.result });
+    logger.warn('Missing required props', { prompt: !!prompt, job: !!job, hasResult: !!job?.result });
     return (
       <Alert severity="warning">
         No enhancement results available.
@@ -81,9 +84,9 @@ export const EnhancementResults: React.FC<EnhancementResultsProps> = ({
     );
   }
 
-  console.log('✅ EnhancementResults: All props valid, extracting result');
+  logger.debug('All props valid, extracting result');
   const { result } = job;
-  console.log('✅ EnhancementResults: Result extracted successfully', { resultType: typeof result, hasResult: !!result });
+  logger.debug('Result extracted successfully', { resultType: typeof result, hasResult: !!result });
 
   const renderChangesList = () => {
     if (!result.changes || result.changes.length === 0) {

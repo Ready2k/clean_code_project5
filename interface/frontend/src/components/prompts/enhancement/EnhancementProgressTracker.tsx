@@ -22,17 +22,20 @@ import { useAppDispatch, useAppSelector } from '../../../hooks/redux';
 import { fetchEnhancementStatus, cancelEnhancement } from '../../../store/slices/enhancementSlice';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { EnhancementProgress } from '../../../types/enhancement';
+import { createLogger } from '../../../utils/logger';
 
 interface EnhancementProgressTrackerProps {
   job: EnhancementProgress | null;
   onProgressUpdate: (progress: EnhancementProgress) => void;
 }
 
+const logger = createLogger('EnhancementProgressTracker');
+
 export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProps> = ({
   job,
   onProgressUpdate,
 }) => {
-  console.log('🔍 EnhancementProgressTracker: Component rendering', { 
+  logger.debug('Component rendering', { 
     jobId: job?.jobId, 
     status: job?.status,
     hasResult: !!job?.result 
@@ -78,7 +81,7 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
     if (!job) return;
 
     const currentJob = jobs[job.jobId];
-    console.log('🔄 EnhancementProgressTracker: Job update check', { 
+    logger.trace('Job update check', { 
       jobId: job.jobId,
       hasCurrentJob: !!currentJob,
       currentJobStatus: currentJob?.status,
@@ -86,7 +89,7 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
     });
     
     if (currentJob && currentJob !== job) {
-      console.log('📤 EnhancementProgressTracker: Sending progress update to parent', {
+      logger.debug('Sending progress update to parent', {
         status: currentJob.status,
         hasResult: !!currentJob.result
       });
@@ -109,7 +112,7 @@ export const EnhancementProgressTracker: React.FC<EnhancementProgressTrackerProp
           jobId: job.jobId,
         })).unwrap();
 
-        console.log('📤 EnhancementProgressTracker: Sending polling result to parent', {
+        logger.debug('Sending polling result to parent', {
           status: result.status,
           hasResult: !!result.result
         });

@@ -22,6 +22,7 @@ import { EnhancementInitiation } from './enhancement/EnhancementInitiation';
 import { EnhancementProgressTracker } from './enhancement/EnhancementProgressTracker';
 import { EnhancementQuestionnaire } from './enhancement/EnhancementQuestionnaire';
 import { EnhancementResults } from './enhancement/EnhancementResults';
+import { createLogger } from '../../utils/logger';
 
 interface EnhancementWorkflowDialogProps {
   open: boolean;
@@ -30,13 +31,15 @@ interface EnhancementWorkflowDialogProps {
   onApprove?: (promptId: string, enhancementResult: any) => void;
 }
 
+const logger = createLogger('EnhancementWorkflowDialog');
+
 export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps> = ({
   open,
   prompt,
   onClose,
   onApprove,
 }) => {
-  console.log('🔍 EnhancementWorkflowDialog: Rendering', { open, prompt: !!prompt });
+  logger.debug('Rendering', { open, prompt: !!prompt });
   
   const [currentStep, setCurrentStep] = React.useState(0);
   const [activeJob, setActiveJob] = React.useState<EnhancementProgress | null>(null);
@@ -44,14 +47,14 @@ export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps>
   React.useEffect(() => {
     if (!open) {
       // Reset state when dialog closes
-      console.log('🔄 EnhancementWorkflowDialog: Resetting state (dialog closed)');
+      logger.debug('Resetting state (dialog closed)');
       setCurrentStep(0);
       setActiveJob(null);
     }
   }, [open]);
 
   const handleEnhancementStarted = (jobId: string, promptId: string) => {
-    console.log('🚀 EnhancementWorkflowDialog: Enhancement started', { jobId, promptId });
+    logger.info('Enhancement started', { jobId, promptId });
     setActiveJob({
       jobId,
       promptId,
@@ -63,7 +66,7 @@ export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps>
   };
 
   const handleProgressUpdate = (progress: EnhancementProgress) => {
-    console.log('📊 EnhancementWorkflowDialog: Progress update received', { 
+    logger.debug('Progress update received', { 
       status: progress.status, 
       hasResult: !!progress.result,
       hasQuestions: !!progress.result?.questions,
@@ -74,13 +77,13 @@ export const EnhancementWorkflowDialog: React.FC<EnhancementWorkflowDialogProps>
     
     // Move to questionnaire step if questions are generated
     if (progress.status === 'generating_questions' && progress.result?.questions) {
-      console.log('❓ EnhancementWorkflowDialog: Moving to questionnaire step');
+      logger.info('Moving to questionnaire step');
       setCurrentStep(2);
     }
     
     // Move to results step if enhancement is complete
     if (progress.status === 'completed' && progress.result) {
-      console.log('✅ EnhancementWorkflowDialog: Moving to results step', { 
+      logger.info('Moving to results step', { 
         resultType: typeof progress.result,
         resultKeys: Object.keys(progress.result || {})
       });
