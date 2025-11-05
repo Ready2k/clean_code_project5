@@ -121,8 +121,11 @@ export const PromptTemplatesPage: React.FC = () => {
       {/* Template Routes */}
       <Routes>
         <Route path="/" element={<TemplateListPage />} />
+        <Route path="/editor" element={<TemplateEditorPage />} />
         <Route path="/editor/:templateId" element={<TemplateEditorPage />} />
+        <Route path="/testing" element={<TemplateTestingPage />} />
         <Route path="/testing/:templateId" element={<TemplateTestingPage />} />
+        <Route path="/analytics" element={<TemplateAnalyticsPage />} />
         <Route path="/analytics/:templateId" element={<TemplateAnalyticsPage />} />
       </Routes>
     </Box>

@@ -293,7 +293,10 @@ export class TemplateAnalyticsService {
           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY execution_time_ms) as p50_render_time,
           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY execution_time_ms) as p95_render_time,
           PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY execution_time_ms) as p99_render_time,
-          SUM(CASE WHEN success THEN 1 ELSE 0 END)::float / COUNT(*) as success_rate
+          CASE 
+            WHEN COUNT(*) > 0 THEN SUM(CASE WHEN success THEN 1 ELSE 0 END)::float / COUNT(*)
+            ELSE 0
+          END as success_rate
         FROM prompt_template_usage 
         WHERE template_id = $1 
           AND created_at BETWEEN $2 AND $3
@@ -371,7 +374,10 @@ export class TemplateAnalyticsService {
           pt.category,
           COUNT(ptu.id) as usage_count,
           AVG(ptu.execution_time_ms) as avg_render_time,
-          SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(ptu.id) as success_rate,
+          CASE 
+            WHEN COUNT(ptu.id) > 0 THEN SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(ptu.id)
+            ELSE 0
+          END as success_rate,
           COUNT(DISTINCT ptu.usage_context->>'userId') as unique_users
         FROM prompt_templates pt
         LEFT JOIN prompt_template_usage ptu ON pt.id = ptu.template_id
@@ -542,7 +548,10 @@ export class TemplateAnalyticsService {
           COUNT(*) as usage_count,
           COUNT(DISTINCT usage_context->>'userId') as unique_users,
           AVG(execution_time_ms) as avg_render_time,
-          SUM(CASE WHEN success THEN 1 ELSE 0 END)::float / COUNT(*) as success_rate
+          CASE 
+            WHEN COUNT(*) > 0 THEN SUM(CASE WHEN success THEN 1 ELSE 0 END)::float / COUNT(*)
+            ELSE 0
+          END as success_rate
         FROM prompt_template_usage
         WHERE created_at BETWEEN $1 AND $2
         GROUP BY template_id, DATE(created_at)
@@ -831,7 +840,10 @@ export class TemplateAnalyticsService {
       SELECT 
         COUNT(*) as usage,
         AVG(ptu.execution_time_ms) as avg_render_time,
-        SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(*) as success_rate
+        CASE 
+          WHEN COUNT(*) > 0 THEN SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(*)
+          ELSE 0
+        END as success_rate
       FROM prompt_template_ab_assignments pta
       JOIN prompt_template_usage ptu ON ptu.usage_context->>'userId' = pta.user_id
       WHERE pta.test_id = $1 
@@ -938,7 +950,10 @@ export class TemplateAnalyticsService {
           COUNT(ptu.id) as total_usage,
           COUNT(DISTINCT ptu.usage_context->>'userId') as unique_users,
           AVG(ptu.execution_time_ms) as avg_render_time,
-          SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(ptu.id) as success_rate
+          CASE 
+            WHEN COUNT(ptu.id) > 0 THEN SUM(CASE WHEN ptu.success THEN 1 ELSE 0 END)::float / COUNT(ptu.id)
+            ELSE 0
+          END as success_rate
         FROM prompt_templates pt
         LEFT JOIN prompt_template_usage ptu ON pt.id = ptu.template_id 
           AND ptu.created_at BETWEEN $1 AND $2

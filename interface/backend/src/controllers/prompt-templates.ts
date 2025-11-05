@@ -814,22 +814,52 @@ export const getTemplatesByCategory = async (req: Request, res: Response): Promi
  */
 export const getTemplateUsageStats = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { start, end } = req.query;
+  const { timeRange: timeRangeParam, start, end } = req.query;
 
   if (!id) {
     throw new ValidationError('Template ID is required');
   }
 
-  // Validate time range
-  const { error, value } = timeRangeSchema.validate({ start, end });
-  if (error) {
-    throw new ValidationError(
-      error.details[0]?.message || 'Invalid time range',
-      error.details[0]?.path?.[0] as string || 'unknown'
-    );
-  }
+  let timeRange: TimeRange;
 
-  const timeRange: TimeRange = value;
+  // Handle both timeRange parameter (e.g., "7d") and start/end parameters
+  if (timeRangeParam && typeof timeRangeParam === 'string') {
+    // Convert timeRange parameter to start/end dates
+    const now = new Date();
+    const endDate = new Date(now);
+    let startDate: Date;
+
+    switch (timeRangeParam) {
+      case '1d':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        throw new ValidationError('Invalid time range. Supported values: 1d, 7d, 30d, 90d');
+    }
+
+    timeRange = { start: startDate, end: endDate };
+  } else if (start && end) {
+    // Validate start/end parameters
+    const { error, value } = timeRangeSchema.validate({ start, end });
+    if (error) {
+      throw new ValidationError(
+        error.details[0]?.message || 'Invalid time range',
+        error.details[0]?.path?.[0] as string || 'unknown'
+      );
+    }
+    timeRange = value;
+  } else {
+    throw new ValidationError('Either timeRange parameter or start/end parameters are required');
+  }
 
   try {
     const systemPromptManager = getSystemPromptManager();
@@ -852,22 +882,52 @@ export const getTemplateUsageStats = async (req: Request, res: Response): Promis
  */
 export const getTemplatePerformanceMetrics = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { start, end } = req.query;
+  const { timeRange: timeRangeParam, start, end } = req.query;
 
   if (!id) {
     throw new ValidationError('Template ID is required');
   }
 
-  // Validate time range
-  const { error, value } = timeRangeSchema.validate({ start, end });
-  if (error) {
-    throw new ValidationError(
-      error.details[0]?.message || 'Invalid time range',
-      error.details[0]?.path?.[0] as string || 'unknown'
-    );
-  }
+  let timeRange: TimeRange;
 
-  const timeRange: TimeRange = value;
+  // Handle both timeRange parameter (e.g., "7d") and start/end parameters
+  if (timeRangeParam && typeof timeRangeParam === 'string') {
+    // Convert timeRange parameter to start/end dates
+    const now = new Date();
+    const endDate = new Date(now);
+    let startDate: Date;
+
+    switch (timeRangeParam) {
+      case '1d':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        throw new ValidationError('Invalid time range. Supported values: 1d, 7d, 30d, 90d');
+    }
+
+    timeRange = { start: startDate, end: endDate };
+  } else if (start && end) {
+    // Validate start/end parameters
+    const { error, value } = timeRangeSchema.validate({ start, end });
+    if (error) {
+      throw new ValidationError(
+        error.details[0]?.message || 'Invalid time range',
+        error.details[0]?.path?.[0] as string || 'unknown'
+      );
+    }
+    timeRange = value;
+  } else {
+    throw new ValidationError('Either timeRange parameter or start/end parameters are required');
+  }
 
   try {
     const systemPromptManager = getSystemPromptManager();
@@ -889,18 +949,48 @@ export const getTemplatePerformanceMetrics = async (req: Request, res: Response)
  * GET /api/admin/prompt-templates/analytics/dashboard
  */
 export const getAnalyticsDashboard = async (req: Request, res: Response): Promise<void> => {
-  const { start, end, category } = req.query;
+  const { timeRange: timeRangeParam, start, end, category } = req.query;
 
-  // Validate time range
-  const { error, value } = timeRangeSchema.validate({ start, end });
-  if (error) {
-    throw new ValidationError(
-      error.details[0]?.message || 'Invalid time range',
-      error.details[0]?.path?.[0] as string || 'unknown'
-    );
+  let timeRange: TimeRange;
+
+  // Handle both timeRange parameter (e.g., "7d") and start/end parameters
+  if (timeRangeParam && typeof timeRangeParam === 'string') {
+    // Convert timeRange parameter to start/end dates
+    const now = new Date();
+    const endDate = new Date(now);
+    let startDate: Date;
+
+    switch (timeRangeParam) {
+      case '1d':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        throw new ValidationError('Invalid time range. Supported values: 1d, 7d, 30d, 90d');
+    }
+
+    timeRange = { start: startDate, end: endDate };
+  } else if (start && end) {
+    // Validate start/end parameters
+    const { error, value } = timeRangeSchema.validate({ start, end });
+    if (error) {
+      throw new ValidationError(
+        error.details[0]?.message || 'Invalid time range',
+        error.details[0]?.path?.[0] as string || 'unknown'
+      );
+    }
+    timeRange = value;
+  } else {
+    throw new ValidationError('Either timeRange parameter or start/end parameters are required');
   }
-
-  const timeRange: TimeRange = value;
 
   try {
     const analyticsService = getTemplateAnalyticsService();
@@ -1206,22 +1296,52 @@ export const bulkDeleteTemplates = async (req: Request, res: Response): Promise<
  * GET /api/admin/prompt-templates/analytics/export
  */
 export const exportAnalytics = async (req: Request, res: Response): Promise<void> => {
-  const { start, end, category, format = 'csv' } = req.query;
+  const { timeRange: timeRangeParam, start, end, category, format = 'csv' } = req.query;
 
-  // Validate time range
-  const { error, value } = timeRangeSchema.validate({ start, end });
-  if (error) {
-    throw new ValidationError(
-      error.details[0]?.message || 'Invalid time range',
-      error.details[0]?.path?.[0] as string || 'unknown'
-    );
+  let timeRange: TimeRange;
+
+  // Handle both timeRange parameter (e.g., "7d") and start/end parameters
+  if (timeRangeParam && typeof timeRangeParam === 'string') {
+    // Convert timeRange parameter to start/end dates
+    const now = new Date();
+    const endDate = new Date(now);
+    let startDate: Date;
+
+    switch (timeRangeParam) {
+      case '1d':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        throw new ValidationError('Invalid time range. Supported values: 1d, 7d, 30d, 90d');
+    }
+
+    timeRange = { start: startDate, end: endDate };
+  } else if (start && end) {
+    // Validate start/end parameters
+    const { error, value } = timeRangeSchema.validate({ start, end });
+    if (error) {
+      throw new ValidationError(
+        error.details[0]?.message || 'Invalid time range',
+        error.details[0]?.path?.[0] as string || 'unknown'
+      );
+    }
+    timeRange = value;
+  } else {
+    throw new ValidationError('Either timeRange parameter or start/end parameters are required');
   }
 
   if (!['csv', 'json', 'xlsx'].includes(format as string)) {
     throw new ValidationError('Format must be csv, json, or xlsx');
   }
-
-  const timeRange: TimeRange = value;
 
   logger.info('Exporting analytics data', {
     timeRange,

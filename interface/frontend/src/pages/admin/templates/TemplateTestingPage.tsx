@@ -150,7 +150,8 @@ export const TemplateTestingPage: React.FC = () => {
   // Load template
   const loadTemplate = useCallback(async () => {
     if (!templateId || templateId === 'new') {
-      setError('Invalid template ID');
+      // No template selected - this is valid for the testing overview
+      setTemplate(null);
       setLoading(false);
       return;
     }
@@ -383,9 +384,42 @@ export const TemplateTestingPage: React.FC = () => {
 
   if (!template) {
     return (
-      <Alert severity="error">
-        Template not found
-      </Alert>
+      <Box>
+        <Typography variant="h5" component="h2" gutterBottom>
+          Template Testing
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Select a template to test its functionality and performance
+        </Typography>
+        
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Select Template to Test
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Choose a template from the list below or go to the Templates tab to create a new one.
+            </Typography>
+            
+            <Stack spacing={2}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/admin/prompt-templates')}
+                fullWidth
+              >
+                Browse All Templates
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/admin/prompt-templates/editor')}
+                fullWidth
+              >
+                Create New Template
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
     );
   }
 

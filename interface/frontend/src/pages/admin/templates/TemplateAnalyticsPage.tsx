@@ -239,15 +239,18 @@ export const TemplateAnalyticsPage: React.FC = () => {
     }
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number | null | undefined) => {
+    if (num == null || isNaN(num)) return '0';
     return new Intl.NumberFormat().format(num);
   };
 
-  const formatPercentage = (num: number) => {
+  const formatPercentage = (num: number | null | undefined) => {
+    if (num == null || isNaN(num)) return '0.0%';
     return `${(num * 100).toFixed(1)}%`;
   };
 
-  const formatDuration = (ms: number) => {
+  const formatDuration = (ms: number | null | undefined) => {
+    if (ms == null || isNaN(ms)) return '0.0ms';
     return `${ms.toFixed(1)}ms`;
   };
 
@@ -425,17 +428,17 @@ export const TemplateAnalyticsPage: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" fontWeight="medium">
-                                {template.score.toFixed(1)}
+                                {template.score != null && !isNaN(template.score) ? template.score.toFixed(1) : '0.0'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              {formatNumber(template.metrics.usage)}
+                              {formatNumber(template.metrics?.usage)}
                             </TableCell>
                             <TableCell>
-                              {formatDuration(template.metrics.performance)}
+                              {formatDuration(template.metrics?.performance)}
                             </TableCell>
                             <TableCell>
-                              {formatPercentage(template.metrics.successRate)}
+                              {formatPercentage(template.metrics?.successRate)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -453,13 +456,13 @@ export const TemplateAnalyticsPage: React.FC = () => {
                     Recent Activity
                   </Typography>
                   <Stack spacing={1}>
-                    {summary.recentActivity.map((activity, index) => (
+                    {(summary?.recentActivity || []).map((activity, index) => (
                       <Box key={index} sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                         <Typography variant="body2" fontWeight="medium">
-                          {activity.templateName}
+                          {activity?.templateName || 'Unknown'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {activity.action} • {new Date(activity.timestamp).toLocaleString()}
+                          {activity?.action || 'Unknown'} • {activity?.timestamp ? new Date(activity.timestamp).toLocaleString() : 'Unknown time'}
                         </Typography>
                       </Box>
                     ))}
@@ -558,7 +561,7 @@ export const TemplateAnalyticsPage: React.FC = () => {
                     Usage by Provider
                   </Typography>
                   <Stack spacing={1}>
-                    {Object.entries(usageStats.usageByProvider).map(([provider, count]) => (
+                    {Object.entries(usageStats?.usageByProvider || {}).map(([provider, count]) => (
                       <Box key={provider}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center">
                           <Typography variant="body2">{provider}</Typography>
@@ -568,7 +571,7 @@ export const TemplateAnalyticsPage: React.FC = () => {
                         </Stack>
                         <LinearProgress
                           variant="determinate"
-                          value={(count / usageStats.totalUsage) * 100}
+                          value={usageStats?.totalUsage ? (count / usageStats.totalUsage) * 100 : 0}
                           sx={{ mt: 0.5 }}
                         />
                       </Box>
@@ -612,8 +615,8 @@ export const TemplateAnalyticsPage: React.FC = () => {
                     <Box>
                       <Stack direction="row" justifyContent="space-between">
                         <Typography variant="body2">Error Rate</Typography>
-                        <Typography variant="body2" fontWeight="medium" color={performanceMetrics.errorRate > 0.05 ? 'error.main' : 'text.primary'}>
-                          {formatPercentage(performanceMetrics.errorRate)}
+                        <Typography variant="body2" fontWeight="medium" color={(performanceMetrics?.errorRate || 0) > 0.05 ? 'error.main' : 'text.primary'}>
+                          {formatPercentage(performanceMetrics?.errorRate)}
                         </Typography>
                       </Stack>
                     </Box>

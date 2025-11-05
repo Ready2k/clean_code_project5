@@ -113,7 +113,7 @@ export const TemplateEditorPage: React.FC = () => {
   const { token } = useAppSelector((state) => state.auth);
   const [searchParams] = useSearchParams();
   const isViewMode = searchParams.get('mode') === 'view';
-  const isNewTemplate = templateId === 'new';
+  const isNewTemplate = !templateId || templateId === 'new';
 
   // State
   const [template, setTemplate] = useState<TemplateInfo | null>(null);
@@ -234,14 +234,17 @@ export const TemplateEditorPage: React.FC = () => {
       setError(null);
 
       const url = isNewTemplate 
-        ? '/api/admin/prompt-templates'
-        : `/api/admin/prompt-templates/${templateId}`;
+        ? 'http://localhost:8000/api/admin/prompt-templates'
+        : `http://localhost:8000/api/admin/prompt-templates/${templateId}`;
       
       const method = isNewTemplate ? 'POST' : 'PUT';
       
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify(template),
       });
 

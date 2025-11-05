@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-11-05
+
+### Fixed
+- **LLM Prompt Templates Interface**: Resolved blank content in Editor, Testing, and Analytics tabs
+- **Analytics API**: Fixed 400/500 errors with flexible timeRange parameter support (1d, 7d, 30d, 90d)
+- **Frontend Stability**: Eliminated TypeError crashes with comprehensive null safety checks
+- **SQL Robustness**: Prevented division by zero errors in analytics queries
+- **Route Configuration**: Added missing routes for template management workflows
+
+### Enhanced
+- **User Experience**: Template creation, testing, and analytics workflows now fully functional
+- **Error Handling**: Graceful degradation when no data is available
+- **API Flexibility**: Analytics endpoints support both timeRange and start/end parameters
+- **Data Display**: Analytics dashboard shows appropriate defaults for empty datasets
+
+### Technical Improvements
+- **Defensive Programming**: Added null safety checks throughout frontend components
+- **SQL Safety**: Implemented CASE statements to prevent mathematical errors
+- **Route Handling**: Enhanced routing for admin interface navigation
+- **Parameter Validation**: Improved API parameter handling and validation
+
 ## [1.1.0] - 2025-02-10
 
 ### Security
