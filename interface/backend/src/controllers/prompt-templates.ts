@@ -403,6 +403,63 @@ export const previewTemplate = async (req: Request, res: Response): Promise<void
 };
 
 /**
+ * Preview template content without requiring a saved template
+ * POST /api/admin/prompt-templates/preview
+ */
+export const previewTemplateContent = async (req: Request, res: Response): Promise<void> => {
+  const previewSchema = Joi.object({
+    content: Joi.string().required(),
+    variables: Joi.object().required(),
+    context: Joi.object({
+      provider: Joi.string().optional(),
+      taskType: Joi.string().optional(),
+      domainKnowledge: Joi.string().optional(),
+      userContext: Joi.object().optional()
+    }).optional()
+  });
+
+  const { error, value } = previewSchema.validate(req.body);
+  if (error) {
+    throw new ValidationError(
+      error.details[0]?.message || 'Validation error',
+      error.details[0]?.path?.[0] as string || 'unknown'
+    );
+  }
+
+  const { content, variables, context } = value;
+
+  try {
+    const systemPromptManager = getSystemPromptManager();
+    
+    // Convert variables object to TemplateVariable array format
+    const templateVariables = Object.entries(variables).map(([name, value]) => ({
+      name,
+      type: 'string' as const,
+      description: `Preview variable: ${name}`,
+      required: true,
+      defaultValue: String(value)
+    }));
+
+    // Use the private renderTemplate method through a public interface
+    // We'll need to create a public method for this
+    const renderedContent = await systemPromptManager.renderTemplateContent(content, templateVariables, context);
+
+    res.json({
+      success: true,
+      data: { 
+        preview: renderedContent,
+        performance: { renderTime: 0 }, // Simple preview doesn't need performance metrics
+        warnings: []
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to preview template content:', error);
+    throw error;
+  }
+};
+
+/**
  * Test template compatibility with LLM providers
  * POST /api/admin/prompt-templates/:id/test-compatibility
  */

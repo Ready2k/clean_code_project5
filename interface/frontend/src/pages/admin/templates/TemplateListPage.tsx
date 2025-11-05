@@ -162,7 +162,7 @@ export const TemplateListPage: React.FC = () => {
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelected(templates.map(t => t.id));
+      setSelected((templates || []).map(t => t.id));
     } else {
       setSelected([]);
     }
@@ -193,7 +193,7 @@ export const TemplateListPage: React.FC = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (selected.length === 0) return;
+    if ((selected || []).length === 0) return;
     
     try {
       const response = await fetch('http://localhost:8000/api/admin/prompt-templates/bulk-delete', {
@@ -259,7 +259,7 @@ export const TemplateListPage: React.FC = () => {
     );
   }
 
-  if (loading && templates.length === 0) {
+  if (loading && (templates || []).length === 0) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -364,11 +364,11 @@ export const TemplateListPage: React.FC = () => {
       )}
 
       {/* Bulk Actions Toolbar */}
-      {selected.length > 0 && (
+      {(selected || []).length > 0 && (
         <Paper sx={{ mb: 2 }}>
           <Toolbar>
             <Typography variant="subtitle1" component="div" sx={{ flex: '1 1 100%' }}>
-              {selected.length} selected
+              {(selected || []).length} selected
             </Typography>
             <Tooltip title="Delete selected">
               <IconButton onClick={handleBulkDelete}>
@@ -387,8 +387,8 @@ export const TemplateListPage: React.FC = () => {
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={selected.length > 0 && selected.length < templates.length}
-                    checked={templates.length > 0 && selected.length === templates.length}
+                    indeterminate={(selected || []).length > 0 && (selected || []).length < (templates || []).length}
+                    checked={(templates || []).length > 0 && (selected || []).length === (templates || []).length}
                     onChange={handleSelectAll}
                   />
                 </TableCell>
@@ -402,7 +402,7 @@ export const TemplateListPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {templates.map((template) => (
+              {(templates || []).map((template) => (
                 <TableRow
                   key={template.id}
                   hover
@@ -451,7 +451,7 @@ export const TemplateListPage: React.FC = () => {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    {template.metadata.complexity_level && (
+                    {template.metadata?.complexity_level && (
                       <Chip
                         label={template.metadata.complexity_level}
                         color={COMPLEXITY_COLORS[template.metadata.complexity_level]}

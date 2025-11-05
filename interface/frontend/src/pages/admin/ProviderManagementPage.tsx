@@ -192,10 +192,10 @@ export const ProviderManagementPage: React.FC = () => {
   // Calculate health statistics
   const healthStats = React.useMemo(() => {
     const healthArray = Object.values(providerHealth);
-    const total = healthArray.length;
-    const healthy = healthArray.filter(h => h.status === 'healthy').length;
-    const degraded = healthArray.filter(h => h.status === 'degraded').length;
-    const down = healthArray.filter(h => h.status === 'down').length;
+    const total = (healthArray || []).length;
+    const healthy = (healthArray || []).filter(h => h.status === 'healthy').length;
+    const degraded = (healthArray || []).filter(h => h.status === 'degraded').length;
+    const down = (healthArray || []).filter(h => h.status === 'down').length;
     
     return { total, healthy, degraded, down };
   }, [providerHealth]);
@@ -370,7 +370,7 @@ export const ProviderManagementPage: React.FC = () => {
               Filters
             </Button>
 
-            {Object.keys(filters.providers).length > 0 && (
+            {Object.keys(filters.providers || {}).length > 0 && (
               <Button
                 variant="text"
                 onClick={() => dispatch(clearProviderFilters())}
@@ -390,7 +390,7 @@ export const ProviderManagementPage: React.FC = () => {
                   size="small"
                   onDelete={() => {
                     const newStatus = filters.providers.status?.filter(s => s !== status);
-                    handleFilterChange({ status: newStatus?.length ? newStatus : undefined });
+                    handleFilterChange({ status: (newStatus || []).length ? newStatus : undefined });
                   }}
                 />
               ))}
@@ -402,7 +402,7 @@ export const ProviderManagementPage: React.FC = () => {
                   size="small"
                   onDelete={() => {
                     const newMethods = filters.providers.authMethod?.filter(m => m !== method);
-                    handleFilterChange({ authMethod: newMethods?.length ? newMethods : undefined });
+                    handleFilterChange({ authMethod: (newMethods || []).length ? newMethods : undefined });
                   }}
                 />
               ))}

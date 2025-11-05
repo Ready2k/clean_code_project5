@@ -576,9 +576,9 @@ export const AdminDashboard: React.FC = () => {
                     <Typography variant="h6">Recent Events</Typography>
                   </Box>
                   
-                  {systemEvents.length > 0 ? (
+                  {(systemEvents || []).length > 0 ? (
                     <List dense>
-                      {systemEvents.slice(0, 5).map((event) => (
+                      {(systemEvents || []).slice(0, 5).map((event) => (
                         <ListItem key={event.id} divider>
                           <ListItemIcon>
                             {getEventIcon(event.type)}
@@ -632,7 +632,7 @@ export const AdminDashboard: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {users.map((user) => (
+                  {(users || []).map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>

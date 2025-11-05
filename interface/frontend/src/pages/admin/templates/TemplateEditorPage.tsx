@@ -185,7 +185,7 @@ export const TemplateEditorPage: React.FC = () => {
       }
 
       const data = await response.json();
-      setTemplate(data);
+      setTemplate(data.data?.template || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load template');
     } finally {
@@ -252,9 +252,9 @@ export const TemplateEditorPage: React.FC = () => {
       const savedTemplate = await response.json();
       
       if (isNewTemplate) {
-        navigate(`/admin/prompt-templates/editor/${savedTemplate.id}`);
+        navigate(`/admin/prompt-templates/editor/${savedTemplate.data?.template?.id}`);
       } else {
-        setTemplate(savedTemplate);
+        setTemplate(savedTemplate.data?.template || null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save template');
@@ -267,19 +267,42 @@ export const TemplateEditorPage: React.FC = () => {
     if (!template) return;
 
     try {
-      const response = await fetch('http://localhost:8000/api/admin/prompt-templates/preview', {
+      // For new templates, use the general preview endpoint
+      // For existing templates, use the ID-specific endpoint
+      const url = isNewTemplate 
+        ? 'http://localhost:8000/api/admin/prompt-templates/preview'
+        : `http://localhost:8000/api/admin/prompt-templates/${template.id}/preview`;
+
+      const requestBody = isNewTemplate 
+        ? {
+            content: template.content,
+            variables: template.variables.reduce((acc, v) => ({
+              ...acc,
+              [v.name]: v.defaultValue || `{{${v.name}}}`,
+            }), {}),
+            context: {
+              provider: 'openai',
+              taskType: 'general'
+            }
+          }
+        : {
+            variables: template.variables.reduce((acc, v) => ({
+              ...acc,
+              [v.name]: v.defaultValue || `{{${v.name}}}`,
+            }), {}),
+            context: {
+              provider: 'openai',
+              taskType: 'general'
+            }
+          };
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
-        body: JSON.stringify({
-          content: template.content,
-          variables: template.variables.reduce((acc, v) => ({
-            ...acc,
-            [v.name]: v.defaultValue || `{{${v.name}}}`,
-          }), {}),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -287,7 +310,7 @@ export const TemplateEditorPage: React.FC = () => {
       }
 
       const data = await response.json();
-      setPreviewContent(data.renderedContent);
+      setPreviewContent(data.data?.preview || data.renderedContent || '');
       setShowPreview(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate preview');
@@ -316,8 +339,8 @@ export const TemplateEditorPage: React.FC = () => {
     if (!template) return;
 
     const updatedVariables = editingVariable
-      ? template.variables.map(v => v.name === editingVariable.name ? variableForm : v)
-      : [...template.variables, variableForm];
+      ? (template.variables || []).map(v => v.name === editingVariable.name ? variableForm : v)
+      : [...(template.variables || []), variableForm];
 
     setTemplate({
       ...template,
@@ -352,7 +375,7 @@ export const TemplateEditorPage: React.FC = () => {
       }
 
       const revertedTemplate = await response.json();
-      setTemplate(revertedTemplate);
+      setTemplate(revertedTemplate.data?.template || null);
       setShowHistory(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revert to version');
@@ -495,11 +518,11 @@ export const TemplateEditorPage: React.FC = () => {
                 <FormControl fullWidth>
                   <InputLabel>Complexity Level</InputLabel>
                   <Select
-                    value={template.metadata.complexity_level || 'basic'}
+                    value={template.metadata?.complexity_level || 'basic'}
                     label="Complexity Level"
                     onChange={(e) => setTemplate({
                       ...template,
-                      metadata: { ...template.metadata, complexity_level: e.target.value as any }
+                      metadata: { ...(template.metadata || {}), complexity_level: e.target.value as any }
                     })}
                     disabled={isViewMode}
                   >
@@ -589,7 +612,7 @@ export const TemplateEditorPage: React.FC = () => {
               </Box>
 
               <List>
-                {template.variables.map((variable, index) => (
+                {(template.variables || []).map((variable, index) => (
                   <ListItem key={variable.name} divider>
                     <ListItemText
                       primary={
@@ -624,7 +647,7 @@ export const TemplateEditorPage: React.FC = () => {
                 ))}
               </List>
 
-              {template.variables.length === 0 && (
+              {(template.variables || []).length === 0 && (
                 <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
                   No variables defined. Add variables to make your template dynamic.
                 </Typography>
@@ -639,11 +662,11 @@ export const TemplateEditorPage: React.FC = () => {
                 <TextField
                   fullWidth
                   label="Tags (comma-separated)"
-                  value={template.metadata.tags?.join(', ') || ''}
+                  value={template.metadata?.tags?.join(', ') || ''}
                   onChange={(e) => setTemplate({
                     ...template,
                     metadata: {
-                      ...template.metadata,
+                      ...(template.metadata || {}),
                       tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
                     }
                   })}
@@ -655,11 +678,11 @@ export const TemplateEditorPage: React.FC = () => {
                 <TextField
                   fullWidth
                   label="Provider Optimized (comma-separated)"
-                  value={template.metadata.provider_optimized?.join(', ') || ''}
+                  value={template.metadata?.provider_optimized?.join(', ') || ''}
                   onChange={(e) => setTemplate({
                     ...template,
                     metadata: {
-                      ...template.metadata,
+                      ...(template.metadata || {}),
                       provider_optimized: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
                     }
                   })}

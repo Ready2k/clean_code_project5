@@ -417,13 +417,13 @@ export const TemplateTestingPage: React.FC = () => {
               </Typography>
               
               <Stack spacing={2}>
-                {template.variables.map((variable) => (
+                {(template.variables || []).map((variable) => (
                   <Box key={variable.name}>
                     {getVariableInput(variable)}
                   </Box>
                 ))}
                 
-                {template.variables.length === 0 && (
+                {(template.variables || []).length === 0 && (
                   <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
                     This template has no variables to configure.
                   </Typography>
@@ -522,13 +522,13 @@ export const TemplateTestingPage: React.FC = () => {
                       </Box>
 
                       {/* Errors */}
-                      {testResult.errors && testResult.errors.length > 0 && (
+                      {testResult.errors && (testResult.errors || []).length > 0 && (
                         <Box>
                           <Typography variant="subtitle2" color="error" gutterBottom>
                             Errors
                           </Typography>
                           <List dense>
-                            {testResult.errors.map((error, index) => (
+                            {(testResult.errors || []).map((error, index) => (
                               <ListItem key={index}>
                                 <ListItemIcon>
                                   <ErrorIcon color="error" fontSize="small" />
@@ -544,13 +544,13 @@ export const TemplateTestingPage: React.FC = () => {
                       )}
 
                       {/* Warnings */}
-                      {testResult.warnings && testResult.warnings.length > 0 && (
+                      {testResult.warnings && (testResult.warnings || []).length > 0 && (
                         <Box>
                           <Typography variant="subtitle2" color="warning.main" gutterBottom>
                             Warnings
                           </Typography>
                           <List dense>
-                            {testResult.warnings.map((warning, index) => (
+                            {(testResult.warnings || []).map((warning, index) => (
                               <ListItem key={index}>
                                 <ListItemIcon>
                                   <WarningIcon color="warning" fontSize="small" />
@@ -645,7 +645,7 @@ export const TemplateTestingPage: React.FC = () => {
       </Grid>
 
       {/* Provider Test Results */}
-      {providerResults.length > 0 && (
+      {(providerResults || []).length > 0 && (
         <Card sx={{ mt: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -664,7 +664,7 @@ export const TemplateTestingPage: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {providerResults.map((result, index) => (
+                  {(providerResults || []).map((result, index) => (
                     <TableRow key={index}>
                       <TableCell>
                         <Chip label={result.provider} />

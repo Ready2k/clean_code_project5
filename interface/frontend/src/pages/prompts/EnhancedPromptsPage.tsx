@@ -390,7 +390,7 @@ export const EnhancedPromptsPage: React.FC = () => {
       }
       
       // If no preferred provider match, use the first available connection
-      if (!selectedConnection && availableConnections.length > 0) {
+      if (!selectedConnection && (availableConnections || []).length > 0) {
         selectedConnection = availableConnections[0];
       }
 
@@ -637,7 +637,7 @@ export const EnhancedPromptsPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && groupedPrompts.length === 0 && !error && (
+      {!isLoading && (groupedPrompts || []).length === 0 && !error && (
         <Box
           display="flex"
           flexDirection="column"
@@ -649,7 +649,7 @@ export const EnhancedPromptsPage: React.FC = () => {
             No prompts found
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            {filters.search || filters.tags?.length || filters.status?.length
+            {filters.search || (filters.tags || []).length || (filters.status || []).length
               ? 'Try adjusting your filters or create a new prompt.'
               : 'Get started by creating your first prompt.'
             }
@@ -665,7 +665,7 @@ export const EnhancedPromptsPage: React.FC = () => {
       )}
 
       {/* Prompts Grid */}
-      {!isLoading && groupedPrompts.length > 0 && (
+      {!isLoading && (groupedPrompts || []).length > 0 && (
         <>
           <Grid container spacing={3}>
             {groupedPrompts.map((group: any) => (
@@ -705,7 +705,7 @@ export const EnhancedPromptsPage: React.FC = () => {
             {/* Results Summary */}
             <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
               <Typography variant="body2" color="text.secondary">
-                Showing {groupedPrompts.length} prompt groups of {pagination.total} total prompts
+                Showing {(groupedPrompts || []).length} prompt groups of {pagination.total} total prompts
               </Typography>
               {pagination.totalPages > 1 && (
                 <Typography variant="body2" color="text.secondary">
@@ -734,7 +734,7 @@ export const EnhancedPromptsPage: React.FC = () => {
                     Loading more prompts...
                   </>
                 ) : (
-                  `Load More Prompts (${pagination.total - groupedPrompts.length} remaining)`
+                  `Load More Prompts (${pagination.total - (groupedPrompts || []).length} remaining)`
                 )}
               </Button>
             )}

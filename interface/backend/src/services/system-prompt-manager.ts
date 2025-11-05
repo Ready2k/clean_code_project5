@@ -13,6 +13,7 @@ import { AppError, ValidationError, NotFoundError, ConflictError, ErrorCode } fr
 import {
   TemplateCategory,
   TemplateInfo,
+  TemplateMetadata,
   TemplateVariable,
   TemplateContext,
   TemplateFilters,
@@ -85,6 +86,29 @@ export class SystemPromptManager {
       defaultValue
     });
     return defaultValue;
+  }
+
+  /**
+   * Helper function to safely parse metadata with proper default structure
+   */
+  private safeParseMetadata(value: any): TemplateMetadata {
+    const defaultMetadata: TemplateMetadata = {
+      provider_optimized: [],
+      task_types: [],
+      complexity_level: 'basic',
+      tags: []
+    };
+
+    const parsed = this.safeJsonParse(value, defaultMetadata);
+    
+    // Ensure the parsed object has the required structure
+    return {
+      provider_optimized: parsed.provider_optimized || [],
+      task_types: parsed.task_types || [],
+      complexity_level: parsed.complexity_level || 'basic',
+      tags: parsed.tags || [],
+      ...parsed // Include any additional properties
+    };
   }
 
   // ============================================================================
@@ -439,6 +463,13 @@ export class SystemPromptManager {
     });
 
     return rendered;
+  }
+
+  /**
+   * Public method to render template content (for preview functionality)
+   */
+  async renderTemplateContent(content: string, variables: TemplateVariable[], context?: TemplateContext): Promise<string> {
+    return this.renderTemplate(content, variables, context);
   }
 
   // ============================================================================
@@ -1033,7 +1064,7 @@ export class SystemPromptManager {
       description: row.description,
       content: row.content,
       variables: this.safeJsonParse(row.variables, []),
-      metadata: this.safeJsonParse(row.metadata, {})
+      metadata: this.safeParseMetadata(row.metadata)
     };
   }
 
@@ -1049,7 +1080,7 @@ export class SystemPromptManager {
       description: row.description,
       content: row.content,
       variables: this.safeJsonParse(row.variables, []),
-      metadata: this.safeJsonParse(row.metadata, {}),
+      metadata: this.safeParseMetadata(row.metadata),
       isActive: row.is_active,
       isDefault: row.is_default,
       version: row.version || 1,

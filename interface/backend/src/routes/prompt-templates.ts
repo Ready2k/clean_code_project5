@@ -31,7 +31,7 @@ router.delete('/:id', requirePermission(Permission.ADMIN_USERS), asyncHandler(pr
 // ============================================================================
 
 router.post('/validate', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.validateTemplate));
-router.post('/preview', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.previewTemplate));
+router.post('/preview', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.previewTemplateContent));
 router.post('/test', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.testTemplate));
 router.post('/test-provider', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.testProviderCompatibility));
 router.post('/performance-test', requirePermission(Permission.ADMIN_USERS), asyncHandler(promptTemplateController.performanceTest));

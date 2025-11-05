@@ -332,12 +332,12 @@ export const PromptsPage: React.FC = () => {
       const enhancedHumanPrompt = {
         ...currentPrompt.humanPrompt,
         // Enhance the goal with system context if available
-        goal: structuredPrompt?.system?.length > 0
-          ? `${currentPrompt.humanPrompt.goal}\n\nEnhanced Instructions:\n${structuredPrompt.system.join('\n')}`
+        goal: (structuredPrompt?.system || []).length > 0
+          ? `${currentPrompt.humanPrompt.goal}\n\nEnhanced Instructions:\n${(structuredPrompt?.system || []).join('\n')}`
           : currentPrompt.humanPrompt.goal,
         // Enhance the audience description if capabilities are available
-        audience: structuredPrompt?.capabilities?.length > 0
-          ? `${currentPrompt.humanPrompt.audience}\n\nRequired Capabilities: ${structuredPrompt.capabilities.join(', ')}`
+        audience: (structuredPrompt?.capabilities || []).length > 0
+          ? `${currentPrompt.humanPrompt.audience}\n\nRequired Capabilities: ${(structuredPrompt?.capabilities || []).join(', ')}`
           : currentPrompt.humanPrompt.audience,
         // Keep original steps but add enhancement notes
         steps: [
@@ -350,14 +350,14 @@ export const PromptsPage: React.FC = () => {
         output_expectations: {
           ...currentPrompt.humanPrompt.output_expectations,
           format: structuredPrompt?.user_template
-            ? `${currentPrompt.humanPrompt.output_expectations.format}\n\nStructured Template:\n${structuredPrompt.user_template.substring(0, 200)}${structuredPrompt.user_template.length > 200 ? '...' : ''}`
+            ? `${currentPrompt.humanPrompt.output_expectations.format}\n\nStructured Template:\n${structuredPrompt.user_template.substring(0, 200)}${(structuredPrompt.user_template || '').length > 200 ? '...' : ''}`
             : currentPrompt.humanPrompt.output_expectations.format
         }
       };
 
       // Create proper variable definitions from the structured prompt
-      const enhancedVariables: Variable[] = structuredPrompt?.variables?.length > 0
-        ? structuredPrompt.variables.map((varName: string): Variable => ({
+      const enhancedVariables: Variable[] = (structuredPrompt?.variables || []).length > 0
+        ? (structuredPrompt.variables || []).map((varName: string): Variable => ({
           key: varName,
           label: varName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
           type: 'string' as const,
@@ -416,7 +416,7 @@ export const PromptsPage: React.FC = () => {
   };
 
   const handleBulkExport = () => {
-    if (selectedPromptIds.length === 0) {
+    if ((selectedPromptIds || []).length === 0) {
       setSnackbar({
         open: true,
         message: 'Please select prompts to export',
@@ -449,7 +449,7 @@ export const PromptsPage: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    const allPromptIds = filteredPrompts.map(p => p.id);
+    const allPromptIds = (filteredPrompts || []).map(p => p.id);
     dispatch(setSelectedPromptIds(allPromptIds));
   };
 
@@ -580,14 +580,14 @@ export const PromptsPage: React.FC = () => {
                 <Button
                   size="small"
                   onClick={handleSelectAll}
-                  disabled={selectedPromptIds.length === filteredPrompts.length}
+                  disabled={(selectedPromptIds || []).length === (filteredPrompts || []).length}
                 >
                   All
                 </Button>
                 <Button
                   size="small"
                   onClick={handleDeselectAll}
-                  disabled={selectedPromptIds.length === 0}
+                  disabled={(selectedPromptIds || []).length === 0}
                 >
                   None
                 </Button>
@@ -595,10 +595,10 @@ export const PromptsPage: React.FC = () => {
                   variant="outlined"
                   startIcon={<ExportIcon />}
                   onClick={handleBulkExport}
-                  disabled={selectedPromptIds.length === 0}
+                  disabled={(selectedPromptIds || []).length === 0}
                   size="small"
                 >
-                  Export ({selectedPromptIds.length})
+                  Export ({(selectedPromptIds || []).length})
                 </Button>
               </>
             )}
@@ -679,7 +679,7 @@ export const PromptsPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && filteredPrompts.length === 0 && !error && (
+      {!isLoading && (filteredPrompts || []).length === 0 && !error && (
         <Box
           display="flex"
           flexDirection="column"
@@ -693,7 +693,7 @@ export const PromptsPage: React.FC = () => {
           <Typography variant="body2" color="text.secondary" paragraph>
             {currentTab === 1
               ? 'No variants have been created yet. Render a prompt with different LLMs and save successful adaptations as variants.'
-              : filters.search || filters.tags?.length || filters.status?.length
+              : filters.search || (filters.tags || []).length || (filters.status || []).length
                 ? 'Try adjusting your filters or create a new prompt.'
                 : 'Get started by creating your first prompt.'
             }
@@ -709,10 +709,10 @@ export const PromptsPage: React.FC = () => {
       )}
 
       {/* Prompts Grid */}
-      {!isLoading && filteredPrompts.length > 0 && (
+      {!isLoading && (filteredPrompts || []).length > 0 && (
         <>
           <Grid container spacing={3}>
-            {filteredPrompts.map((prompt) => (
+            {(filteredPrompts || []).map((prompt) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={prompt.id}>
                 <PromptCard
                   prompt={prompt}
@@ -747,7 +747,7 @@ export const PromptsPage: React.FC = () => {
             {/* Results Summary */}
             <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
               <Typography variant="body2" color="text.secondary">
-                Showing {filteredPrompts.length} of {pagination.total} prompts
+                Showing {(filteredPrompts || []).length} of {pagination.total} prompts
               </Typography>
               {pagination.totalPages > 1 && (
                 <Typography variant="body2" color="text.secondary">
@@ -776,7 +776,7 @@ export const PromptsPage: React.FC = () => {
                     Loading more prompts...
                   </>
                 ) : (
-                  `Load More Prompts (${pagination.total - filteredPrompts.length} remaining)`
+                  `Load More Prompts (${pagination.total - (filteredPrompts || []).length} remaining)`
                 )}
               </Button>
             )}
