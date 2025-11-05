@@ -170,11 +170,12 @@ export const TemplateTestingPage: React.FC = () => {
       }
 
       const data = await response.json();
-      setTemplate(data);
+      const template = data.data?.template || null;
+      setTemplate(template);
       
       // Initialize test variables with default values
       const initialVariables: Record<string, any> = {};
-      data.variables.forEach((variable: TemplateVariable) => {
+      (template?.variables || []).forEach((variable: TemplateVariable) => {
         initialVariables[variable.name] = variable.defaultValue || '';
       });
       setTestVariables(initialVariables);
@@ -197,15 +198,18 @@ export const TemplateTestingPage: React.FC = () => {
       setTesting(true);
       setError(null);
 
-      const response = await fetch('http://localhost:8000/api/admin/prompt-templates/test', {
+      const response = await fetch(`http://localhost:8000/api/admin/prompt-templates/${template.id}/test`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({
-          templateId: template.id,
           variables: testVariables,
+          context: {
+            provider: selectedProvider,
+            taskType: 'general'
+          }
         }),
       });
 
@@ -214,7 +218,7 @@ export const TemplateTestingPage: React.FC = () => {
       }
 
       const result = await response.json();
-      setTestResult(result);
+      setTestResult(result.data?.result || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to test template');
     } finally {
@@ -230,16 +234,21 @@ export const TemplateTestingPage: React.FC = () => {
       setProviderTesting(true);
       setError(null);
 
-      const response = await fetch('http://localhost:8000/api/admin/prompt-templates/test-provider', {
+      const response = await fetch(`http://localhost:8000/api/admin/prompt-templates/${template.id}/test-compatibility`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({
-          provider: selectedProvider,
-          prompt: testResult.renderedContent,
-          templateId: template.id,
+          providers: [selectedProvider],
+          testData: {
+            variables: testVariables,
+            context: {
+              provider: selectedProvider,
+              taskType: 'general'
+            }
+          }
         }),
       });
 
@@ -248,7 +257,7 @@ export const TemplateTestingPage: React.FC = () => {
       }
 
       const result = await response.json();
-      setProviderResults(prev => [result, ...prev.slice(0, 4)]); // Keep last 5 results
+      setProviderResults(prev => [result.data?.results || result, ...prev.slice(0, 4)]); // Keep last 5 results
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to test with provider');
     } finally {
@@ -282,7 +291,7 @@ export const TemplateTestingPage: React.FC = () => {
       }
 
       const result = await response.json();
-      setPerformanceMetrics(result);
+      setPerformanceMetrics(result.data || result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run performance test');
     } finally {
